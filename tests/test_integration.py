@@ -7,6 +7,8 @@ import os
 import subprocess
 from subprocess import Popen, PIPE
 
+import pytest
+
 import easyila
 from easyila.guidance import Guidance, AnnoType
 from easyila.synthesis_template import *
@@ -79,6 +81,7 @@ class RvMiniModel(HwModel):
         return widths, signalvalues
 
 
+@pytest.mark.skip()
 class TestIntegration:
     def test_can_import_cvc5(self):
         """

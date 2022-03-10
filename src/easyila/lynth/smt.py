@@ -119,6 +119,8 @@ class Kind(Enum):
     Ite     = auto()
     Lambda  = auto()
     Equal   = auto()
+    Exists  = auto()
+    ForAll  = auto()
 
     def _to_cvc5(self, _cvc5_ctx):
         try:
@@ -150,6 +152,8 @@ _OP_KIND_MAPPING = {
     Kind.Ite: pycvc5.Kind.Ite,
     Kind.Lambda: pycvc5.Kind.Lambda,
     Kind.Equal: pycvc5.Kind.Equal,
+    Kind.Exists: pycvc5.Kind.Exists,
+    Kind.ForAll: pycvc5.Kind.Forall,
 }
 # ...and vice versa
 _OP_KIND_REV_MAPPING = {v: k for k, v in _OP_KIND_MAPPING.items()}
@@ -167,6 +171,8 @@ _OP_SYGUS_SYMBOLS = {
     Kind.Xor: "xor",
     Kind.Equal: "eq",
     Kind.Ite: "ite",
+    Kind.Exists: "exists",
+    Kind.ForAll: "forall",
 }
 
 
@@ -181,6 +187,8 @@ class Term(ABC):
             return Variable.from_cvc5(cvc5_term)
         elif cvc5_kind == k.Lambda:
             return LambdaTerm.from_cvc5(cvc5_term)
+        elif cvc5_kind in (k.Exists, k.Forall):
+            return QuantTerm.from_cvc5(cvc5_term)
         elif cvc5_kind == k.ConstBV:
             return BVConst.from_cvc5(cvc5_term)
         elif cvc5_kind in _OP_KIND_REV_MAPPING:
@@ -427,13 +435,74 @@ class LambdaTerm(Term):
         else:
             cvc5_kind = pycvc5.Kind.Lambda
             # TODO this needs to be tested
-            t = cvc5_ctx.solver.mkTerm(cvc5_kind, [v._to_cvc5(cvc5_ctx) for v in self.body])
+            vlist = cvc5_ctx.solver.mkTerm(pycvc5.Kind.VariableList, [p._to_cvc5() for p in self.params])
+            t = cvc5_ctx.solver.mkTerm(cvc5_kind, vlist, [v._to_cvc5(cvc5_ctx) for v in self.body])
             cvc5_ctx.terms[self] = t
             return t
 
     def to_sygus2(self):
         return "(define-fun (" + \
             " ".join([f"({p.name} {p.sort.to_sygus2()})" for p in self.params]) + ") " + \
+            self.body.sort.to_sygus2() + " " + \
+            self.body.to_sygus2() \
+            + ")"
+
+    def to_verilog_str(self):
+        raise NotImplementedError()
+
+    @property
+    def _has_children(self):
+        return True
+
+    def to_verif_dsl(self):
+        raise NotImplementedError()
+
+    def to_uclid(self):
+        return self.to_sygus2()
+        # return f"(" + \
+        #     ", ".join([f"{p.name} : {p.sort.to_uclid()}" for p in self.params]) + ") : " + \
+        #     self.body.sort.to_uclid() + " = " + \
+        #     self.body.to_uclid()
+
+
+@dataclass(frozen=True)
+class QuantTerm(Term):
+    kind: Kind
+    bound_vars: Tuple[Variable, ...]
+    body: Term
+
+    @property
+    def sort(self):
+        return BoolSort()
+
+    @staticmethod
+    def from_cvc5(cvc5_term):
+        k = cvc5_term.getKind()
+        if k not in [pycvc5.Kind.Exists, pycvc5.Kind.Forall]:
+            c_params = cvc5_term[0]
+            c_body = cvc5_term[1]
+            return QuantTerm(
+                Kind.from_cvc5(k),
+                tuple([Variable.from_cvc5(c) for c in c_params]),
+                Term.from_cvc5(c_body),
+            )
+        else:
+            raise TypeError("QuantTerm must be translated from pycvc5.Kind.Exists or Forall, instead got " + str(k))
+
+    def _to_cvc5(self, cvc5_ctx):
+        if self in cvc5_ctx.terms:
+            return cvc5_ctx.terms[self]
+        else:
+            cvc5_kind = self.kind._to_cvc5()
+            # TODO this needs to be tested
+            vlist = cvc5_ctx.solver.mkTerm(pycvc5.Kind.VariableList, [p._to_cvc5() for p in self.bound_vars])
+            t = cvc5_ctx.solver.mkTerm(cvc5_kind, vlist, [v._to_cvc5(cvc5_ctx) for v in self.body])
+            cvc5_ctx.terms[self] = t
+            return t
+
+    def to_sygus2(self):
+        return "(" + self.kind.to_sygus2() + " (" + \
+            " ".join([f"({p.name} {p.sort.to_sygus2()})" for p in self.bound_vars]) + ") " + \
             self.body.sort.to_sygus2() + " " + \
             self.body.to_sygus2() \
             + ")"

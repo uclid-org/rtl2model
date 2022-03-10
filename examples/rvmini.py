@@ -9,12 +9,15 @@ from easyila.testcase import *
 import easyila.gen_config as gen_config
 import easyila.lynth.smt as smt
 
-REPO_BASE_DIR = subprocess.run(
+REPO_BASE_DIR = "/home/jhshi/research/hwlifting/"
+"""
+subprocess.run(
     "git rev-parse --show-toplevel",
     shell=True,
     capture_output=True,
     check=True
 ).stdout.decode("utf-8").strip()
+"""
 
 BASEDIR = os.path.join(REPO_BASE_DIR, "processors/riscv-mini/")
 
@@ -32,11 +35,17 @@ class RvMiniModel(HwModel):
         return TestCase(
             xInstrWord(0, 8) * (31 * 4),    # @000 496 bytes of 0s
             xInstrWord('00000013'),         # @496 nop
-            xInstrWord(0, 8) * 3,           # @500 through 511:  more 0s
-            xInstrWord('00c586b3') * 2,     # @512 add a3, a1, a2
-            bInstrWord(f"{int(inputs[0]):0{12}b}00000000011000010011"), # @516 addi a2, x0, ???
-            bInstrWord(f"{int(inputs[1]):0{12}b}00000000010110010011"), # @520 addi a1, x0, ???
-            xInstrWord('00c586b3') * 20     # @524 (and later) add a3, a1, a2
+            xInstrWord('00000013'),         # @500 nop
+            xInstrWord('00000013'),         # @504 nop
+            xInstrWord('00000013'),         # @508 nop
+            bInstrWord(f"{int(inputs[0]):0{12}b}00000000011000010011"), # @512 addi a2, x0, ???
+            bInstrWord(f"{int(inputs[1]):0{12}b}00000000010110010011"), # @516 addi a1, x0, ???
+            xInstrWord('00c586b3') * 20     # @520 (and later) add a3, a1, a2
+            # xInstrWord(0, 8) * 3,           # @500 through 511:  more 0s
+            # xInstrWord('00c586b3') * 2,     # @512 add a3, a1, a2
+            # bInstrWord(f"{int(inputs[0]):0{12}b}00000000011000010011"), # @516 addi a2, x0, ???
+            # bInstrWord(f"{int(inputs[1]):0{12}b}00000000010110010011"), # @520 addi a1, x0, ???
+            # xInstrWord('00c586b3') * 20     # @524 (and later) add a3, a1, a2
             # a1 is x11, a2 is x12, a3 is x13
             # remember that instructions don't commit until they reach the last stage, making
             # cycle 14 (IF_PC=532) the minimum -- we can overshoot safely though since there

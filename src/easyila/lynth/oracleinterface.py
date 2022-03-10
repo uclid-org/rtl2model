@@ -44,6 +44,7 @@ class OracleInterface(ABC):
     ):
         if log_path is None:
             log_path = f"logs/oracle_{name}_call.log"
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
         self.log_path = log_path
         self.binpath = None
         self.lfun = None
@@ -83,7 +84,7 @@ class OracleInterface(ABC):
     @abstractmethod
     def apply_constraints(self, slv, fun):
         """
-        Adds constraints on the specified function within the solver instance.
+        Adds constraints on the specified candidate function within the solver instance.
         """
         raise NotImplementedError
 
@@ -147,23 +148,59 @@ class CorrectnessOracle(OracleInterface):
 
 # class DistinguishingOracle(OracleInterface):
 #     """
-#     Distinguishing oracle. The provided binary/function should
-#     see diagram on p10 of https://arxiv.org/pdf/2107.13477.pdf
-#     perhaps the distinguishing oracle should contain a correctness and
-#     i/o oracle as members?
+#     Distinguishing oracle. Given a history of I/O inputs and a candidate
+#     function, produce an input on which the candidate function defers from
+#     some other function.
 #     """
 
-#     def __init__(self, name: str, oracle) -> None:
+#     def __init__(
+#         self,
+#         name: str,
+#         in_widths: List[int],
+#         out_width: int,
+#         io_oracle_name: str,
+#         *,
+#         replay_inputs: Optional[List[Tuple[int, ...]]]=None,
+#         log_path: Optional[str]=None
+#     ):
+#         def oracle_fun(args):
+
 #         super().__init__(name, oracle)
 
 #     def invoke(self, args):
 #         return super()._invoke(args)
 
-#     # Require that function matches all existing I/O pairs
-#     def apply_constraints(self, slv, args):
-#         fun = args[self.name]
+#     def apply_constraints(self, slv, fun):
+#         """
+#         Pseudocode for the distinguishing constraint is:
+#         exists (f', O, O') . (Behave(f') and f(I) == O and f'(I) == O' and O != O'
+#         That is, there exists some other function f' that matches candidate function f
+#         on all existing inputs but differs on some input set I.
+#         """
+#         in_sorts = tuple([smt.BVSort(i) for i in self.in_widths])
+#         out_sort = smt.BVSort(self.out_width)
+#         synth_inputs = tuple([smt.Variable(f"__dist_in_{i}", s) for i, s in enumerate(in_sort)])
+#         other_fn = smt.Variable("__other_fn", smt.FunctionSort(in_sorts, out_sort))
+#         cand_out = smt.Variable("__cand_out", out_sort)
+#         other_out = smt.Variable("__other_out", out_sort)
+#         eq_terms = []
 #         for call in self.calls:
+#             in_consts = [smt.BVConst(int(i_value), i_width) for i_width, i_value in zip(self.in_widths, call.inputs)]
+#             out_const = smt.BVConst(call.output, self.out_width)
+#             fn_apply = smt.ApplyUF(other_fn, tuple(in_consts))
+#             # TODO allow python operators
+#             eq_terms.append(smt.OpTerm(smt.Kind.Equal, (fn_apply, out_const)))
+#         behave_constraint = smt.OpTerm(smt.Kind.And, tuple(eq_terms))
+#         out_neq = smt.OpTerm(smt.Kind.Not, smt.OpTerm(smt.Kind.Equal, (cand_out, other_out)))
+#         cand_call = smt.OpTerm(smt.Kind.Equal, (smt.ApplyUf(fun, synth_inputs), cand_out))
+#         other_call = smt.OpTerm(smt.Kind.Equal, (smt.ApplyUf(other_fn, synth_inputs), other_out))
+#         exists = smt.QuantTerm(
+#             smt.Kind.Exists,
+#             (other_fn, cand_out, other_out),
+#             smt.OpTerm(smt.Kind.And, (behave_constraint, cand_call, other_call, out_neq))
+#         )
 
+#         slv.add_sygus_constraint()
 
 class OracleCtx:
     """
@@ -191,6 +228,6 @@ class OracleCtx:
     #         fileh.write('\n'.join(self.call_logs))
 
     def apply_all_constraints(self, slv, oracle_map):
-        for oraclename, fun in oracle_map.items():
-            self.oracles[oraclename].apply_constraints(slv, fun)
+        for oraclename, args in oracle_map.items():
+            self.oracles[oraclename].apply_constraints(slv, args)
 

@@ -7,12 +7,15 @@ from easyila.testcase import *
 import easyila.gen_config as gen_config
 import easyila.lynth.smt as smt
 
-REPO_BASE_DIR = subprocess.run(
+REPO_BASE_DIR = "/home/jhshi/research/hwlifting/"
+"""
+subprocess.run(
     "git rev-parse --show-toplevel",
     shell=True,
     capture_output=True,
     check=True
 ).stdout.decode("utf-8").strip()
+"""
 
 BASEDIR = os.path.join(REPO_BASE_DIR, "processors/R8051/")
 

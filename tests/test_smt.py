@@ -51,6 +51,12 @@ class TestSygus:
         )
         assert lt.sort == smt.FunctionSort((bv32, bv32), bv32)
 
+    def test_quant_sort(self):
+        bv32 = smt.BVSort(32)
+        x = smt.Variable("x", bv32)
+        e = smt.QuantTerm(smt.Kind.Exists, (x,), smt.OpTerm(smt.Kind.Equal, (x, smt.BVConst(0, 32))))
+        assert e.sort == smt.BoolSort()
+
     def test_to_uclid(self):
         # TODO convert to uclid python library
         bv32 = smt.BVSort(32)

@@ -271,6 +271,24 @@ class HwModel(ABC):
         solver = self.solver
         sf = solver.synthfuns[0]
         while True:
+            print("Correctness oracle returned false, please provide more constraints: ")
+            # TODO key on names instead of just by order
+            io_o = self.o_ctx.oracles["io"]
+            replayed_inputs = io_o.next_replay_input()
+            # TODO prompt for input before anything else
+            if replayed_inputs is not None:
+                inputs = replayed_inputs
+                print("REPLAYING INPUTS:")
+                for i, v in enumerate(sf.bound_vars):
+                    print(f"- {v.name} (input {i + 1}):", inputs[i])
+            else:
+                inputs = []
+                for i, v in enumerate(sf.bound_vars):
+                    inputs.append(input(f"{v.name} (input {i + 1}): "))
+            solver.reinit_cvc5()
+            self.o_ctx.call_oracle("io", inputs)
+            self.o_ctx.oracles["io"].save_call_logs()
+
             self.o_ctx.apply_all_constraints(solver, {"io": sf})
             sr = solver.check_synth()
             if sr.is_unsat:
@@ -284,23 +302,7 @@ class HwModel(ABC):
                     print(solution.to_sygus2())
                     self.o_ctx.oracles["io"].save_call_logs()
                     break
-                else:
-                    print("Correctness oracle returned false, please provide more constraints: ")
-                    # TODO key on names instead of just by order
-                    io_o = self.o_ctx.oracles["io"]
-                    replayed_inputs = io_o.next_replay_input()
-                    if replayed_inputs is not None:
-                        inputs = replayed_inputs
-                        print("REPLAYING INPUTS:")
-                        for i, v in enumerate(sf.bound_vars):
-                            print(f"- {v.name} (input {i + 1}):", inputs[i])
-                    else:
-                        inputs = []
-                        for i, v in enumerate(sf.bound_vars):
-                            inputs.append(input(f"{v.name} (input {i + 1}): "))
-                    solver.reinit_cvc5()
-                    self.o_ctx.call_oracle("io", inputs)
-                    self.o_ctx.oracles["io"].save_call_logs()
+
             else:
                 print("Sorry, no solution found!")
                 break
