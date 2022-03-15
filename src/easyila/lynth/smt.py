@@ -19,10 +19,12 @@ class Sort(ABC):
     def from_cvc5(cvc5_sort):
         if cvc5_sort.isBitVector():
             return BVSort(cvc5_sort.getBitVectorSize())
-        if cvc5_sort.isBoolean():
+        elif cvc5_sort.isBoolean():
             return BoolSort()
-        if cvc5_sort.isFunction():
+        elif cvc5_sort.isFunction():
             return FunctionSort.from_cvc5(cvc5_sort)
+        elif cvc5_sort.isUninterpretedSort():
+            return UninterpretedSort.from_cvc5(cvc5_sort)
         raise NotImplementedError(f"Cannot convert from CVC5 sort {cvc5_sort}")
 
     @abstractmethod
@@ -63,7 +65,6 @@ class BVSort(Sort):
 
 @dataclass(frozen=True)
 class BoolSort(Sort):
-
     def _to_cvc5(self, cvc5_ctx):
         return cvc5_ctx.solver.getBooleanSort()
 
@@ -96,10 +97,32 @@ class FunctionSort(Sort):
         return "(-> " + " ".join([a.to_sygus2() for a in self.args]) + self.codomain.to_sygus2() + ")"
 
     def to_verilog_str(self):
-        raise NotImplementedError("Cannot convert FunctionSort to verilog")
+        raise NotImplementedError(f"Cannot convert {type(self).__name__} to verilog")
 
     def to_uclid(self):
-        raise NotImplementedError("Cannot convert FunctionSort to uclid")
+        raise NotImplementedError(f"Cannot convert {type(self).__name__} to uclid")
+
+@dataclass(frozen=True)
+class UninterpretedSort(Sort):
+    name: str
+
+    @staticmethod
+    def from_cvc5(cvc5_sort):
+        assert cvc5_sort.isUninterpretedSort()
+        return UninterpretedSort(cvc5_sort.getUninterpretedSortName())
+
+    def _to_cvc5(self, cvc5_ctx):
+        # TODO need to memoize?
+        return cvc5_ctx.solver.mkUninterpretedSort(self.name)
+
+    def to_sygus2(self):
+        return self.name
+
+    def to_verilog_str(self):
+        raise NotImplementedError(f"Cannot convert {type(self).__name__} to verilog")
+
+    def to_uclid(self):
+        raise NotImplementedError(f"Cannot convert {type(self).__name__} to uclid")
 
 # === END SMT Sorts ===
 
@@ -193,6 +216,8 @@ class Term(ABC):
             return BVConst.from_cvc5(cvc5_term)
         elif cvc5_kind in _OP_KIND_REV_MAPPING:
             return OpTerm.from_cvc5(cvc5_term)
+
+        # TODO what corresponds to UFTerm?
         raise NotImplementedError("Cannot convert from CVC5 term of kind " + str(cvc5_kind))
 
     @abstractmethod
@@ -231,6 +256,11 @@ class _TermMeta(ABCMeta, EnumMeta):
 
 @dataclass(frozen=True)
 class Variable(Term):
+    """
+    This class represents both variable declarations and variabl references.
+    TODO separate them?
+    """
+
     name: str
     sort: Sort
 
@@ -406,6 +436,50 @@ class OpTerm(Term):
         if self.kind == Kind.Ite:
             return "if (" + self.args[0].to_uclid() + ") then " + self.args[1].to_uclid() + " else " + self.args[2].to_uclid()
         raise NotImplementedError(self.kind)
+
+# TODO distinguish between references and declarations
+# variables and UFTerms should be referenced in the same way, but obviously declared
+# in different manners
+@dataclass(frozen=True)
+class UFTerm(Term):
+    """
+    A term representing an uninterpreted function of arbitrary arity.
+    """
+    name: str
+    sort: Sort
+    params: Tuple[Variable, ...]
+
+    @property
+    def arity(self):
+        return len(self.params)
+
+    @staticmethod
+    def from_cvc5(cvc5_term):
+        raise NotImplementedError("Cannot convert from CVC5 UF term")
+
+    def _to_cvc5(self, cvc5_ctx):
+        cvc5_ctx.solver.declareFun(
+            self.name,
+            [p.sort._to_cvc5(cvc5_ctx) for p in self.params],
+            self.sort._to_cvc5(cvc5_ctx)
+        )
+
+    def to_verilog_str(self):
+        raise NotImplementedError()
+
+    def to_sygus2(self):
+        raise NotImplementedError()
+
+    def to_verif_dsl(self):
+        raise NotImplementedError()
+
+    # @abstractmethod
+    def to_uclid(self):
+        raise NotImplementedError
+
+    @property
+    def _has_children(self):
+        return False
 
 
 @dataclass(frozen=True)

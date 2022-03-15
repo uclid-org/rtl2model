@@ -1,4 +1,5 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+import textwrap
 from typing import List, Dict
 
 import easyila.lynth.smt as smt
@@ -16,11 +17,19 @@ class Instruction:
 # models should look something like this?
 @dataclass
 class Model:
-    inputs: List[smt.Variable]
-    outputs: List[smt.Variable]
-    state: List[smt.Variable]
+    name: str
+    inputs: List[smt.Variable] = field(default_factory=list)
+    outputs: List[smt.Variable] = field(default_factory=list)
+    state: List[smt.Variable] = field(default_factory=list)
+    # TODO variables are just UFs of 0 arity -- should we treat them all the same?
+    ufs: List[smt.UFTerm] = field(default_factory=list)
     # memories: List[]
-    submodules: Dict[str, "Module"] # how do we incorporate child-ILA transitions?
+    # how do we incorporate child-ILA transitions?
+    submodules: Dict[str, "Module"] = field(default_factory=dict)
+    """
+    Same-cycle logic expressions.
+    """
+    logic: Dict[smt.Variable, smt.Term] = field(default_factory=dict)
     """
     TODO
 
@@ -30,7 +39,22 @@ class Model:
     how do we distinguish between having ILA instructions to execute vs.
     having transitions? for now, just have a default "NEXT" instruction
     """
-    instructions: Dict[str, Instruction]
+    instructions: Dict[str, Instruction] = field(default_factory=dict)
+    init_values: Dict[str, smt.BVConst] = field(default_factory=dict)
+
+    def print(self):
+        print(textwrap.dedent(f"""\
+            Model(
+                inputs={self.inputs},
+                outputs={self.outputs},
+                state={self.state},
+                ufs={self.ufs},
+                submodules={self.submodules},
+                logic={self.logic},
+                instructions={self.instructions},
+                init_values={self.init_values},
+            )
+            """))
 
 @dataclass
 class ManualModel(Model):

@@ -36,6 +36,7 @@ from pyverilog.utils import signaltype
 # import pydot
 
 # from vcd_wrapper import VcdWrapper
+from easyila.verilog import *
 
 @dataclass
 class ModuleSkeleton:
@@ -46,8 +47,8 @@ class ModuleSkeleton:
     def print(self):
         print(
             "ModuleSkeleton(" + f"\n\tin=[{', '.join(self.inputs)}]," + \
-            f"\n\tout=[{', '.join(self.outputs)}]," + \
             f"\n\tstate=[{', '.join(self.state_vars)}]" + \
+            f"\n\tout=[{', '.join(self.outputs)}]," + \
             "\n)"
         )
 
@@ -129,163 +130,105 @@ def partition(
         parents = binddict[sc]
         for p in parents:
             if p.tree is not None:
-                # should only be length 1
-                next_parents, curr_parents = [], []
-                find_direct_parent_nodes(p.tree, terms, next_parents, curr_parents)
-                print(f"next cycle parents of {signal_name}:", next_parents)
-                print(f"curr cycle parents of {signal_name}:", curr_parents)
-                if len(next_parents) != 0:
-                    next_parent_map[signal_name] = next_parents
-                    for p in next_parents:
-                        next_child_map[p].add(signal_name)
-                if len(curr_parents) != 0:
-                    curr_parent_map[signal_name] = curr_parents
-                    for p in curr_parents:
-                        curr_child_map[p].add(signal_name)
+                parents = find_direct_parent_nodes(p.tree)
+                if signaltype.isReg(terms[sc].termtype):
+                    print(f"next cycle parents of {signal_name}:", parents)
+                    p_map = next_parent_map
+                    c_map = next_child_map
+                else:
+                    print(f"curr cycle parents of {signal_name}:", parents)
+                    p_map = curr_parent_map
+                    c_map = curr_child_map
+                if len(parents) != 0:
+                    p_map[signal_name] = parents
+                    for p in parents:
+                        c_map[p].add(signal_name)
     # Sinks in the dependency graph constitute module outputs
-    # or imply internal state if they are an __rn variable
-    sinks = [s for s in all_signals if len(curr_child_map[s]) == 0]
+    sinks = {s for s in all_signals if len(curr_child_map[s]) == 0 and not len(curr_parent_map[s]) == 0}
     # `stages` contains a list of all pipeline stages we've produced, in the order that
     # we visited them in -- not necessarily their order in the pipeline
     # TODO use exprs instead of just signal names
     stages: List[ModuleSkeleton] = []
     # `stage_map` identifies the index in `stages` that a signal corresponds to
     stage_map: Dict[str, int] = {}
-    # `next_map` identifies indices in `stages` where the next value of the signal
-    # is read (i.e. used as input)
-    next_map: Dict[str, List[int]] = {}
+    # `input_map` identifies indices in `stages` where the signal is used as input
+    input_map: Dict[str, List[int]] = defaultdict(list)
+    to_visit = []
+    visited = set()
+    # First pass: start by identifying outputs (sinks), then add their parents to be
+    # traversed
     for sink in sinks:
-        if sink not in stage_map:
-            new_stage = ModuleSkeleton()
-            stage_map[sink] = len(stages)
-            stages.append(new_stage)
-        stage = stages[stage_map[sink]]
-        stage.outputs.append(sink)
+        new_stage = ModuleSkeleton()
+        stage_i = len(stages)
+        print("visit sink", sink, "at stage", stage_i)
+        stage_map[sink] = stage_i
+        stages.append(new_stage)
+        new_stage.outputs.append(sink)
         for p in curr_parent_map[sink]:
+            has_curr_parents = len(curr_parent_map[p]) == 0
+            has_next_parents = len(next_parent_map[p]) == 0
+            if has_curr_parents and not has_next_parents:
+                # If the node is a source w/ no register edges, then treat it
+                # as an input to the module
+                new_stage.inputs.append(p)
+                input_map[p].append(p)
+            else:
+                new_stage.state_vars.append(p)
+                stage_map[p] = stage_i
+                if p not in visited:
+                    to_visit.append(p)
+    for signal_name in to_visit: # TODO prune non-important signals
+        visited.add(signal_name)
+        stage_i = stage_map[signal_name]
+        print("visit state", signal_name, "at stage", stage_i)
+        stage = stages[stage_i]
+        for p in curr_parent_map[signal_name]:
             if len(curr_parent_map[p]) == 0:
                 stage.inputs.append(p)
+                input_map[p].append(stage_i)
             else:
                 stage.state_vars.append(p)
+                stage_map[p] = stage_i
+                if p not in visited:
+                    to_visit.append(p)
     return stages
 
-def maybe_scope_chain_to_str(sc):
-    if isinstance(sc, ScopeChain):
-        return repr(sc)
-    else: # pray it's a string
-        return sc
-
-def str_to_scope_chain(s):
-    return ScopeChain([ScopeLabel(l) for l in s.split(".")])
-
-def find_direct_parent_nodes(p, termdict, next_cycle=None, curr_cycle=None):
+def find_direct_parent_nodes(p, parents=None):
     """
     Traverses pyverilog expression tree `p` to find parents of the signal assigned
-    by `p`. `next_cycle` is a set of signal names where the value of the signal on
-    the NEXT cycle is a dependency of `p`, and `curr_cycle` is a set of signal names
-    where the signal value on the CURRENT cycle is a dependency of `p`.
+    by `p`. It is agnostic to whether the dependency crosses cycle boundaries; that
+    logic should be handled by the caller. Also returns the list when done.
 
-    TERMDICT is the pyverilog-generated dict mapping scope chains to internal
-    Term objects, which contain information like wire vs. reg and data width.
-
-    This function will recursively update `next_cycle` and `curr_cycle` while traversing
+    This function will recursively update `parents` while traversing
     the expression tree.
     """
-    if next_cycle is None:
-        next_cycle = []
-    if curr_cycle is None:
-        curr_cycle = []
+    if parents is None:
+        parents = []
     if isinstance(p, DFTerminal):
         # "_rnN_" wires are the value of the wire on the next timestep
         # TODO account for reassigning w/in always@ block? what if there
         # are multiple always@ blocks?
         sc_str = maybe_scope_chain_to_str(p.name)
-        td_entry = termdict[p.name]
         # print(td_entry.termtype)
-        unqualified_name = sc_str.split(".")[-1]
-        if signaltype.isReg(td_entry.termtype):
-            next_cycle.append(sc_str)
-        else:
-            curr_cycle.append(sc_str)
+        # unqualified_name = sc_str.split(".")[-1]
+        parents.append(sc_str)
     elif isinstance(p, DFIntConst):
         pass
     elif isinstance(p, DFBranch):
         assert p.condnode is not None, p.tocode()
         # always a dependency on the condition
-        find_direct_parent_nodes(p.condnode, termdict, next_cycle, curr_cycle)
+        find_direct_parent_nodes(p.condnode, parents)
         # truenode and falsenode can both be None for "if/else if/else" blocks that
         if p.truenode is not None:
-            find_parent_nodes(p.truenode, termdict, next_cycle, curr_cycle)
+            find_parent_nodes(p.truenode, parents)
         if p.falsenode is not None:
-            find_parent_nodes(p.falsenode, termdict, next_cycle, curr_cycle)
+            find_parent_nodes(p.falsenode, parents)
     elif isinstance(p, DFNotTerminal):
         # Confusingly, this nodes syntactic "children" are actually its parents in the
         # dependency graph
         for c in p.children():
             assert c is not None
-            find_direct_parent_nodes(c, termdict, next_cycle, curr_cycle)
+            find_direct_parent_nodes(c, parents)
     else:
         raise NotImplementedError("uncovered DF type: " + str(type(p)))
-
-def to_smt_expr(node):
-    """
-    Converts the pyverilog AST tree into an expression in our SMT DSL.
-
-    # TERMDICT is the pyverilog-generated dict mapping scope chains to internal
-    # Term objects, which contain information like wire vs. reg and data width.
-
-    TODO merge this into the same pass as find_direct_parent_nodes?
-
-    TODO pass important_signals as an argument, and if a referenced variable
-    is not in this list, replace it with a synth fun and with its "important"
-    parents as possible arguments
-
-    TODO figure out how to get the width of the expression
-    consider passing around an "expected" width?
-    """
-    if isinstance(node, DFTerminal):
-        width = 1 # TODO get the width of the variable
-        return smt.Variable(maybe_scope_chain_to_str(node.name), width)
-    elif isinstance(node, DFIntConst):
-        width = 1 # TODO get the width of the variable
-        return smt.BVConst(node.eval(), width)
-    elif isinstance(node, DFPartselect):
-        lsb = to_smt_expr(node.lsb)
-        msb = to_smt_expr(node.msb)
-        raise NotImplementedError("bit slicing not implemented yet")
-        # mask = ~(-1 << (msb - lsb + 1)) << lsb
-        # return full_val & mask
-    elif isinstance(node, DFOperator):
-        op = node.operator
-        evaled_children = [to_smt_expr(c) for c in node.nextnodes]
-        # https://github.com/PyHDI/Pyverilog/blob/5847539a9d4178a521afe66dbe2b1a1cf36304f3/pyverilog/utils/signaltype.py#L87
-        # Assume that arity checks are already done for us
-        reducer = {
-            "Or": lambda a, b: a | b,
-            "Lor": lambda a, b: a or b,
-            "And": lambda a, b: a & b,
-            "Land": lambda a, b: a and b,
-            "LessThan": lambda a, b: a < b,
-            "GreaterThan": lambda a, b: a > b,
-            "LassEq": lambda a, b: a <= b, # [sic]
-            "GreaterEq": lambda a, b: a >= b,
-            "Eq": lambda a, b: a == b,
-            "NotEq": lambda a, b: a != b,
-            # what are "Eql" and "NotEql"???
-        }
-        # By testing, it seems that "Unot" is ~ and "Ulnot" is ! (presumably "Unary Logical NOT")
-        if op == "Unot":
-            assert len(evaled_children) == 1
-            return smt.OpTerm(smt.Kind.BVNot, (evaled_children[0],))
-        elif op == "Ulnot":
-            assert len(evaled_children) == 1
-            return smt.OpTerm(smt.Kind.Not, (evaled_children[0],))
-        elif op == "Uor":
-            assert len(evaled_children) == 1
-            # unary OR just checks if any bit is nonzero
-            raise NotImplementedError("unary OR not implemented yet")
-            # return int(evaled_children[0] > 0)
-        raise NotImplementedError("unary reductions implemented yet")
-        # return functools.reduce(reducer[op], evaled_children)
-    else:
-        # return None
-        raise NotImplementedError(type(node))
+    return parents
