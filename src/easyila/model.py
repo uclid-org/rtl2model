@@ -4,17 +4,18 @@ from typing import List, Dict
 
 import easyila.lynth.smt as smt
 
-@dataclass
-class Instruction:
-    """
-    Represents a sequence of state transitions. A transition is a mapping
-    of state variables to expressions computing their next values.
+"""
+An Instruction represents a sequence of state transitions. A transition is a mapping
+of state variables to expressions computing their next values.
 
-    A single instruction is considered to be atomic.
-    """
-    transitions: List[Dict[smt.Variable, smt.Term]]
+A single instruction is considered to be atomic.
+"""
+Instruction = List[Dict[smt.Variable, smt.Term]]
 
 # models should look something like this?
+# TODO instead of having separate uf/logic/next logic, should they all be values of
+# a dict keyed by variables? probably not, because of the splitting behavior of the
+# `instructions` array
 @dataclass
 class Model:
     name: str
@@ -24,12 +25,11 @@ class Model:
     # TODO variables are just UFs of 0 arity -- should we treat them all the same?
     ufs: List[smt.UFTerm] = field(default_factory=list)
     # memories: List[]
-    # how do we incorporate child-ILA transitions?
+    # how do we incorporate child-ILA transitions? how do we connect modules?
     submodules: Dict[str, "Module"] = field(default_factory=dict)
-    """
-    Same-cycle logic expressions.
-    """
     logic: Dict[smt.Variable, smt.Term] = field(default_factory=dict)
+    """Same-cycle logic expressions."""
+
     """
     TODO
 
@@ -39,6 +39,7 @@ class Model:
     how do we distinguish between having ILA instructions to execute vs.
     having transitions? for now, just have a default "NEXT" instruction
     """
+    default_next: Instruction = field(default_factory=list)
     instructions: Dict[str, Instruction] = field(default_factory=dict)
     init_values: Dict[str, smt.BVConst] = field(default_factory=dict)
 
@@ -51,6 +52,7 @@ class Model:
                 ufs={self.ufs},
                 submodules={self.submodules},
                 logic={self.logic},
+                default_next={self.default_next},
                 instructions={self.instructions},
                 init_values={self.init_values},
             )

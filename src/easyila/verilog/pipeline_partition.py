@@ -112,37 +112,15 @@ def partition(
         if missing_signal_names:
             raise Exception("Signal names not found in pyverilog terms: " + ",".join([f"'{s}'" for s in missing_signal_names]))
 
+    deps = make_dependency_graph(important_signals, terms, binddict)
     # Maps signal names to their source signals from the current cycle
-    curr_parent_map = defaultdict(list)
+    curr_parent_map = deps.curr_parent_map
     # Maps signal names to their dependents on the current cycle
-    curr_child_map = defaultdict(set)
+    curr_child_map = deps.curr_child_map
     # Maps signal names to their source signals on the next cycle
-    next_parent_map = defaultdict(list)
-    next_child_map = defaultdict(set)
-    # Regardless of what signals are identified as "important", we always need to visit
-    # every single signal in case we miss some pipeline stages
-    # Since every signals is visited, this algorithm does not need to be recursive
-    for signal_name in all_signals:
-        print("visit", signal_name)
-        sc = str_to_scope_chain(signal_name)
-        if sc not in binddict:
-            continue
-        parents = binddict[sc]
-        for p in parents:
-            if p.tree is not None:
-                parents = find_direct_parent_nodes(p.tree)
-                if signaltype.isReg(terms[sc].termtype):
-                    print(f"next cycle parents of {signal_name}:", parents)
-                    p_map = next_parent_map
-                    c_map = next_child_map
-                else:
-                    print(f"curr cycle parents of {signal_name}:", parents)
-                    p_map = curr_parent_map
-                    c_map = curr_child_map
-                if len(parents) != 0:
-                    p_map[signal_name] = parents
-                    for p in parents:
-                        c_map[p].add(signal_name)
+    next_parent_map = deps.next_parent_map
+    next_child_map = deps.next_child_map
+
     # Sinks in the dependency graph constitute module outputs
     sinks = {s for s in all_signals if len(curr_child_map[s]) == 0 and not len(curr_parent_map[s]) == 0}
     # `stages` contains a list of all pipeline stages we've produced, in the order that
@@ -192,43 +170,3 @@ def partition(
                 if p not in visited:
                     to_visit.append(p)
     return stages
-
-def find_direct_parent_nodes(p, parents=None):
-    """
-    Traverses pyverilog expression tree `p` to find parents of the signal assigned
-    by `p`. It is agnostic to whether the dependency crosses cycle boundaries; that
-    logic should be handled by the caller. Also returns the list when done.
-
-    This function will recursively update `parents` while traversing
-    the expression tree.
-    """
-    if parents is None:
-        parents = []
-    if isinstance(p, DFTerminal):
-        # "_rnN_" wires are the value of the wire on the next timestep
-        # TODO account for reassigning w/in always@ block? what if there
-        # are multiple always@ blocks?
-        sc_str = maybe_scope_chain_to_str(p.name)
-        # print(td_entry.termtype)
-        # unqualified_name = sc_str.split(".")[-1]
-        parents.append(sc_str)
-    elif isinstance(p, DFIntConst):
-        pass
-    elif isinstance(p, DFBranch):
-        assert p.condnode is not None, p.tocode()
-        # always a dependency on the condition
-        find_direct_parent_nodes(p.condnode, parents)
-        # truenode and falsenode can both be None for "if/else if/else" blocks that
-        if p.truenode is not None:
-            find_parent_nodes(p.truenode, parents)
-        if p.falsenode is not None:
-            find_parent_nodes(p.falsenode, parents)
-    elif isinstance(p, DFNotTerminal):
-        # Confusingly, this nodes syntactic "children" are actually its parents in the
-        # dependency graph
-        for c in p.children():
-            assert c is not None
-            find_direct_parent_nodes(c, parents)
-    else:
-        raise NotImplementedError("uncovered DF type: " + str(type(p)))
-    return parents

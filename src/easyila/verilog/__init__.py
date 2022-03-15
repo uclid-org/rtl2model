@@ -1,5 +1,15 @@
 
-from typing import List, Optional
+"""
+Functions for producing a Model from a Verilog file.
+
+This code uses the pyverilog library for parsing and dataflow analysis.
+"""
+
+from collections import defaultdict
+from dataclasses import dataclass
+from enum import Enum, auto
+import textwrap
+from typing import Dict, List, Optional, Set
 
 import pyverilog
 from pyverilog.dataflow.dataflow_analyzer import VerilogDataflowAnalyzer
@@ -10,12 +20,38 @@ from pyverilog.utils import signaltype
 from easyila.model import Model
 import easyila.lynth.smt as smt
 
+class COIConf(Enum):
+    """
+    Configuration for how to treat cone-of-influence behavior for model generation from Verilog.
+    """
+
+    NO_COI = auto()
+    """
+    No cone-of-influence check is performed. Any non-important signals are omitted entirely, and
+    replaced with 0-arity uninterpreted functions.
+    """
+
+    KEEP_COI = auto()
+    """
+    Any signals found to be within the cone-of-influence of an important signal (i.e. the parent
+    of an important signal in the dataflow graph) is kept in the resulting model.
+    """
+
+    UF_ARGS_COI = auto()
+    """
+    Signals found to be within the cone-of-influence of an important signal are replaced with
+    uninterpreted functions, but the important signals that are its parents in the dependency
+    graph are kept as arguments to them.
+
+    TODO just list vars instead of making them args?
+    """
+
 def verilog_to_model(
     verilog_file: str,
     top_name: str,
     clock_name: str="clk",
     important_signals: Optional[List[str]]=None,
-    keep_important_parents=False,
+    coi_conf=COIConf.NO_COI,
 ) -> Model:
     """
     Given a verilog modules and a list of important_signals, returns a list of
@@ -64,6 +100,7 @@ def verilog_to_model(
     # this requires looking at all signals in the design
     # TODO how to handle dependencies going through submodules?
     # TODO implement this first pass
+    deps = make_dependency_graph(important_signals, terms, binddict)
     # Second pass: traverse AST to get expressions, and replace missing variables with UFs
     # Sadly, the only way we can distinguish between next cycle and combinatorial udpates is
     # by checking whether the variable is a reg or a variable. This isn't an entirely accurate
@@ -98,7 +135,7 @@ def verilog_to_model(
             for p in parents:
                 # Not entirely sure why there's multiple parents
                 if p.tree is not None:
-                    if signaltype.isReg(termtype):
+                    if p.alwaysinfo is not None and p.alwaysinfo.isClockEdge():
                         next_updates[s] = pv_to_smt_expr(p.tree)
                     else:
                         logic[s] = pv_to_smt_expr(p.tree)
@@ -110,17 +147,145 @@ def verilog_to_model(
         state=m_state,
         ufs=list(ufs.values()),
         logic=logic, # TODO update to use smt vars as keys instead?
-        instructions=
-            # TODO figure out how to deal with NEXT relations
-            next_updates
-        ,
+        default_next=next_updates,
+        # TODO figure out how to deal with NEXT relations
+        instructions={},
         init_values={
             # TODO read init values
         }
     )
 
-def get_dependency_graph(all_signals, binddict):
-    ...
+
+@dataclass
+class DependencyGraph:
+    curr_parents: Dict[str, List[str]]
+    """
+    Maps signal names to their source signals on the CURRENT cycle.
+    For example, the wire assignment `assign out = a + b;` would add the entry
+    `{"out": ["a", "b""]}`
+    """
+    curr_children: Dict[str, Set[str]]
+    """
+    Maps signal names to their dependent signals on the CURRENT cycle.
+    For example, the wire assignment `assign out = a + b;` would add the entries
+    `{"a": {"out"}, "b": {"out"}}`
+    """
+    next_parents: Dict[str, List[str]]
+    """
+    Maps signal names to their source signals on the NEXT cycle.
+    For example, a reg assignment within an always@ block `r = a + b;` would add the
+    entry `{"r": ["a", "b"]}`.
+    """
+    next_children: Dict[str, Set[str]]
+    """
+    Maps signal names to their dependent signals from the NEXT cycle.
+    For example, a reg assignment within an always@ block `r = a + b;` would add the
+    entries `{"a": {"r"}, "b": {"r"}}`.
+    """
+
+
+def make_dependency_graph(important_signals, termdict, binddict) -> DependencyGraph:
+    """
+    Computes a dependency graph from design information parsed by pyverilog.
+
+    `important_signals` specifies a list of signals which MUST be in the resulting
+    dependency graph.
+
+    The resulting dependency graph may contain more than just `important_signals`,
+    because if intermediate variables maybe omitted that would induce dependencies.
+    For example, in the graph `a -> b -> c`, `c` depends on `a`, but if `b` is omitted
+    from the dependency graph, this would be undiscoverable.
+
+    `termdict` and `binddict` are generated from pyverilog.
+    """
+    curr_parents = defaultdict(list)
+    curr_children = defaultdict(set)
+    next_parents = defaultdict(list)
+    next_children = defaultdict(set)
+    to_visit = list(important_signals)
+    visited = set()
+    for signal_name in to_visit:
+        if signal_name in visited:
+            continue
+        visited.add(signal_name)
+        # print("visit", signal_name)
+        sc = str_to_scope_chain(signal_name)
+        # Inputs are not in binddict, and won't have dependencies
+        if sc not in binddict:
+            continue
+        bind = binddict[sc]
+        for i, p in enumerate(bind):
+            print("bind information for", signal_name, i)
+            print(textwrap.dedent(f"""\
+                tree={p.tree.tocode()}
+                dest={p.dest}
+                msb={p.msb}
+                lsb={p.lsb}
+                ptr={p.ptr}
+                alwaysinfo={p.alwaysinfo}
+                parameterinfo={p.parameterinfo}
+            """))
+
+        for p in bind:
+            if p.tree is not None:
+                parents = find_direct_parent_nodes(p.tree)
+                if signaltype.isReg(termdict[sc].termtype):
+                    # print(f"next cycle parents of {signal_name}:", parents)
+                    p_map = next_parents
+                    c_map = next_children
+                else:
+                    # print(f"curr cycle parents of {signal_name}:", parents)
+                    p_map = curr_parents
+                    c_map = curr_children
+                if len(parents) != 0:
+                    p_map[signal_name] = parents
+                    for p in parents:
+                        c_map[p].add(signal_name)
+                to_visit.extend(parents)
+    return DependencyGraph(curr_parents, curr_children, next_parents, next_children)
+
+
+def find_direct_parent_nodes(p, parents=None) -> List[str]:
+    """
+    Traverses pyverilog expression tree `p` to find parents of the signal assigned
+    by `p`. It is agnostic to whether the dependency crosses cycle boundaries; that
+    logic should be handled by the caller. Also returns the list when done.
+
+    This function will recursively update `parents` while traversing
+    the expression tree.
+    """
+    if parents is None:
+        parents = []
+    if isinstance(p, DFTerminal):
+        # "_rnN_" wires are the value of the wire on the next timestep
+        # TODO account for reassigning w/in always@ block? what if there
+        # are multiple always@ blocks?
+        sc_str = maybe_scope_chain_to_str(p.name)
+        # print(td_entry.termtype)
+        # unqualified_name = sc_str.split(".")[-1]
+        parents.append(sc_str)
+    elif isinstance(p, DFIntConst):
+        pass
+    elif isinstance(p, DFBranch):
+        assert p.condnode is not None, p.tocode()
+        # always a dependency on the condition
+        find_direct_parent_nodes(p.condnode, parents)
+        # truenode and falsenode can both be None for "if/else if/else" blocks that
+        if p.truenode is not None:
+            find_direct_parent_nodes(p.truenode, parents)
+        if p.falsenode is not None:
+            find_direct_parent_nodes(p.falsenode, parents)
+    elif isinstance(p, DFNotTerminal):
+        # Confusingly, this nodes syntactic "children" are actually its parents in the
+        # dependency graph
+        for c in p.children():
+            assert c is not None
+            find_direct_parent_nodes(c, parents)
+    else:
+        raise NotImplementedError("uncovered DF type: " + str(type(p)))
+    return parents
+
+
 def pv_to_smt_expr(node):
     """
     Converts the pyverilog AST tree into an expression in our SMT DSL.
@@ -198,11 +363,13 @@ def pv_to_smt_expr(node):
         # return None
         raise NotImplementedError(type(node))
 
+
 def maybe_scope_chain_to_str(sc):
     if isinstance(sc, ScopeChain):
         return repr(sc)
     else: # pray it's a string
         return sc
+
 
 def str_to_scope_chain(s):
     return ScopeChain([ScopeLabel(l) for l in s.split(".")])
