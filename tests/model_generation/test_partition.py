@@ -21,8 +21,8 @@ class TestPartition:
         """
         rtl = textwrap.dedent("""\
             module pipe(input clk, input in, output out);
-                reg v1 = 0;
-                reg v2 = 0;
+                reg v1;
+                reg v2;
                 always @(posedge clk) begin
                     v1 = in;
                     v2 = v1;
@@ -70,7 +70,7 @@ class TestPartition:
         """
         rtl = textwrap.dedent("""\
             module pipe(input clk, input in, output out);
-                reg v1 = 0;
+                reg v1;
                 always @(posedge clk) begin
                     v1 = in | v1;
                 end
@@ -117,8 +117,8 @@ class TestPartition:
         """
         rtl = textwrap.dedent("""\
             module pipe(input clk, input in, output out);
-                reg v1 = 0;
-                reg v2 = 0;
+                reg v1;
+                reg v2;
                 always @(posedge clk) begin
                     v1 = in ^ v2;
                     v2 = v1;
@@ -185,8 +185,8 @@ class TestPartition:
         """
         rtl = textwrap.dedent("""\
             module pipe(input clk, input in, output out);
-                reg v1 = 0;
-                reg v2 = 0;
+                reg v1;
+                reg v2;
                 always @(posedge clk) begin
                     v1 <= in;
                     v2 <= v1;

@@ -1,6 +1,8 @@
 """
 Provides in-memory representations of SMT expressions and grammars, which can then be translated
 to solver backends like CVC5 and Z3.
+
+TODO add str methods to everything
 """
 
 from abc import ABC, ABCMeta, abstractmethod
@@ -202,6 +204,89 @@ _OP_SYGUS_SYMBOLS = {
 # === BEGIN SMT TERMS ===
 
 class Term(ABC):
+    def _op_type_check(self, other):
+        assert isinstance(other, Term), f"cannot add {self} with {other}"
+        assert hasattr(self, "sort")
+        assert hasattr(other, "sort")
+        assert self.sort == other.sort, f"cannot add value of sort {self.sort} to {other.sort}"
+
+    # === OPERATOR OVERRIDES ===
+    def __lt__(self, other):
+        self._op_type_check(other)
+        ...
+
+    def __le__(self, other):
+        self._op_type_check(other)
+        ...
+        # return OpTerm(Kind.BVLe, self, other)
+
+    def op_eq(self, other):
+        """
+        We can't override __eq__ without breaking a decent amount of stuff, so
+        op_eq is syntactic sugar for an equality expression instead.
+        """
+        self._op_type_check(other)
+        return OpTerm(Kind.Equal, (self, other))
+
+    def __ne__(self, other):
+        self._op_type_check(other)
+        return OpTerm(Kind.Not, OpTerm(Kind.Equal, (self, other)))
+
+    def __gt__(self, other):
+        self._op_type_check(other)
+        ...
+
+    def __ge__(self, other):
+        self._op_type_check(other)
+        ...
+
+    def __add__(self, other):
+        self._op_type_check(other)
+        return OpTerm(Kind.BVAdd, (self, other))
+
+    def __and__(self, other):
+        self._op_type_check(other)
+        if isinstance(self.sort, BoolSort):
+            op = Kind.And
+        else:
+            op = Kind.BVAnd
+        return OpTerm(op, (self, other))
+
+    def __invert__(self):
+        if isinstance(self.sort, BoolSort):
+            op = Kind.Not
+        else:
+            op = Kind.BVNot
+        return OpTerm(op, self)
+
+    def __neg__(self):
+        ...
+
+    def __or__(self, other):
+        self._op_type_check(other)
+        if isinstance(self.sort, BoolSort):
+            op = Kind.Or
+        else:
+            op = Kind.BVOr
+        return OpTerm(op, (self, other))
+
+    def __rshift__(self, other):
+        self._op_type_check(other)
+        ...
+
+    def __sub__(self, other):
+        self._op_type_check(other)
+        ...
+
+    def __xor__(self, other):
+        self._op_type_check(other)
+        if isinstance(self.sort, BoolSort):
+            op = Kind.Xor
+        else:
+            op = Kind.BVXor
+        return OpTerm(op, (self, other))
+
+    # === ABSTRACT AND SHARED STATIC METHODS ===
     @staticmethod
     def from_cvc5(cvc5_term):
         from pycvc5 import Kind as k
@@ -219,6 +304,11 @@ class Term(ABC):
 
         # TODO what corresponds to UFTerm?
         raise NotImplementedError("Cannot convert from CVC5 term of kind " + str(cvc5_kind))
+
+    @property
+    @abstractmethod
+    def sort(self):
+        raise NotImplementedError()
 
     @abstractmethod
     def _to_cvc5(self, cvc5_ctx):
@@ -262,7 +352,7 @@ class Variable(Term):
     """
 
     name: str
-    sort: Sort
+    _sort: Sort
 
     @staticmethod
     def from_cvc5(cvc5_term):
@@ -275,6 +365,10 @@ class Variable(Term):
         if name[0] == "|" and name[-1] == "|":
             name = name[1:-1]
         return Variable(name, Sort.from_cvc5(cvc5_term.getSort()))
+
+    @property
+    def sort(self):
+        return self._sort
 
     def _to_cvc5(self, cvc5_ctx):
         if self in cvc5_ctx.terms:
@@ -446,7 +540,7 @@ class UFTerm(Term):
     A term representing an uninterpreted function of arbitrary arity.
     """
     name: str
-    sort: Sort
+    _sort: Sort
     params: Tuple[Variable, ...]
 
     @property
@@ -456,6 +550,10 @@ class UFTerm(Term):
     @staticmethod
     def from_cvc5(cvc5_term):
         raise NotImplementedError("Cannot convert from CVC5 UF term")
+
+    @property
+    def sort(self):
+        return self._sort
 
     def _to_cvc5(self, cvc5_ctx):
         cvc5_ctx.solver.declareFun(
@@ -637,6 +735,10 @@ class BoolConst(Term, Enum, metaclass=_TermMeta):
     F = 0
     T = 1
 
+    @property
+    def sort(self):
+        return BoolSort()
+
     def _to_cvc5(self, cvc5_ctx):
         if self == self.F:
             return cvc5_ctx.solver.mkFalse()
@@ -661,6 +763,10 @@ class BoolConst(Term, Enum, metaclass=_TermMeta):
 class BVConst(Term):
     val: int
     width: int
+
+    @property
+    def sort(self):
+        return BVSort(self.width)
 
     @staticmethod
     def from_cvc5(cvc5_term):

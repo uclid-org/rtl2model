@@ -25,17 +25,15 @@ class TestVerilogParse:
         No "important" values are specified.
         """
         rtl = textwrap.dedent("""\
-            module top(input clk, input rst, input should_inc, output [2:0] result);
+            module top(input clk, input should_inc, output [2:0] result);
                 reg [2:0] a;
                 wire [2:0] a_p1;
                 always @(posedge clk) begin
-                    if (rst) begin
-                        a = 0;
-                    end else if (should_inc) begin
+                    if (should_inc) begin
                         a = a_p1;
                     end
                 end
-                assign a_p1 = a + 1;
+                assign a_p1 = a + 3'h1;;
                 assign result = ~a;
             endmodule
             """
@@ -51,8 +49,8 @@ class TestVerilogParse:
                 outputs=[var("result", bv3)],
                 state=[var("a", bv3), var("a_p1", bv3)],
                 logic={
-                    var("a_p1", bv3): smt.OpTerm(smt.Kind.BVAdd, var("a", bv3)),
-                    var("result", bv3): smt.OpTerm(smt.Kind.BVNot, var("a", bv3)),
+                    var("a_p1", bv3): var("a", bv3) + smt.BVConst(1, 3),
+                    var("result", bv3): ~var("a", bv3),
                 },
                 default_next=[{var("a", bv3): var("a_p1", bv3)}],
                 init_values={var("a", bv3): smt.BVConst(0, 3)}
@@ -70,22 +68,19 @@ class TestVerilogParse:
         `coi_conf` is NO_COI, meaning every important signal needs to be manually specified.
         """
         rtl = textwrap.dedent("""\
-            module top(input clk, input rst, input should_inc, output [2:0] result);
+            module top(input clk, input should_inc, output [2:0] result);
                 reg [2:0] a;
                 reg [2:0] b;
                 wire [2:0] a_p1;
                 wire [2:0] b_p1;
                 always @(posedge clk) begin
-                    if (rst) begin
-                        a = 0;
-                        b = 0;
-                    end else if (should_inc) begin
+                    if (should_inc) begin
                         a = a_p1;
                         b = b_p1;
                     end
                 end
-                assign a_p1 = a + 1;
-                assign b_p1 = b + 1;
+                assign a_p1 = a + 3'h1;;
+                assign b_p1 = b + 3'h1;;
                 assign result = ~a | ~b;
             endmodule
             """)
@@ -158,7 +153,7 @@ class TestVerilogParse:
         `coi_conf` is UF_ARGS_COI, meaning some important signals should be inferred.
         """
         rtl = textwrap.dedent("""\
-            module top(input clk, input rst, input shouldinc, output [2:0] result);
+            module top(input clk, input should_inc, output [2:0] result);
                 reg [2:0] a;
                 reg [2:0] b;
                 wire [2:0] a_p1;
@@ -169,8 +164,8 @@ class TestVerilogParse:
                         b = b_p1;
                     end
                 end
-                assign a_p1 = a + 1;
-                assign b_p1 = b + 1;
+                assign a_p1 = a + 3'h1;;
+                assign b_p1 = b + 3'h1;;
                 assign result = ~a | ~b;
             endmodule
             """)
@@ -190,7 +185,7 @@ class TestVerilogParse:
                 reg [2:0] i_state;
                 always @(posedge clk) begin
                     if (rst) begin
-                        i_state = 0;
+                        i_state = 3'h0;
                     end else begin
                         i_state = i_inner | i_state;
                     end

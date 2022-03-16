@@ -112,7 +112,7 @@ def partition(
         if missing_signal_names:
             raise Exception("Signal names not found in pyverilog terms: " + ",".join([f"'{s}'" for s in missing_signal_names]))
 
-    deps = make_dependency_graph(important_signals, terms, binddict)
+    deps = DependencyGraph(important_signals, terms, binddict)
     # Maps signal names to their source signals from the current cycle
     curr_parent_map = deps.curr_parent_map
     # Maps signal names to their dependents on the current cycle

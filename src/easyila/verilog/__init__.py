@@ -100,7 +100,8 @@ def verilog_to_model(
     # this requires looking at all signals in the design
     # TODO how to handle dependencies going through submodules?
     # TODO implement this first pass
-    deps = make_dependency_graph(important_signals, terms, binddict)
+    deps = DependencyGraph(important_signals, terms, binddict)
+
     # Second pass: traverse AST to get expressions, and replace missing variables with UFs
     # Sadly, the only way we can distinguish between next cycle and combinatorial udpates is
     # by checking whether the variable is a reg or a variable. This isn't an entirely accurate
@@ -135,10 +136,15 @@ def verilog_to_model(
             for p in parents:
                 # Not entirely sure why there's multiple parents
                 if p.tree is not None:
+                    term = terms[sc]
+                    assert isinstance(term.msb, DFIntConst)
+                    assert isinstance(term.lsb, DFIntConst)
+                    # TODO deal with `dims` for arrays?
+                    exp_width = term.msb.eval() - term.lsb.eval() + 1;
                     if p.alwaysinfo is not None and p.alwaysinfo.isClockEdge():
-                        next_updates[s] = pv_to_smt_expr(p.tree)
+                        next_updates[s] = pv_to_smt_expr(p.tree, exp_width)
                     else:
-                        logic[s] = pv_to_smt_expr(p.tree)
+                        logic[s] = pv_to_smt_expr(p.tree, exp_width)
     # TODO unqualify module names
     return Model(
         top_name,
@@ -183,66 +189,64 @@ class DependencyGraph:
     entries `{"a": {"r"}, "b": {"r"}}`.
     """
 
+    def __init__(self, important_signals, termdict, binddict):
+        """
+        Computes a dependency graph from design information parsed by pyverilog.
 
-def make_dependency_graph(important_signals, termdict, binddict) -> DependencyGraph:
-    """
-    Computes a dependency graph from design information parsed by pyverilog.
+        `important_signals` specifies a list of signals which MUST be in the resulting
+        dependency graph.
 
-    `important_signals` specifies a list of signals which MUST be in the resulting
-    dependency graph.
+        The resulting dependency graph may contain more than just `important_signals`,
+        because if intermediate variables maybe omitted that would induce dependencies.
+        For example, in the graph `a -> b -> c`, `c` depends on `a`, but if `b` is omitted
+        from the dependency graph, this would be undiscoverable.
 
-    The resulting dependency graph may contain more than just `important_signals`,
-    because if intermediate variables maybe omitted that would induce dependencies.
-    For example, in the graph `a -> b -> c`, `c` depends on `a`, but if `b` is omitted
-    from the dependency graph, this would be undiscoverable.
+        `termdict` and `binddict` are generated from pyverilog.
+        """
+        self.curr_parents = defaultdict(list)
+        self.curr_children = defaultdict(set)
+        self.next_parents = defaultdict(list)
+        self.next_children = defaultdict(set)
+        to_visit = list(important_signals)
+        visited = set()
+        for signal_name in to_visit:
+            if signal_name in visited:
+                continue
+            visited.add(signal_name)
+            # print("visit", signal_name)
+            sc = str_to_scope_chain(signal_name)
+            # Inputs are not in binddict, and won't have dependencies
+            if sc not in binddict:
+                continue
+            bind = binddict[sc]
+            # for i, p in enumerate(bind):
+            #     print("bind information for", signal_name, i)
+            #     print(textwrap.dedent(f"""\
+            #         tree={p.tree.tocode()}
+            #         dest={p.dest}
+            #         msb={p.msb}
+            #         lsb={p.lsb}
+            #         ptr={p.ptr}
+            #         alwaysinfo={p.alwaysinfo}
+            #         parameterinfo={p.parameterinfo}
+            #     """))
 
-    `termdict` and `binddict` are generated from pyverilog.
-    """
-    curr_parents = defaultdict(list)
-    curr_children = defaultdict(set)
-    next_parents = defaultdict(list)
-    next_children = defaultdict(set)
-    to_visit = list(important_signals)
-    visited = set()
-    for signal_name in to_visit:
-        if signal_name in visited:
-            continue
-        visited.add(signal_name)
-        # print("visit", signal_name)
-        sc = str_to_scope_chain(signal_name)
-        # Inputs are not in binddict, and won't have dependencies
-        if sc not in binddict:
-            continue
-        bind = binddict[sc]
-        for i, p in enumerate(bind):
-            print("bind information for", signal_name, i)
-            print(textwrap.dedent(f"""\
-                tree={p.tree.tocode()}
-                dest={p.dest}
-                msb={p.msb}
-                lsb={p.lsb}
-                ptr={p.ptr}
-                alwaysinfo={p.alwaysinfo}
-                parameterinfo={p.parameterinfo}
-            """))
-
-        for p in bind:
-            if p.tree is not None:
-                parents = find_direct_parent_nodes(p.tree)
-                if signaltype.isReg(termdict[sc].termtype):
-                    # print(f"next cycle parents of {signal_name}:", parents)
-                    p_map = next_parents
-                    c_map = next_children
-                else:
-                    # print(f"curr cycle parents of {signal_name}:", parents)
-                    p_map = curr_parents
-                    c_map = curr_children
-                if len(parents) != 0:
-                    p_map[signal_name] = parents
-                    for p in parents:
-                        c_map[p].add(signal_name)
-                to_visit.extend(parents)
-    return DependencyGraph(curr_parents, curr_children, next_parents, next_children)
+            for p in bind:
+                if p.tree is not None:
+                    parents = find_direct_parent_nodes(p.tree)
+                    if signaltype.isReg(termdict[sc].termtype):
+                        # print(f"next cycle parents of {signal_name}:", parents)
+                        p_map = self.next_parents
+                        c_map = self.next_children
+                    else:
+                        # print(f"curr cycle parents of {signal_name}:", parents)
+                        p_map = self.curr_parents
+                        c_map = self.curr_children
+                    if len(parents) != 0:
+                        p_map[signal_name] = parents
+                        for p in parents:
+                            c_map[p].add(signal_name)
+                    to_visit.extend(parents)
 
 
 def find_direct_parent_nodes(p, parents=None) -> List[str]:
@@ -271,6 +275,10 @@ def find_direct_parent_nodes(p, parents=None) -> List[str]:
         # always a dependency on the condition
         find_direct_parent_nodes(p.condnode, parents)
         # truenode and falsenode can both be None for "if/else if/else" blocks that
+        # TODO when a node is missing, there should actually be an implict dependency
+        # on itself from the previous cycle
+        # this is due to constructions like `if (...) begin r <= a; end`
+        # that have an implicit `else begin r <= r; end`
         if p.truenode is not None:
             find_direct_parent_nodes(p.truenode, parents)
         if p.falsenode is not None:
@@ -286,14 +294,11 @@ def find_direct_parent_nodes(p, parents=None) -> List[str]:
     return parents
 
 
-def pv_to_smt_expr(node):
+def pv_to_smt_expr(node, width):
     """
     Converts the pyverilog AST tree into an expression in our SMT DSL.
 
-    # TERMDICT is the pyverilog-generated dict mapping scope chains to internal
-    # Term objects, which contain information like wire vs. reg and data width.
-
-    TODO merge this into the same pass as find_direct_parent_nodes?
+    `width` is the bit width needed of this expression.
 
     TODO pass important_signals as an argument, and if a referenced variable
     is not in this list, replace it with a synth fun and with its "important"
@@ -302,33 +307,38 @@ def pv_to_smt_expr(node):
     TODO figure out how to get the width of the expression
     consider passing around an "expected" width?
     """
+    print(type(node))
     if isinstance(node, DFTerminal):
-        width = 1 # TODO get the width of the variable
         return smt.Variable(maybe_scope_chain_to_str(node.name), width)
     elif isinstance(node, DFIntConst):
-        width = 1 # TODO get the width of the variable
         return smt.BVConst(node.eval(), width)
     elif isinstance(node, DFPartselect):
-        lsb = pv_to_smt_expr(node.lsb)
-        msb = pv_to_smt_expr(node.msb)
-        raise NotImplementedError("bit slicing not implemented yet")
+        # TODO need to get concrete values for LSB/MS
+        if not isinstance(lsb, DFIntConst) and not isinstance(msb, DFIntConst):
+            raise NotImplementedError("only constant bit slices can translated")
+        lsb_v = node.lsb.eval()
+        msb_v = node.msb.eval()
+        raise NotImplementedError("SMT bit slice operator not implemented yet")
+        # lsb = pv_to_smt_expr(node.lsb)
+        # msb = pv_to_smt_expr(node.msb)
         # mask = ~(-1 << (msb - lsb + 1)) << lsb
         # return full_val & mask
     elif isinstance(node, DFBranch):
         assert node.condnode is not None, p.tocode()
-        cond = pv_to_smt_expr(node.condnode)
-        # TODO replace empty branch with old value
+        cond = pv_to_smt_expr(node.condnode, 1)
+        # TODO replace empty branch with original value of signal
         truenode = None
         falsenode = None
         # truenode and falsenode can both be None for "if/else if/else" blocks that
         if node.truenode is not None:
-            truenode = pv_to_smt_expr(node.truenode)
+            truenode = pv_to_smt_expr(node.truenode, width)
         if node.falsenode is not None:
-            falsenode = pv_to_smt_expr(node.falsenode)
+            falsenode = pv_to_smt_expr(node.falsenode, width)
         return smt.OpTerm(smt.Kind.Ite, (cond, truenode, falsenode))
     elif isinstance(node, DFOperator):
         op = node.operator
-        evaled_children = [pv_to_smt_expr(c) for c in node.nextnodes]
+        # TODO figure out how to deal with width-changing operations
+        evaled_children = [pv_to_smt_expr(c, width) for c in node.nextnodes]
         # https://github.com/PyHDI/Pyverilog/blob/5847539a9d4178a521afe66dbe2b1a1cf36304f3/pyverilog/utils/signaltype.py#L87
         # Assume that arity checks are already done for us
         reducer = {
