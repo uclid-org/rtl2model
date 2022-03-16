@@ -33,7 +33,7 @@ class TestVerilogParse:
                         a = a_p1;
                     end
                 end
-                assign a_p1 = a + 3'h1;;
+                assign a_p1 = a + 3'h1;
                 assign result = ~a;
             endmodule
             """
@@ -42,18 +42,20 @@ class TestVerilogParse:
         model.print()
         bv3 = smt.BVSort(3)
         var = smt.Variable
+        a = var("a", bv3)
+        a_p1 = var("a_p1", bv3)
         assert model == \
             Model(
                 "top",
                 inputs=[var("should_inc", smt.BoolSort)],
                 outputs=[var("result", bv3)],
-                state=[var("a", bv3), var("a_p1", bv3)],
+                state=[a, a_p1],
                 logic={
-                    var("a_p1", bv3): var("a", bv3) + smt.BVConst(1, 3),
-                    var("result", bv3): ~var("a", bv3),
+                    a_p1: a + 1,
+                    var("result", bv3): ~a,
                 },
-                default_next=[{var("a", bv3): var("a_p1", bv3)}],
-                init_values={var("a", bv3): smt.BVConst(0, 3)}
+                default_next=[{a: a_p1}],
+                init_values={a: smt.BVConst(0, 3)}
             )
 
     def test_verilog_always_star(self):
@@ -89,62 +91,50 @@ class TestVerilogParse:
         # TODO to allow for composition of child modules, and specifying important_signals for those
         model_no_a = verilog_to_model(rtl, "top", important_signals=["should_inc", "b", "b_p1", "result"])
         model_no_a.print()
+        a = var("a", bv3)
+        a_p1 = var("a_p1", bv3)
+        b = var("b", bv3)
+        b_p1 = var("b_p1", bv3)
+        should_inc = var("should_inc", smt.BoolSort())
+        result = var("result", bv3)
         assert model_no_a == \
             Model(
                 "top",
-                inputs=[var("should_inc", smt.BoolSort)],
-                outputs=[var("result", bv3)],
-                state=[var("b", bv3), var("b_p1", bv3)],
+                inputs=[should_inc],
+                outputs=[result],
+                state=[b, b_p1],
                 # `a` appears in the expression for `result`, but is not declared important
                 # therefore, it is modeled as an uninterpreted function
                 # TODO namespace collision for should_inc parameter?
-                ufs=[smt.UFTerm("a", bv3, var("should_inc", smt.BoolSort))],
+                ufs=[smt.UFTerm("a", bv3, should_inc)],
                 logic={
-                    var("b_p1", bv3): smt.OpTerm(smt.Kind.BVAdd, var("b", bv3)),
-                    var("result", bv3):
-                        smt.OpTerm(
-                            smt.Kind.BVOr,
-                            (smt.OpTerm(
-                                smt.Kind.BVNot,
-                                # TODO distinguish between ref and decl?
-                                var("a", bv3)
-                            ),
-                            smt.OpTerm(smt.Kind.BVNot, var("b", bv3))),
-                        )
+                    b_p1: b + 1,
+                    result: (~a) | (~b)
                 },
                 instructions={
                     # TODO
                 },
-                init_values={var("b", bv3): smt.BVConst(0, 3)}
+                init_values={}
             )
         model_no_b = verilog_to_model(rtl, "top", important_signals=["should_inc", "a", "a_p1", "result"])
         assert model_no_b == \
             Model(
                 "top",
-                inputs=[var("should_inc", smt.BoolSort)],
-                outputs=[var("result", bv3)],
-                state=[var("a", bv3), var("a_p1", bv3)],
+                inputs=[should_inc],
+                outputs=[result],
+                state=[a, a_p1],
                 # `b` appears in the expression for `result`, but is not declared important
                 # therefore, it is modeled as an uninterpreted function
                 # TODO namespace collision for should_inc parameter?
-                ufs=[smt.UFTerm("b", bv3, var("should_inc", smt.BoolSort))],
+                ufs=[smt.UFTerm("b", bv3, should_inc)],
                 logic={
-                    var("a_p1", bv3): smt.OpTerm(smt.Kind.BVAdd, var("a", bv3)),
-                    var("result", bv3):
-                        smt.OpTerm(
-                            smt.Kind.BVOr,
-                            (smt.OpTerm(smt.Kind.BVNot, var("a", bv3)),
-                            smt.OpTerm(
-                                smt.Kind.BVNot,
-                                # TODO distinguish between ref and decl?
-                                var("__UF_result_0", bv3)
-                            )),
-                        )
+                    a_p1: a + 1,
+                    result: (~a) | (~b)
                 },
                 instructions={
                     # TODO
                 },
-                init_values={var("a", bv3): smt.BVConst(0, 3)}
+                init_values={}
             )
 
     def test_verilog_single_imp_with_parents(self):

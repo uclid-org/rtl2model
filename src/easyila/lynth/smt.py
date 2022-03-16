@@ -241,7 +241,12 @@ class Term(ABC):
         ...
 
     def __add__(self, other):
-        self._op_type_check(other)
+        if isinstance(other, int):
+            # Automatically generate appropriate-width constant
+            assert isinstance(self.sort, BVSort)
+            other = BVConst(other, self.sort.bitwidth)
+        else:
+            self._op_type_check(other)
         return OpTerm(Kind.BVAdd, (self, other))
 
     def __and__(self, other):
