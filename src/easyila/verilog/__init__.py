@@ -151,6 +151,7 @@ def verilog_to_model(
     m_state: List[smt.Variable] = []
     for s in important_signals:
         v = term_to_smt_var(s, terms, top_name)
+        width = get_term_width(s, terms)
         # Categorize input, output, or state
         sc = str_to_scope_chain(s)
         termtype = terms[sc].termtype
@@ -202,14 +203,18 @@ def verilog_to_model(
     )
 
 
-def term_to_smt_var(s, terms, top_name):
+def get_term_width(s, terms):
     sc = str_to_scope_chain(s)
     term = terms[sc]
     termtype = term.termtype
     assert isinstance(term.msb, DFIntConst)
     assert isinstance(term.lsb, DFIntConst)
+    return term.msb.eval() - term.lsb.eval() + 1;
+
+
+def term_to_smt_var(s, terms, top_name):
+    width = get_term_width(s, terms)
     # TODO deal with `dims` for arrays?
-    width = term.msb.eval() - term.lsb.eval() + 1;
     unqual_s = s[len(top_name) + 1:]
     # TODO distinguish between bv1 and booleans
     if width == 1:
