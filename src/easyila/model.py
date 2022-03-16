@@ -46,6 +46,7 @@ class Model:
     def print(self):
         print(textwrap.dedent(f"""\
             Model(
+                name="{self.name}",
                 inputs={self.inputs},
                 outputs={self.outputs},
                 state={self.state},

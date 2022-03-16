@@ -52,6 +52,7 @@ def verilog_to_model(
     clock_name: str="clk",
     important_signals: Optional[List[str]]=None,
     coi_conf=COIConf.NO_COI,
+    inline_renames=True,
 ) -> Model:
     """
     Given a verilog modules and a list of important_signals, returns a list of
@@ -62,10 +63,10 @@ def verilog_to_model(
     `important_signals` are turned into uninterpreted functions
     TODO with arguments based on their parents in the dependency graph.
 
-    If `keep_important_parents` is True, then all signals that affect values in `important_signals`
-    (i.e. are parents in the dataflow graph of a signal in `important_signals`) are preserved
-    as well. Note that COI calculations are performed regardless, as they are needed to identify
-    arguments for the uninterpreted functions replacing omitted variables.
+    `coi_conf` determines how cone of influence calculations are used (see `COIConf` docstring).
+
+    If `inline_renames` is `True` (the default), then pyverilog-generated "rename" variables
+    (starting with `_rnN` for some number `N`) are replaced with their corresponding expressions.
     """
     if important_signals is None:
         important_signals = []
@@ -102,59 +103,89 @@ def verilog_to_model(
     # TODO implement this first pass
     deps = DependencyGraph(important_signals, terms, binddict)
 
+    # 1.5th pass: traverse AST to get expressions for _rn variables.
+    rename_substitutions = {}
+    """
+    Unlike the dicts passed to the model constructor, `rename_substitutions` is keyed on
+    fully-qualified variable names.
+    """
+    if inline_renames:
+        for sc, term in terms.items():
+            assert isinstance(term.msb, DFIntConst)
+            assert isinstance(term.lsb, DFIntConst)
+            # TODO deal with `dims` for arrays?
+            width = term.msb.eval() - term.lsb.eval() + 1;
+            s = maybe_scope_chain_to_str(sc)
+            if signaltype.isRename(term.termtype):
+                for p in binddict[sc]:
+                    # In this context, there should never be an empty else branch, so we
+                    # make the default branch field None to loudly error
+                    rename_substitutions[s] = pv_to_smt_expr(p.tree, width, None)
+        # TODO replace renames with other renames (may require modifying SMT tree,
+        # or using dependency graph info to topo sort)
+
     # Second pass: traverse AST to get expressions, and replace missing variables with UFs
     # Sadly, the only way we can distinguish between next cycle and combinatorial udpates is
     # by checking whether the variable is a reg or a variable. This isn't an entirely accurate
     # heuristic (since you can "assign" a reg value), but we should be fine to operate under
     # the assumption that idiomatic and/or auto-generated verilog would not include such constructs.
-    # `next_updates` maps variable names to SMT expressions for their _next_ cycle values
     next_updates = {}
-    # `logic` maps variable names to SMT expressions to their expressions on the _current_ cycle
+    """`next_updates` maps variable names to SMT expressions for their _next_ cycle values"""
     logic = {}
-    # `ufs` maps ignored (non-important) variables to a corresponding `UFTerm` that describes its
-    # cone of influence. This map is updated on calls to `pv_to_smt_expr`.
+    """`logic` maps variable names to SMT expressions to their expressions on the _current_ cycle"""
     ufs = {}
+    """
+    `ufs` maps ignored (non-important) variables to a corresponding `UFTerm` that describes its
+    cone of influence. This map is updated on calls to `pv_to_smt_expr`.
+    """
+
     # These arrays determine which variables are in our model output
     important_signal_set = set(important_signals)
-    m_inputs = []
-    m_outputs = []
-    m_state = []
+    m_inputs: List[smt.Variable] = []
+    m_outputs: List[smt.Variable] = []
+    m_state: List[smt.Variable] = []
     for s in important_signals:
         sc = str_to_scope_chain(s)
-        termtype = terms[sc].termtype
+        term = terms[sc]
+        termtype = term.termtype
+        assert isinstance(term.msb, DFIntConst)
+        assert isinstance(term.lsb, DFIntConst)
+        # TODO deal with `dims` for arrays?
+        width = term.msb.eval() - term.lsb.eval() + 1;
+        unqual_s = s[len(top_name) + 1:]
+        # TODO distinguish between bv1 and booleans
+        if width == 1:
+            v = smt.Variable(unqual_s, smt.BoolSort())
+        else:
+            v = smt.Variable(unqual_s, smt.BVSort(width))
         # Categorize input, output, or state
-        if s in important_signal_set:
-            if signaltype.isInput(termtype):
-                m_inputs.append(s)
-            elif signaltype.isOutput(termtype):
-                m_outputs.append(s)
-            else:
-                m_state.append(s)
-        # Get expression tree
-        if not signaltype.isInput(termtype):
-            parents = binddict[sc]
-            for p in parents:
-                # Not entirely sure why there's multiple parents
-                if p.tree is not None:
-                    term = terms[sc]
-                    assert isinstance(term.msb, DFIntConst)
-                    assert isinstance(term.lsb, DFIntConst)
-                    # TODO deal with `dims` for arrays?
-                    exp_width = term.msb.eval() - term.lsb.eval() + 1;
-                    if p.alwaysinfo is not None and p.alwaysinfo.isClockEdge():
-                        next_updates[s] = pv_to_smt_expr(p.tree, exp_width)
-                    else:
-                        logic[s] = pv_to_smt_expr(p.tree, exp_width)
-    # TODO unqualify module names
+        if not inline_renames or not signaltype.isRename(termtype):
+            if s in important_signal_set:
+                if signaltype.isInput(termtype):
+                    m_inputs.append(v)
+                elif signaltype.isOutput(termtype):
+                    m_outputs.append(v)
+                else:
+                    m_state.append(v)
+            # Get expression tree
+            if not signaltype.isInput(termtype):
+                parents = binddict[sc]
+                for p in parents:
+                    # Not entirely sure why there's multiple parents
+                    if p.tree is not None:
+                        expr = pv_to_smt_expr(p.tree, width, v, rename_substitutions)
+                        if p.alwaysinfo is not None and p.alwaysinfo.isClockEdge():
+                            next_updates[v] = expr
+                        else:
+                            logic[v] = expr
     return Model(
         top_name,
         inputs=m_inputs,
         outputs=m_outputs,
         state=m_state,
         ufs=list(ufs.values()),
-        logic=logic, # TODO update to use smt vars as keys instead?
-        default_next=next_updates,
-        # TODO figure out how to deal with NEXT relations
+        logic=logic,
+        default_next=[next_updates],
         instructions={},
         init_values={
             # TODO read init values
@@ -294,22 +325,38 @@ def find_direct_parent_nodes(p, parents=None) -> List[str]:
     return parents
 
 
-def pv_to_smt_expr(node, width):
+def pv_to_smt_expr(node, width, assignee, substitutions={}):
     """
     Converts the pyverilog AST tree into an expression in our SMT DSL.
 
     `width` is the bit width needed of this expression.
 
+    `assignee` is the variable the original AST parent of this expression is being
+    assigned to. This is necessary because pyverilog generates ITE blocks with missing
+    t/f branches for constructs like `if (...) begin r <= a; end`, which implicitly has
+    the branch `else r <= r;`. This might fail in situations where `r` has multiple
+    drivers, but hopefully those constructions are either already incorrect, or would
+    be elided by the dataflow graph.
+
+    `substitutions` is a mapping of fully qualified variable names to SMT expressions.
+    If a variable matching a variable in `substitutions` is encountered while traversing
+    the tree, it is replaced with the corresponding expression.
+
     TODO pass important_signals as an argument, and if a referenced variable
     is not in this list, replace it with a synth fun and with its "important"
     parents as possible arguments
-
-    TODO figure out how to get the width of the expression
-    consider passing around an "expected" width?
     """
-    print(type(node))
+    # print(type(node))
     if isinstance(node, DFTerminal):
-        return smt.Variable(maybe_scope_chain_to_str(node.name), width)
+        qual_name = maybe_scope_chain_to_str(node.name)
+        if qual_name in substitutions:
+            return substitutions[qual_name]
+        # TODO distinguish bv1 and bool
+        unqual_name = maybe_scope_chain_to_str(node.name[1:])
+        if width == 1:
+            return smt.BoolVariable(unqual_name)
+        else:
+            return smt.BVVariable(unqual_name, width)
     elif isinstance(node, DFIntConst):
         return smt.BVConst(node.eval(), width)
     elif isinstance(node, DFPartselect):
@@ -325,50 +372,57 @@ def pv_to_smt_expr(node, width):
         # return full_val & mask
     elif isinstance(node, DFBranch):
         assert node.condnode is not None, p.tocode()
-        cond = pv_to_smt_expr(node.condnode, 1)
-        # TODO replace empty branch with original value of signal
-        truenode = None
-        falsenode = None
+        cond = pv_to_smt_expr(node.condnode, 1, assignee, substitutions)
+        truenode = assignee
+        falsenode = assignee
         # truenode and falsenode can both be None for "if/else if/else" blocks that
         if node.truenode is not None:
-            truenode = pv_to_smt_expr(node.truenode, width)
+            truenode = pv_to_smt_expr(node.truenode, width, assignee, substitutions)
+        else:
+            assert isinstance(assignee, smt.Term)
         if node.falsenode is not None:
-            falsenode = pv_to_smt_expr(node.falsenode, width)
+            falsenode = pv_to_smt_expr(node.falsenode, width, assignee, substitutions)
+        else:
+            assert isinstance(assignee, smt.Term)
         return smt.OpTerm(smt.Kind.Ite, (cond, truenode, falsenode))
     elif isinstance(node, DFOperator):
         op = node.operator
         # TODO figure out how to deal with width-changing operations
-        evaled_children = [pv_to_smt_expr(c, width) for c in node.nextnodes]
+        evaled_children = [pv_to_smt_expr(c, width, assignee, substitutions) for c in node.nextnodes]
         # https://github.com/PyHDI/Pyverilog/blob/5847539a9d4178a521afe66dbe2b1a1cf36304f3/pyverilog/utils/signaltype.py#L87
         # Assume that arity checks are already done for us
-        reducer = {
-            "Or": lambda a, b: a | b,
-            "Lor": lambda a, b: a or b,
-            "And": lambda a, b: a & b,
-            "Land": lambda a, b: a and b,
-            "LessThan": lambda a, b: a < b,
-            "GreaterThan": lambda a, b: a > b,
-            "LassEq": lambda a, b: a <= b, # [sic]
-            "GreaterEq": lambda a, b: a >= b,
-            "Eq": lambda a, b: a == b,
-            "NotEq": lambda a, b: a != b,
+        binops = {
+            "Or": smt.Kind.Or if width == 1 else smt.Kind.BVOr,
+            "Lor": smt.Kind.Or,
+            "And": smt.Kind.And if width == 1 else smt.Kind.BVAnd,
+            "Land": smt.Kind.And,
+            # "LessThan": lambda a, b: a < b,
+            # "GreaterThan": lambda a, b: a > b,
+            # "LassEq": lambda a, b: a <= b, # [sic]
+            # "GreaterEq": lambda a, b: a >= b,
+            "Eq": smt.Kind.Equal,
             # what are "Eql" and "NotEql"???
+            "Plus": smt.Kind.BVAdd, # TODO is this saturating for booleans?
         }
+        if op in binops or op == "Neq":
+            assert len(evaled_children) == 2
+            if op == "Neq":
+                return evaled_children[0] != evaled_children[1]
+            else:
+                return smt.OpTerm(binops[op], tuple(evaled_children))
         # By testing, it seems that "Unot" is ~ and "Ulnot" is ! (presumably "Unary Logical NOT")
-        if op == "Unot":
+        unops = {
+            "Unot": smt.Kind.Not if width == 1 else smt.Kind.BVNot,
+            "Ulnot": smt.Kind.Not,
+        }
+        if op in unops:
             assert len(evaled_children) == 1
-            return smt.OpTerm(smt.Kind.BVNot, (evaled_children[0],))
-        elif op == "Ulnot":
-            assert len(evaled_children) == 1
-            return smt.OpTerm(smt.Kind.Not, (evaled_children[0],))
+            return smt.OpTerm(unops[op], (evaled_children[0],))
         elif op == "Uor":
             assert len(evaled_children) == 1
             # unary OR just checks if any bit is nonzero
-            raise NotImplementedError("unary OR not implemented yet")
-            # return int(evaled_children[0] > 0)
-        return None
-        raise NotImplementedError("unary reductions not implemented yet")
-        # return functools.reduce(reducer[op], evaled_children)
+            raise evaled_children[0] != smt.BVConst(0, width)
+        raise NotImplementedError("operator tranlation not implemented yet: " + str(op))
     else:
         # return None
         raise NotImplementedError(type(node))

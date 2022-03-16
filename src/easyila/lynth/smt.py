@@ -211,6 +211,22 @@ class Term(ABC):
         assert self.sort == other.sort, f"cannot add value of sort {self.sort} to {other.sort}"
 
     # === OPERATOR OVERRIDES ===
+    def ite(self, t_term, f_term):
+        """
+        Constructs an ITE expression with this variable as condition.
+
+        If this term is of sort BV1, then an expression is automatically added to
+        check if this is equal to the constant 1bv1.
+        """
+        if isinstance(self.sort, BVSort):
+            assert self.sort.bitwidth == 1
+            cond = OpTerm(Kind.Eq, (self, BVConst(1, self.sort.bitwidth)))
+        else:
+            assert isinstance(self.sort, BoolSort)
+            cond = self
+        t_term._op_type_check(f_term)
+        return OpTerm(Kind.Ite, (cond, t_term, f_term))
+
     def __lt__(self, other):
         self._op_type_check(other)
         ...
@@ -230,7 +246,7 @@ class Term(ABC):
 
     def __ne__(self, other):
         self._op_type_check(other)
-        return OpTerm(Kind.Not, OpTerm(Kind.Equal, (self, other)))
+        return OpTerm(Kind.Not, (OpTerm(Kind.Equal, (self, other)),))
 
     def __gt__(self, other):
         self._op_type_check(other)
@@ -262,7 +278,7 @@ class Term(ABC):
             op = Kind.Not
         else:
             op = Kind.BVNot
-        return OpTerm(op, self)
+        return OpTerm(op, (self,))
 
     def __neg__(self):
         ...
@@ -400,6 +416,10 @@ class Variable(Term):
         # TODO handle booleans
         assert isinstance(self.sort, BVSort)
         return v.WireOrRegRef(self.name, self.sort.bitwidth)
+
+
+BoolVariable = lambda s: Variable(s, BoolSort())
+BVVariable = lambda s, w: Variable(s, BVSort(w))
 
 
 @dataclass(frozen=True)
