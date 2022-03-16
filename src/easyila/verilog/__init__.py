@@ -112,7 +112,7 @@ def verilog_to_model(
             assert isinstance(term.msb, DFIntConst)
             assert isinstance(term.lsb, DFIntConst)
             # TODO deal with `dims` for arrays?
-            width = term.msb.eval() - term.lsb.eval() + 1;
+            width = term.msb.eval() - term.lsb.eval() + 1
             s = maybe_scope_chain_to_str(sc)
             if signaltype.isRename(term.termtype):
                 for p in binddict[sc]:
@@ -206,10 +206,9 @@ def verilog_to_model(
 def get_term_width(s, terms):
     sc = str_to_scope_chain(s)
     term = terms[sc]
-    termtype = term.termtype
     assert isinstance(term.msb, DFIntConst)
     assert isinstance(term.lsb, DFIntConst)
-    return term.msb.eval() - term.lsb.eval() + 1;
+    return term.msb.eval() - term.lsb.eval() + 1
 
 
 def term_to_smt_var(s, terms, top_name):
@@ -356,7 +355,7 @@ def find_direct_parent_nodes(p, parents=None) -> List[str]:
     return parents
 
 
-def pv_to_smt_expr(node, width, assignee, substitutions={}):
+def pv_to_smt_expr(node, width, assignee, substitutions=None):
     """
     Converts the pyverilog AST tree into an expression in our SMT DSL.
 
@@ -377,6 +376,8 @@ def pv_to_smt_expr(node, width, assignee, substitutions={}):
     is not in this list, replace it with a synth fun and with its "important"
     parents as possible arguments
     """
+    if substitutions is None:
+        substitutions = {}
     # print(type(node))
     if isinstance(node, DFTerminal):
         qual_name = maybe_scope_chain_to_str(node.name)
@@ -403,7 +404,7 @@ def pv_to_smt_expr(node, width, assignee, substitutions={}):
         # mask = ~(-1 << (msb - lsb + 1)) << lsb
         # return full_val & mask
     elif isinstance(node, DFBranch):
-        assert node.condnode is not None, p.tocode()
+        assert node.condnode is not None, node.tocode()
         cond = pv_to_smt_expr(node.condnode, 1, assignee, substitutions)
         truenode = assignee
         falsenode = assignee

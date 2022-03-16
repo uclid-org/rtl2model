@@ -114,12 +114,12 @@ def partition(
 
     deps = DependencyGraph(important_signals, terms, binddict)
     # Maps signal names to their source signals from the current cycle
-    curr_parent_map = deps.curr_parent_map
+    curr_parent_map = deps.curr_parents
     # Maps signal names to their dependents on the current cycle
-    curr_child_map = deps.curr_child_map
+    curr_child_map = deps.curr_children
     # Maps signal names to their source signals on the next cycle
-    next_parent_map = deps.next_parent_map
-    next_child_map = deps.next_child_map
+    next_parent_map = deps.next_parents
+    next_child_map = deps.next_children
 
     # Sinks in the dependency graph constitute module outputs
     sinks = {s for s in all_signals if len(curr_child_map[s]) == 0 and not len(curr_parent_map[s]) == 0}
@@ -149,7 +149,7 @@ def partition(
                 # If the node is a source w/ no register edges, then treat it
                 # as an input to the module
                 new_stage.inputs.append(p)
-                input_map[p].append(p)
+                input_map[p].append(stage_i)
             else:
                 new_stage.state_vars.append(p)
                 stage_map[p] = stage_i

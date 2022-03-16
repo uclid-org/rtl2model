@@ -8,7 +8,7 @@ TODO add str methods to everything
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
 from enum import Enum, EnumMeta, auto
-from typing import ClassVar, Dict, List, Set, Tuple, Optional
+from typing import Dict, List, Set, Tuple, Optional
 
 import pycvc5
 
@@ -93,7 +93,7 @@ class FunctionSort(Sort):
         )
 
     def _to_cvc5(self, cvc5_ctx):
-        return cvc5_ctx.solver.mkFunctionSort([self.args._to_cvc5(cvc5_ctx)], self.codomain._to_cvc5(cvc5_ctx))
+        return cvc5_ctx.solver.mkFunctionSort([a._to_cvc5(cvc5_ctx) for a in self.args], self.codomain._to_cvc5(cvc5_ctx))
 
     def to_sygus2(self):
         return "(-> " + " ".join([a.to_sygus2() for a in self.args]) + self.codomain.to_sygus2() + ")"
@@ -161,6 +161,9 @@ class Kind(Enum):
         except KeyError:
             raise NotImplementedError(f"cannot convert CVC5 kind {cvc5_kind}")
 
+    def to_sygus2(self):
+        raise NotImplementedError()
+
 
 # Maps our Kind class to pycvc5.Kind...
 _OP_KIND_MAPPING = {
@@ -225,7 +228,7 @@ class Term(ABC):
         """
         if isinstance(self.sort, BVSort):
             assert self.sort.bitwidth == 1
-            cond = OpTerm(Kind.Eq, (self, BVConst(1, self.sort.bitwidth)))
+            cond = OpTerm(Kind.Equal, (self, BVConst(1, self.sort.bitwidth)))
         else:
             assert isinstance(self.sort, BoolSort)
             cond = self
@@ -319,6 +322,8 @@ class Term(ABC):
             hi = max(key.start, key.stop)
             lo = min(key.start, key.stop)
             return OpTerm(Kind.BVExtract, (hi, lo, self))
+        else:
+            raise KeyError(key)
 
     # === ABSTRACT AND SHARED STATIC METHODS ===
     @staticmethod
@@ -477,7 +482,7 @@ class OpTerm(Term):
 
     def _to_cvc5(self, cvc5_ctx):
         cvc5_kind = self.kind._to_cvc5(self)
-        if kind == Kind.BVExtract:
+        if self.kind == Kind.BVExtract:
             # TODO special case BVExtract for from_cvc5?
             assert isinstance(self.args[0], BVConst)
             assert isinstance(self.args[1], BVConst)
@@ -720,7 +725,7 @@ class QuantTerm(Term):
         if self in cvc5_ctx.terms:
             return cvc5_ctx.terms[self]
         else:
-            cvc5_kind = self.kind._to_cvc5()
+            cvc5_kind = self.kind._to_cvc5(cvc5_ctx)
             # TODO this needs to be tested
             vlist = cvc5_ctx.solver.mkTerm(pycvc5.Kind.VariableList, [p._to_cvc5() for p in self.bound_vars])
             t = cvc5_ctx.solver.mkTerm(cvc5_kind, vlist, [v._to_cvc5(cvc5_ctx) for v in self.body])
@@ -783,6 +788,9 @@ class ApplyUF(Term):
         return True
 
     def to_verif_dsl(self):
+        raise NotImplementedError()
+
+    def to_uclid(self):
         raise NotImplementedError()
 
 
