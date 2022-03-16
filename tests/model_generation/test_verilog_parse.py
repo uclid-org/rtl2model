@@ -95,10 +95,77 @@ class TestVerilogParse:
                 default_next=[{r0: r0 | in_}]
             )
 
-    def test_verilog_single_imp_no_parents(self):
+    def test_verilog_single_imp_no_coi(self):
         """
         Tests generation of a model from a single RTL module with specified important signals.
-        `coi_conf` is NO_COI, meaning every important signal needs to be manually specified.
+        `coi_conf` is NO_COI, meaning non-important signals are 0-arity UFs.
+        """
+        rtl = textwrap.dedent("""\
+            module top(input clk, input should_inc, output [2:0] result);
+                reg [2:0] a;
+                reg [2:0] b;
+                wire [2:0] a_p1;
+                wire [2:0] b_p1;
+                always @(posedge clk) begin
+                    if (should_inc) begin
+                        a = a_p1;
+                        b = b_p1;
+                    end
+                end
+                assign a_p1 = a + 3'h1;
+                assign b_p1 = b + 3'h1;
+                assign result = ~a | ~b;
+            endmodule
+            """)
+        bv3 = smt.BVSort(3)
+        var = smt.Variable
+        # TODO to allow for composition of child modules, and specifying important_signals for those
+        model_no_a = verilog_to_model(rtl, "top", important_signals=["should_inc", "b", "b_p1", "result"])
+        model_no_a.print()
+        a = var("a", bv3)
+        a_p1 = var("a_p1", bv3)
+        b = var("b", bv3)
+        b_p1 = var("b_p1", bv3)
+        should_inc = var("should_inc", smt.BoolSort())
+        result = var("result", bv3)
+        assert model_no_a == \
+            Model(
+                "top",
+                inputs=[should_inc],
+                outputs=[result],
+                state=[b, b_p1],
+                # `a` appears in the expression for `result`, but is not declared important
+                # therefore, it is modeled as a 0-arity uninterpreted function
+                ufs=[smt.UFTerm("a", bv3, ())],
+                logic={
+                    b_p1: b + 1,
+                    result: (~a) | (~b)
+                },
+                default_next=[{b: should_inc.ite(b_p1, b)}],
+            )
+        model_no_b = verilog_to_model(rtl, "top", important_signals=["should_inc", "a", "a_p1", "result"])
+        assert model_no_b == \
+            Model(
+                "top",
+                inputs=[should_inc],
+                outputs=[result],
+                state=[a, a_p1],
+                # `b` appears in the expression for `result`, but is not declared important
+                # therefore, it is modeled as a 0-arity uninterpreted function
+                ufs=[smt.UFTerm("b", bv3, ())],
+                logic={
+                    a_p1: a + 1,
+                    result: (~a) | (~b)
+                },
+                default_next=[{a: should_inc.ite(a_p1, a)}],
+            )
+
+
+    def test_verilog_single_imp_uf_coi(self):
+        """
+        Tests generation of a model from a single RTL module with specified important signals.
+        `coi_conf` is UF_COI, meaning that non-important signals are replaced with uninterpreted
+        functions. Unlike NO_COI, these UF terms have important arguments in their COI as arguments.
         """
         rtl = textwrap.dedent("""\
             module top(input clk, input should_inc, output [2:0] result);
@@ -168,7 +235,8 @@ class TestVerilogParse:
                 init_values={}
             )
 
-    def test_verilog_single_imp_with_parents(self):
+
+    def test_verilog_single_imp_keep_coi(self):
         """
         Tests generation of a model from a single RTL module with specified important signals.
         `coi_conf` is UF_ARGS_COI, meaning some important signals should be inferred.
@@ -231,4 +299,13 @@ class TestVerilogParse:
             """
         )
         model = verilog_to_model(rtl, "top")
+        model.print()
+        submodel = verilog_to_model(rtl, "inner")
+        submodel.print()
+        """
+        TODO submodule handling V
+        we may internally need to make multiple calls to pyverilog.Dataflowwhatever
+        because calling on the top level will follow dependencies into submodules,
+        which isn't necessarily desirable behavior
+        """
         assert False

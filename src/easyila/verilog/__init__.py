@@ -100,9 +100,7 @@ def verilog_to_model(
     # First pass: compute dependency graph to get cones of influence for each variable
     # this requires looking at all signals in the design
     # TODO how to handle dependencies going through submodules?
-    # TODO implement this first pass
     deps = DependencyGraph(important_signals, terms, binddict)
-
     # 1.5th pass: traverse AST to get expressions for _rn variables.
     rename_substitutions = {}
     """
@@ -135,8 +133,15 @@ def verilog_to_model(
     """`logic` maps variable names to SMT expressions to their expressions on the _current_ cycle"""
     ufs = {}
     """
-    `ufs` maps ignored (non-important) variables to a corresponding `UFTerm` that describes its
-    cone of influence. This map is updated on calls to `pv_to_smt_expr`.
+    `ufs` maps ignored (non-important) variables to a corresponding `UFTerm` with arguments based
+    on the variable's COI. This behavior changes based on the `coi_conf` option:
+    - NO_COI: All functions are 0-arity, and can be determined directly from edges of the dependency
+              graph generated in pass #1.
+    - KEEP_COI: Any symbol found to be in the cone-of-influence of an important signal is added
+                directly to the model -- the `ufs` map should therefore be empty.
+    - UF_ARGS_COI: Any symbol found to be an immediate parent of an important signal is modeled as
+                   a UF, but unlike NO_COI, this UF takes as arguments the important signals that
+                   are in its COI.
     """
 
     # These arrays determine which variables are in our model output
@@ -145,20 +150,10 @@ def verilog_to_model(
     m_outputs: List[smt.Variable] = []
     m_state: List[smt.Variable] = []
     for s in important_signals:
-        sc = str_to_scope_chain(s)
-        term = terms[sc]
-        termtype = term.termtype
-        assert isinstance(term.msb, DFIntConst)
-        assert isinstance(term.lsb, DFIntConst)
-        # TODO deal with `dims` for arrays?
-        width = term.msb.eval() - term.lsb.eval() + 1;
-        unqual_s = s[len(top_name) + 1:]
-        # TODO distinguish between bv1 and booleans
-        if width == 1:
-            v = smt.Variable(unqual_s, smt.BoolSort())
-        else:
-            v = smt.Variable(unqual_s, smt.BVSort(width))
+        v = term_to_smt_var(s, terms, top_name)
         # Categorize input, output, or state
+        sc = str_to_scope_chain(s)
+        termtype = terms[sc].termtype
         if not inline_renames or not signaltype.isRename(termtype):
             if s in important_signal_set:
                 if signaltype.isInput(termtype):
@@ -178,6 +173,20 @@ def verilog_to_model(
                             next_updates[v] = expr
                         else:
                             logic[v] = expr
+    if coi_conf == COIConf.NO_COI:
+        # Model missing variables (all 1 edge away from important signal in dep graph)
+        # as 0-arity uninterpreted functions.
+        all_missing = set()
+        for s in important_signals:
+            all_missing.update(deps.next_parents[s])
+            all_missing.update(deps.curr_parents[s])
+        all_missing.difference_update(important_signals)
+        for s in all_missing:
+            if not inline_renames or not signaltype.isRename(terms[str_to_scope_chain(s)].termtype):
+                ufs[v] = term_to_smt_var(s, terms, top_name).to_uf()
+    elif coi_conf == COIConf.KEEP_COI:
+        ...
+        # TODO
     return Model(
         top_name,
         inputs=m_inputs,
@@ -191,6 +200,23 @@ def verilog_to_model(
             # TODO read init values
         }
     )
+
+
+def term_to_smt_var(s, terms, top_name):
+    sc = str_to_scope_chain(s)
+    term = terms[sc]
+    termtype = term.termtype
+    assert isinstance(term.msb, DFIntConst)
+    assert isinstance(term.lsb, DFIntConst)
+    # TODO deal with `dims` for arrays?
+    width = term.msb.eval() - term.lsb.eval() + 1;
+    unqual_s = s[len(top_name) + 1:]
+    # TODO distinguish between bv1 and booleans
+    if width == 1:
+        v = smt.Variable(unqual_s, smt.BoolSort())
+    else:
+        v = smt.Variable(unqual_s, smt.BVSort(width))
+    return v
 
 
 @dataclass
@@ -361,11 +387,12 @@ def pv_to_smt_expr(node, width, assignee, substitutions={}):
         return smt.BVConst(node.eval(), width)
     elif isinstance(node, DFPartselect):
         # TODO need to get concrete values for LSB/MS
-        if not isinstance(lsb, DFIntConst) and not isinstance(msb, DFIntConst):
+        if not isinstance(node.lsb, DFIntConst) and not isinstance(node.msb, DFIntConst):
             raise NotImplementedError("only constant bit slices can translated")
         lsb_v = node.lsb.eval()
         msb_v = node.msb.eval()
-        raise NotImplementedError("SMT bit slice operator not implemented yet")
+        # TODO width here can be arbitrary?
+        return pv_to_smt_expr(node.var, width, assignee, substitutions)[msb_v:lsb_v]
         # lsb = pv_to_smt_expr(node.lsb)
         # msb = pv_to_smt_expr(node.msb)
         # mask = ~(-1 << (msb - lsb + 1)) << lsb

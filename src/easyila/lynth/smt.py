@@ -130,22 +130,23 @@ class UninterpretedSort(Sort):
 
 class Kind(Enum):
     # https://cvc5.github.io/docs/api/cpp/kind.html
-    BVAdd   = auto()
-    BVSub   = auto()
-    BVOr    = auto()
-    BVAnd   = auto()
-    BVNot   = auto()
-    BVXor   = auto()
-    Or      = auto()
-    And     = auto()
-    Not     = auto()
-    Xor     = auto()
-    Implies = auto()
-    Ite     = auto()
-    Lambda  = auto()
-    Equal   = auto()
-    Exists  = auto()
-    ForAll  = auto()
+    BVAdd       = auto()
+    BVSub       = auto()
+    BVOr        = auto()
+    BVAnd       = auto()
+    BVNot       = auto()
+    BVXor       = auto()
+    BVExtract   = auto()
+    Or          = auto()
+    And         = auto()
+    Not         = auto()
+    Xor         = auto()
+    Implies     = auto()
+    Ite         = auto()
+    Lambda      = auto()
+    Equal       = auto()
+    Exists      = auto()
+    ForAll      = auto()
 
     def _to_cvc5(self, _cvc5_ctx):
         try:
@@ -163,22 +164,25 @@ class Kind(Enum):
 
 # Maps our Kind class to pycvc5.Kind...
 _OP_KIND_MAPPING = {
-    Kind.BVAdd: pycvc5.Kind.BVAdd,
-    Kind.BVSub: pycvc5.Kind.BVSub,
-    Kind.BVOr: pycvc5.Kind.BVOr,
-    Kind.BVAnd: pycvc5.Kind.BVAnd,
-    Kind.BVNot: pycvc5.Kind.BVNot,
-    Kind.BVXor: pycvc5.Kind.BVXor,
-    Kind.Or: pycvc5.Kind.Or,
-    Kind.And: pycvc5.Kind.And,
-    Kind.Not: pycvc5.Kind.Not,
-    Kind.Xor: pycvc5.Kind.Xor,
-    Kind.Implies: pycvc5.Kind.Implies,
-    Kind.Ite: pycvc5.Kind.Ite,
-    Kind.Lambda: pycvc5.Kind.Lambda,
-    Kind.Equal: pycvc5.Kind.Equal,
-    Kind.Exists: pycvc5.Kind.Exists,
-    Kind.ForAll: pycvc5.Kind.Forall,
+    Kind.BVAdd:     pycvc5.Kind.BVAdd,
+    Kind.BVSub:     pycvc5.Kind.BVSub,
+    Kind.BVOr:      pycvc5.Kind.BVOr,
+    Kind.BVAnd:     pycvc5.Kind.BVAnd,
+    Kind.BVNot:     pycvc5.Kind.BVNot,
+    Kind.BVXor:     pycvc5.Kind.BVXor,
+    Kind.BVExtract: pycvc5.Kind.BVExtract,
+
+    Kind.Equal:     pycvc5.Kind.Equal,
+    Kind.Or:        pycvc5.Kind.Or,
+    Kind.And:       pycvc5.Kind.And,
+    Kind.Not:       pycvc5.Kind.Not,
+    Kind.Xor:       pycvc5.Kind.Xor,
+    Kind.Implies:   pycvc5.Kind.Implies,
+    Kind.Ite:       pycvc5.Kind.Ite,
+
+    Kind.Lambda:    pycvc5.Kind.Lambda,
+    Kind.Exists:    pycvc5.Kind.Exists,
+    Kind.ForAll:    pycvc5.Kind.Forall,
 }
 # ...and vice versa
 _OP_KIND_REV_MAPPING = {v: k for k, v in _OP_KIND_MAPPING.items()}
@@ -190,6 +194,7 @@ _OP_SYGUS_SYMBOLS = {
     Kind.BVAnd: "bvand",
     Kind.BVNot: "bvnot",
     Kind.BVXor: "bvxor",
+    # extract is a special case
     Kind.Or: "or",
     Kind.And: "and",
     Kind.Not: "not",
@@ -307,6 +312,14 @@ class Term(ABC):
             op = Kind.BVXor
         return OpTerm(op, (self, other))
 
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            return OpTerm(Kind.BVExtract, (key, key, self))
+        elif isinstance(key, slice):
+            hi = max(key.start, key.stop)
+            lo = min(key.start, key.stop)
+            return OpTerm(Kind.BVExtract, (hi, lo, self))
+
     # === ABSTRACT AND SHARED STATIC METHODS ===
     @staticmethod
     def from_cvc5(cvc5_term):
@@ -375,6 +388,10 @@ class Variable(Term):
     name: str
     _sort: Sort
 
+    def to_uf(self):
+        """Converts this variable to a 0-arity UFTerm."""
+        return UFTerm(self.name, self.sort, ())
+
     @staticmethod
     def from_cvc5(cvc5_term):
         if cvc5_term.getKind() != pycvc5.Kind.Variable:
@@ -433,7 +450,14 @@ class OpTerm(Term):
         bvops = { Kind.BVAdd, Kind.BVSub, Kind.BVOr, Kind.BVAnd, Kind.BVXor, Kind.BVNot, Kind.Implies }
         if self.kind in bvops:
             return self.args[0].sort
-        if self.kind == Kind.Ite:
+        elif self.kind == Kind.BVExtract:
+            # TODO fix this hack: in the CVC5 API, BVExtract must first be turned into
+            # an operator via Solver::mkOp(BVExtract, high, low)
+            # As a workaround, we store the high/low parameters as BVConst arguments
+            assert isinstance(self.args[0], BVConst)
+            assert isinstance(self.args[1], BVConst)
+            return BVSort(self.args[0].val - self.args[1].val + 1)
+        elif self.kind == Kind.Ite:
             return self.args[1].sort
         bitops = { Kind.Or, Kind.And, Kind.Xor, Kind.Not, Kind.Equal }
         if self.kind in bitops:
@@ -453,6 +477,12 @@ class OpTerm(Term):
 
     def _to_cvc5(self, cvc5_ctx):
         cvc5_kind = self.kind._to_cvc5(self)
+        if kind == Kind.BVExtract:
+            # TODO special case BVExtract for from_cvc5?
+            assert isinstance(self.args[0], BVConst)
+            assert isinstance(self.args[1], BVConst)
+            op = cvc5_ctx.solver.mkOp(cvc5_kind, self.args[0].val, self.args[1].val)
+            return cvc5_ctx.solver.mkTerm(op, self.args[2]._to_cvc5(cvc5_ctx))
         t = cvc5_ctx.solver.mkTerm(cvc5_kind, *[v._to_cvc5(cvc5_ctx) for v in self.args])
         return t
 
@@ -496,7 +526,7 @@ class OpTerm(Term):
             a1_str = wrap(self.args[1])
             a2_str = wrap(self.args[2])
             return f"{a0_str} ? {a1_str} : {a2_str}"
-        raise NotImplementedError()
+        raise NotImplementedError(v)
 
     @property
     def _has_children(self):
