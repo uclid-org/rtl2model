@@ -316,11 +316,13 @@ class Term(ABC):
         return OpTerm(op, (self, other))
 
     def __getitem__(self, key):
+        assert isinstance(self.sort, BVSort)
+        wrap = lambda i: BVConst(i, self.sort.bitwidth)
         if isinstance(key, int):
-            return OpTerm(Kind.BVExtract, (key, key, self))
+            return OpTerm(Kind.BVExtract, (wrap(key), wrap(key), self))
         elif isinstance(key, slice):
-            hi = max(key.start, key.stop)
-            lo = min(key.start, key.stop)
+            hi = warp(max(key.start, key.stop))
+            lo = wrap(min(key.start, key.stop))
             return OpTerm(Kind.BVExtract, (hi, lo, self))
         else:
             raise KeyError(key)

@@ -59,6 +59,31 @@ class Model:
             )
             """))
 
+    def to_uclid(self):
+        indent = 4 * '    '
+        u_vars = ""
+        def u_append(lst):
+            nonlocal u_vars
+            if len(lst) > 0:
+                u_vars += textwrap.indent("\n".join(s.to_uclid() for s in lst), indent)
+        u_append(self.inputs)
+        u_append(self.outputs)
+        u_append(self.state)
+        u_append(self.ufs)
+        return textwrap.dedent(f"""\
+            module {self.name} {{
+                {u_vars}
+
+                init {{
+
+                }}
+
+                next {{
+                    {self.default_next.to_uclid()}
+                }}
+            }}
+            """)
+
 @dataclass
 class ManualModel(Model):
     """

@@ -293,6 +293,11 @@ class TestVerilogParse:
             default_next=[{a: should_inc.ite(a_p1, a)}],
         )
 
+    def test_verilog_output_unimp(self):
+        # TODO what do we do when an output is a dependency of an important signal,
+        # but the output itself is non-important
+        assert False
+
     def test_verilog_one_child_module(self):
         rtl = textwrap.dedent("""\
             module inner(input clk, input rst, input i_inner, output o_inner);
