@@ -328,6 +328,9 @@ class TestVerilogParse:
             endmodule
             """
         )
+        # TODO this example also currently parses incorrectly because of bv indexing:
+        # i_state[0] has LHS of bv1, but we need some other mechanism to figure out the
+        # bitwidth of i_state (probably because we're traversing the AST the wrong way)
         # TODO to allow for composition of child modules, and specifying important_signals for those
         model = verilog_to_model(rtl, "top")
         model.print()
