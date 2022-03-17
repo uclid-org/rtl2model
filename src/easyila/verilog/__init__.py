@@ -76,7 +76,6 @@ def verilog_to_model(
 
     terms = analyzer.getTerms()
     binddict = analyzer.getBinddict()
-    # print(binddict.keys())
     all_signals = [maybe_scope_chain_to_str(t) for t in terms]
     all_signals = [s for s in all_signals if s.split(".")[-1] != clock_name]
     if preserve_all_signals:
@@ -93,14 +92,66 @@ def verilog_to_model(
                     important_signals[i] = qual_name
         if missing_signal_names:
             raise Exception("Signal names not found in pyverilog terms: " + ",".join([f"'{s}'" for s in missing_signal_names]))
+
     # TODO for restricting important signals, look into fast COI computation
     # "Fast Cone-Of-Influence computation and estimation in problems with multiple properties"
     # https://ieeexplore.ieee.org/document/6513616
-    # print(all_signals)
     # First pass: compute dependency graph to get cones of influence for each variable
     # this requires looking at all signals in the design
     # TODO how to handle dependencies going through submodules?
     deps = DependencyGraph(important_signals, terms, binddict)
+    ufs = []
+    """
+    `ufs` is a list of non-important variables that are modeled as a `UFTerm` with arguments based
+    on the variable's COI. This behavior changes based on the `coi_conf` option:
+    - NO_COI: All functions are 0-arity, and can be determined directly from edges of the dependency
+              graph generated in pass #1.
+    - KEEP_COI: Any symbol found to be in the cone-of-influence of an important signal is added
+                directly to the model -- the `ufs` map should therefore be empty.
+    - UF_ARGS_COI: Any symbol found to be an immediate parent of an important signal is modeled as
+                   a UF, but unlike NO_COI, this UF takes as arguments the important signals that
+                   are in its COI.
+    """
+
+    all_missing = set()
+    for s in important_signals:
+        all_missing.update(deps.next_parents[s])
+        all_missing.update(deps.curr_parents[s])
+    all_missing.difference_update(important_signals)
+    uf_names = set()
+    for s in all_missing:
+        if not inline_renames or not signaltype.isRename(terms[str_to_scope_chain(s)].termtype):
+            uf_names.add(s)
+    if coi_conf == COIConf.NO_COI:
+        # Model missing variables (all 1 edge away from important signal in dep graph)
+        # as 0-arity uninterpreted functions.
+        for s in uf_names:
+            ufs.append(term_to_smt_var(s, terms, top_name).to_uf())
+    elif coi_conf == COIConf.KEEP_COI:
+        if preserve_all_signals:
+            pass
+        else:
+            # When KEEP_COI is specified, all signals in the COI of an important signal is kept
+            coi = deps.compute_coi(important_signals)
+            all_coi_items = set()
+            for l in coi.values():
+                all_coi_items.update(l)
+            # In order to preserve order, we don't use `all_coi_items` directly
+            important_signals = [s for s in all_signals if s in all_coi_items]
+            important_signal_set = all_coi_items
+    elif coi_conf == COIConf.UF_ARGS_COI:
+        # Model missing variables as uninterpreted functions, with important signals in COI
+        # as arguments
+        coi = deps.compute_coi(important_signals)
+        for s in uf_names:
+            width = get_term_width(s, terms)
+            unqual_s = s[len(top_name) + 1:]
+            params = tuple(
+                term_to_smt_var(p, terms, top_name) for p in coi[s] if p in important_signal_set
+            )
+            ufs.append(smt.UFTerm(unqual_s, smt.BVSort(width), params))
+    else:
+        raise NotImplementedError("unimplemented COIConf " + str(coi_conf))
     # 1.5th pass: traverse AST to get expressions for _rn variables.
     rename_substitutions = {}
     """
@@ -131,18 +182,6 @@ def verilog_to_model(
     """`next_updates` maps variable names to SMT expressions for their _next_ cycle values"""
     logic = {}
     """`logic` maps variable names to SMT expressions to their expressions on the _current_ cycle"""
-    ufs = {}
-    """
-    `ufs` maps ignored (non-important) variables to a corresponding `UFTerm` with arguments based
-    on the variable's COI. This behavior changes based on the `coi_conf` option:
-    - NO_COI: All functions are 0-arity, and can be determined directly from edges of the dependency
-              graph generated in pass #1.
-    - KEEP_COI: Any symbol found to be in the cone-of-influence of an important signal is added
-                directly to the model -- the `ufs` map should therefore be empty.
-    - UF_ARGS_COI: Any symbol found to be an immediate parent of an important signal is modeled as
-                   a UF, but unlike NO_COI, this UF takes as arguments the important signals that
-                   are in its COI.
-    """
 
     # These arrays determine which variables are in our model output
     important_signal_set = set(important_signals)
@@ -174,31 +213,17 @@ def verilog_to_model(
                             next_updates[v] = expr
                         else:
                             logic[v] = expr
-    if coi_conf == COIConf.NO_COI:
-        # Model missing variables (all 1 edge away from important signal in dep graph)
-        # as 0-arity uninterpreted functions.
-        all_missing = set()
-        for s in important_signals:
-            all_missing.update(deps.next_parents[s])
-            all_missing.update(deps.curr_parents[s])
-        all_missing.difference_update(important_signals)
-        for s in all_missing:
-            if not inline_renames or not signaltype.isRename(terms[str_to_scope_chain(s)].termtype):
-                ufs[v] = term_to_smt_var(s, terms, top_name).to_uf()
-    elif coi_conf == COIConf.KEEP_COI:
-        ...
-        # TODO
     return Model(
         top_name,
         inputs=m_inputs,
         outputs=m_outputs,
         state=m_state,
-        ufs=list(ufs.values()),
+        ufs=ufs,
         logic=logic,
         default_next=[next_updates],
         instructions={},
         init_values={
-            # TODO read init values
+            # TODO read init values (may require pyverilog editing)
         }
     )
 
@@ -274,7 +299,6 @@ class DependencyGraph:
             if signal_name in visited:
                 continue
             visited.add(signal_name)
-            # print("visit", signal_name)
             sc = str_to_scope_chain(signal_name)
             # Inputs are not in binddict, and won't have dependencies
             if sc not in binddict:
@@ -296,11 +320,9 @@ class DependencyGraph:
                 if p.tree is not None:
                     parents = find_direct_parent_nodes(p.tree)
                     if signaltype.isReg(termdict[sc].termtype):
-                        # print(f"next cycle parents of {signal_name}:", parents)
                         p_map = self.next_parents
                         c_map = self.next_children
                     else:
-                        # print(f"curr cycle parents of {signal_name}:", parents)
                         p_map = self.curr_parents
                         c_map = self.curr_children
                     if len(parents) != 0:
@@ -309,6 +331,36 @@ class DependencyGraph:
                             c_map[p].add(signal_name)
                     to_visit.extend(parents)
 
+    def compute_coi(self, signals):
+        """
+        Computes the cone of influence (i.e. dependency graph parents) for every signal
+        in the provided list.
+        """
+        # TODO optimize to use bitmaps instead
+        # Values are dicts that function as a set in order to preserve insertion order
+        coi = {}
+        to_visit = signals
+        visited = set()
+        def visit(s):
+            visited.add(s)
+            # children = set(self.curr_children[s]) | set(self.next_children[s])
+            parents = self.curr_parents[s] + self.next_parents[s]
+            if s not in coi:
+                coi[s] = {s: ()}
+            for p in parents:
+                if p not in visited:
+                    if p not in coi:
+                        coi[p] = {p: ()}
+                    coi[p] |= visit(p)
+                coi[s] |= coi[p]
+            return coi[s]
+
+        for s in to_visit:
+            if s in visited:
+                continue
+            # probably a redundant assignment
+            coi[s] = visit(s)
+        return {k: list(v.keys()) for k, v in coi.items()}
 
 def find_direct_parent_nodes(p, parents=None) -> List[str]:
     """
@@ -326,7 +378,6 @@ def find_direct_parent_nodes(p, parents=None) -> List[str]:
         # TODO account for reassigning w/in always@ block? what if there
         # are multiple always@ blocks?
         sc_str = maybe_scope_chain_to_str(p.name)
-        # print(td_entry.termtype)
         # unqualified_name = sc_str.split(".")[-1]
         parents.append(sc_str)
     elif isinstance(p, DFIntConst):
@@ -378,7 +429,6 @@ def pv_to_smt_expr(node, width, assignee, substitutions=None):
     """
     if substitutions is None:
         substitutions = {}
-    # print(type(node))
     if isinstance(node, DFTerminal):
         qual_name = maybe_scope_chain_to_str(node.name)
         if qual_name in substitutions:

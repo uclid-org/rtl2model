@@ -164,7 +164,7 @@ class TestVerilogParse:
     def test_verilog_single_imp_uf_coi(self):
         """
         Tests generation of a model from a single RTL module with specified important signals.
-        `coi_conf` is UF_COI, meaning that non-important signals are replaced with uninterpreted
+        `coi_conf` is UF_ARGS_COI, meaning that non-important signals are replaced with uninterpreted
         functions. Unlike NO_COI, these UF terms have important arguments in their COI as arguments.
         """
         rtl = textwrap.dedent("""\
@@ -187,7 +187,12 @@ class TestVerilogParse:
         bv3 = smt.BVSort(3)
         var = smt.Variable
         # TODO to allow for composition of child modules, and specifying important_signals for those
-        model_no_a = verilog_to_model(rtl, "top", important_signals=["should_inc", "b", "b_p1", "result"])
+        model_no_a = verilog_to_model(
+            rtl,
+            "top",
+            important_signals=["should_inc", "b", "b_p1", "result"],
+            coi_conf=COIConf.UF_ARGS_COI,
+        )
         model_no_a.print()
         a = var("a", bv3)
         a_p1 = var("a_p1", bv3)
@@ -204,17 +209,19 @@ class TestVerilogParse:
                 # `a` appears in the expression for `result`, but is not declared important
                 # therefore, it is modeled as an uninterpreted function
                 # TODO namespace collision for should_inc parameter?
-                ufs=[smt.UFTerm("a", bv3, should_inc)],
+                ufs=[smt.UFTerm("a", bv3, (should_inc,))],
                 logic={
                     b_p1: b + 1,
                     result: (~a) | (~b)
                 },
-                instructions={
-                    # TODO
-                },
-                init_values={}
+                default_next=[{b: should_inc.ite(b_p1, b)}],
             )
-        model_no_b = verilog_to_model(rtl, "top", important_signals=["should_inc", "a", "a_p1", "result"])
+        model_no_b = verilog_to_model(
+            rtl,
+            "top",
+            important_signals=["should_inc", "a", "a_p1", "result"],
+            coi_conf=COIConf.UF_ARGS_COI,
+        )
         assert model_no_b == \
             Model(
                 "top",
@@ -224,22 +231,19 @@ class TestVerilogParse:
                 # `b` appears in the expression for `result`, but is not declared important
                 # therefore, it is modeled as an uninterpreted function
                 # TODO namespace collision for should_inc parameter?
-                ufs=[smt.UFTerm("b", bv3, should_inc)],
+                ufs=[smt.UFTerm("b", bv3, (should_inc,))],
                 logic={
                     a_p1: a + 1,
                     result: (~a) | (~b)
                 },
-                instructions={
-                    # TODO
-                },
-                init_values={}
+                default_next=[{a: should_inc.ite(a_p1, a)}],
             )
 
 
     def test_verilog_single_imp_keep_coi(self):
         """
         Tests generation of a model from a single RTL module with specified important signals.
-        `coi_conf` is UF_ARGS_COI, meaning some important signals should be inferred.
+        `coi_conf` is KEEP_COI, meaning any signal in the COI of an important signal is kept.
         """
         rtl = textwrap.dedent("""\
             module top(input clk, input should_inc, output [2:0] result);
@@ -258,15 +262,36 @@ class TestVerilogParse:
                 assign result = ~a | ~b;
             endmodule
             """)
-        # TODO to allow for composition of child modules, and specifying important_signals for those
-        model_no_a = verilog_to_model(rtl, "top", important_signals=["b"], coi_conf=COIConf.NO_COI)
-        assert model_no_a == \
-            Model(
-            )
-        model_no_b = verilog_to_model(rtl, "top", important_signals=["a"], coi_conf=COIConf.NO_COI)
-        assert model_no_b == \
-            Model(
-            )
+        model_no_a = verilog_to_model(rtl, "top", important_signals=["b"], coi_conf=COIConf.KEEP_COI)
+        model_no_b = verilog_to_model(rtl, "top", important_signals=["a"], coi_conf=COIConf.KEEP_COI)
+        model_no_a.print()
+        model_no_b.print()
+        bv3 = smt.BVSort(3)
+        var = smt.Variable
+        a = var("a", bv3)
+        a_p1 = var("a_p1", bv3)
+        b = var("b", bv3)
+        b_p1 = var("b_p1", bv3)
+        should_inc = var("should_inc", smt.BoolSort())
+        result = var("result", bv3)
+        assert model_no_a == Model(
+            "top",
+            inputs=[should_inc],
+            outputs=[],
+            # Even though `b_p1` isn't specified as important, it's still in the COI
+            state=[b, b_p1],
+            logic={b_p1: b + 1},
+            default_next=[{b: should_inc.ite(b_p1, b)}],
+        )
+        assert model_no_b == Model(
+            "top",
+            inputs=[should_inc],
+            outputs=[],
+            # Even though `a_p1` isn't specified as important, it's still in the COI
+            state=[a, a_p1],
+            logic={a_p1: a + 1},
+            default_next=[{a: should_inc.ite(a_p1, a)}],
+        )
 
     def test_verilog_one_child_module(self):
         rtl = textwrap.dedent("""\
@@ -298,6 +323,7 @@ class TestVerilogParse:
             endmodule
             """
         )
+        # TODO to allow for composition of child modules, and specifying important_signals for those
         model = verilog_to_model(rtl, "top")
         model.print()
         submodel = verilog_to_model(rtl, "inner")
