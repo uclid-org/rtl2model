@@ -765,6 +765,10 @@ class ApplyUF(Term):
     fun: "SynthFun"
     input_values: Tuple["BVConst", ...]
 
+    @property
+    def sort(self):
+        raise NotImplementedError()
+
     @staticmethod
     def from_cvc5(cvc5_term):
         if cvc5_term.getKind() == pycvc5.Kind.ApplyUf:

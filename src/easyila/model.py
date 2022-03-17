@@ -26,7 +26,7 @@ class Model:
     ufs: List[smt.UFTerm] = field(default_factory=list)
     # memories: List[]
     # how do we incorporate child-ILA transitions? how do we connect modules?
-    submodules: Dict[str, "Module"] = field(default_factory=dict)
+    submodules: Dict[str, "Model"] = field(default_factory=dict)
     logic: Dict[smt.Variable, smt.Term] = field(default_factory=dict)
     """Same-cycle logic expressions."""
 

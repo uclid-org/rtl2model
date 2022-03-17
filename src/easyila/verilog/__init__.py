@@ -127,6 +127,7 @@ def verilog_to_model(
         # as 0-arity uninterpreted functions.
         for s in uf_names:
             ufs.append(term_to_smt_var(s, terms, top_name).to_uf())
+        important_signal_set = set(important_signals)
     elif coi_conf == COIConf.KEEP_COI:
         if preserve_all_signals:
             pass
@@ -143,6 +144,7 @@ def verilog_to_model(
         # Model missing variables as uninterpreted functions, with important signals in COI
         # as arguments
         coi = deps.compute_coi(important_signals)
+        important_signal_set = set(important_signals)
         for s in uf_names:
             width = get_term_width(s, terms)
             unqual_s = s[len(top_name) + 1:]
@@ -184,7 +186,6 @@ def verilog_to_model(
     """`logic` maps variable names to SMT expressions to their expressions on the _current_ cycle"""
 
     # These arrays determine which variables are in our model output
-    important_signal_set = set(important_signals)
     m_inputs: List[smt.Variable] = []
     m_outputs: List[smt.Variable] = []
     m_state: List[smt.Variable] = []

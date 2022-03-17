@@ -4,7 +4,7 @@ import logging
 import os
 from subprocess import Popen, PIPE
 import sys
-from typing import Dict, Callable, List, Union, Optional, Tuple
+from typing import Dict, Callable, Iterator, List, Union, Optional, Tuple
 
 import easyila.lynth.smt as smt
 
@@ -59,6 +59,7 @@ class OracleInterface(ABC):
         self.name = name
         self.calls: List[CallResult] = []
         self.replay_inputs = replay_inputs
+        self._replay_iter: Optional[Iterator[Tuple[int, ...]]]
         if replay_inputs:
             self._replay_iter = iter(replay_inputs)
         else:
