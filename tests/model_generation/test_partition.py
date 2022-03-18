@@ -7,6 +7,7 @@ from easyila.verilog.pipeline_partition import *
 import easyila.lynth.smt as smt
 from easyila.model import Model
 
+@pytest.mark.skip()
 class TestPartition:
     """
     Tests the Verilog pipeline partitioning algorithm.

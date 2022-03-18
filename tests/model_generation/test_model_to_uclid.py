@@ -41,6 +41,8 @@ class TestModelToUclid:
             default_next=[{s_b: i_a[0].ite(i_a, s_b)}]
         )
         model.print()
+        actual_ucl = model.to_uclid().strip()
+        print(actual_ucl)
         # TODO how to get output to appear on same cycle in uclid?
         exp_ucl = textwrap.dedent("""\
             module top {
@@ -71,4 +73,4 @@ class TestModelToUclid:
                 }
             }
             """)
-        assert model.to_uclid().strip() == exp_ucl.strip()
+        assert actual_ucl == exp_ucl.strip()

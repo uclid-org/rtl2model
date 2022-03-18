@@ -329,8 +329,12 @@ class Term(Translatable, ABC):
         return OpTerm(op, (self, other))
 
     def __getitem__(self, key):
-        assert isinstance(self.sort, BVSort), "only BV terms support indexing, instead term was " + str(self)
-        wrap = lambda i: BVConst(i, self.sort.bitwidth)
+        if isinstance(self.sort, BoolSort):
+            width = 1
+        else:
+            assert isinstance(self.sort, BVSort), "only BV terms support indexing, instead term was " + str(self)
+            width = self.sort.bitwidth
+        wrap = lambda i: BVConst(i, width)
         if isinstance(key, int):
             return OpTerm(Kind.BVExtract, (wrap(key), wrap(key), self))
         elif isinstance(key, slice):
@@ -378,8 +382,8 @@ class _TermMeta(ABCMeta, EnumMeta):
 @dataclass(frozen=True)
 class Variable(Term):
     """
-    This class represents both variable declarations and variabl references.
-    TODO separate them?
+    This class represents variable references. To obtain a `Translatable` for a variable
+    declaration, use the `get_decl()` method.
     """
 
     name: str
@@ -388,6 +392,10 @@ class Variable(Term):
     def to_uf(self):
         """Converts this variable to a 0-arity UFTerm."""
         return UFTerm(self.name, self.sort, ())
+
+    def get_decl(self):
+        """Gets a Translatable declaration of this variable."""
+        return VarDecl(self.name, self.sort)
 
     @staticmethod
     def from_cvc5(cvc5_term):
@@ -429,6 +437,29 @@ class Variable(Term):
 
 BoolVariable = lambda s: Variable(s, BoolSort())
 BVVariable = lambda s, w: Variable(s, BVSort(w))
+
+
+@dataclass(frozen=True)
+class VarDecl(Translatable):
+    name: str
+    sort: Sort
+
+    def get_ref(self):
+        return Variable(self.name, self.sort)
+
+    def to_target_format(self, tgt: TargetFormat, **kwargs):
+        if tgt == TargetFormat.CVC5:
+            # The CVC5 interface doesn't really distnguish between declarations
+            # and references of bound variables
+            return self.get_ref().to_cvc5(cvc5_ctx=kwargs["cvc5_ctx"])
+        elif tgt == TargetFormat.SYGUS2:
+            raise NotImplementedError()
+        elif tgt == TargetFormat.VERILOG:
+            raise NotImplementedError()
+        elif tgt == TargetFormat.UCLID:
+            # TODO need to identify inputs/outputs
+            return f"var {self.name} : {self.sort.to_uclid()};"
+        raise NotImplementedError("cannot convert VarDecl to " + str(tgt))
 
 
 @dataclass(frozen=True)
@@ -614,6 +645,9 @@ class UFTerm(Term):
                 [p.sort.to_cvc5(cvc5_ctx) for p in self.params],
                 self.sort.to_cvc5(cvc5_ctx)
             )
+        elif tgt == TargetFormat.UCLID:
+            params_s = ",".join(f"{v.name} : {v.sort.to_uclid()}" for v in self.params)
+            return f"synthesis function {self.name}({params_s}) : {self.sort.to_uclid()};"
         raise NotImplementedError("cannot convert UFTerm to " + str(tgt))
 
 

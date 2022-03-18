@@ -60,26 +60,26 @@ class Model:
             """))
 
     def to_uclid(self):
-        indent = 4 * '    '
-        u_vars = ""
-        def u_append(lst):
+        u_vars = []
+        def u_append(lst, use_decl):
             nonlocal u_vars
             if len(lst) > 0:
-                u_vars += textwrap.indent("\n".join(s.to_uclid() for s in lst), indent)
-        u_append(self.inputs)
-        u_append(self.outputs)
-        u_append(self.state)
-        u_append(self.ufs)
+                u_vars.extend((s.get_decl() if use_decl else s).to_uclid() for s in lst)
+        u_append(self.inputs, True)
+        u_append(self.outputs, True)
+        u_append(self.state, True)
+        u_append(self.ufs, False)
+        u_vars = textwrap.indent("\n".join(u_vars), 4 * '    ')
         return textwrap.dedent(f"""\
             module {self.name} {{
-                {u_vars}
+{u_vars}
 
                 init {{
 
                 }}
 
                 next {{
-                    {self.default_next.to_uclid()}
+
                 }}
             }}
             """)
