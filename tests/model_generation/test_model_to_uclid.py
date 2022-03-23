@@ -19,6 +19,14 @@ class TestModelToUclid:
     TODO does the "prime everything" approach mess with synth funs? if we make state
         variables arguments to the synth funs, it's fine because we can just prime them,
         but if we add them to the grammar then it may pose a problem
+
+    TODO how to get output to appear on same cycle in uclid?
+    the approach taken by chiselucl is to repeat assignments in both the init and next blocks,
+    and in the next block all variable references are primed -- this doesn't seem to have
+    the desired effect though
+    adding `assume` statements seems also not to work for some reason? if they're in next/init
+    they don't use the correct cycle values, and module-level assumes seem to cause spurious
+    passes
     """
 
     def test_model2ucl_simple(self):
