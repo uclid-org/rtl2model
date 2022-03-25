@@ -128,6 +128,7 @@ class TestVerilogParse:
         b_p1 = var("b_p1", bv3)
         should_inc = var("should_inc", smt.BoolSort())
         result = var("result", bv3)
+        assert model_no_a.validate()
         assert model_no_a == \
             Model(
                 "top",
@@ -144,6 +145,7 @@ class TestVerilogParse:
                 default_next=[{b: should_inc.ite(b_p1, b)}],
             )
         model_no_b = verilog_to_model(rtl, "top", important_signals=["should_inc", "a", "a_p1", "result"])
+        assert model_no_b.validate()
         assert model_no_b == \
             Model(
                 "top",
@@ -200,6 +202,7 @@ class TestVerilogParse:
         b_p1 = var("b_p1", bv3)
         should_inc = var("should_inc", smt.BoolSort())
         result = var("result", bv3)
+        assert model_no_a.validate()
         assert model_no_a == \
             Model(
                 "top",
@@ -222,6 +225,7 @@ class TestVerilogParse:
             important_signals=["should_inc", "a", "a_p1", "result"],
             coi_conf=COIConf.UF_ARGS_COI,
         )
+        assert model_no_b.validate()
         assert model_no_b == \
             Model(
                 "top",
@@ -273,7 +277,7 @@ class TestVerilogParse:
         b = var("b", bv3)
         b_p1 = var("b_p1", bv3)
         should_inc = var("should_inc", smt.BoolSort())
-        result = var("result", bv3)
+        assert model_no_a.validate()
         assert model_no_a == Model(
             "top",
             inputs=[should_inc],
@@ -283,6 +287,7 @@ class TestVerilogParse:
             logic={b_p1: b + 1},
             default_next=[{b: should_inc.ite(b_p1, b)}],
         )
+        assert model_no_b.validate()
         assert model_no_b == Model(
             "top",
             inputs=[should_inc],
@@ -334,8 +339,10 @@ class TestVerilogParse:
         # TODO to allow for composition of child modules, and specifying important_signals for those
         model = verilog_to_model(rtl, "top")
         model.print()
+        assert model.validate()
         submodel = verilog_to_model(rtl, "inner")
         submodel.print()
+        assert submodel.validate()
         """
         TODO submodule handling V
         we may internally need to make multiple calls to pyverilog.Dataflowwhatever

@@ -1,3 +1,4 @@
+from collections import defaultdict
 from dataclasses import dataclass, field
 import textwrap
 from typing import List, Dict
@@ -26,7 +27,11 @@ class Model:
     ufs: List[smt.UFTerm] = field(default_factory=list)
     # memories: List[]
     # how do we incorporate child-ILA transitions? how do we connect modules?
-    submodules: Dict[str, "Model"] = field(default_factory=dict)
+    instances: Dict[str, "Model"] = field(default_factory=dict)
+    """
+    Maps instance names to coresponding Model objects. I/O connections should be declared through
+    the `logic` field.
+    """
     logic: Dict[smt.Variable, smt.Term] = field(default_factory=dict)
     """Same-cycle logic expressions."""
 
@@ -43,6 +48,92 @@ class Model:
     instructions: Dict[str, Instruction] = field(default_factory=dict)
     init_values: Dict[str, smt.BVConst] = field(default_factory=dict)
 
+    def __post_init__(self):
+        assert isinstance(self.inputs, list)
+        assert isinstance(self.outputs, list)
+        assert isinstance(self.state, list)
+        assert isinstance(self.ufs, list)
+        assert isinstance(self.logic, dict)
+        assert isinstance(self.default_next, list)
+        assert isinstance(self.instances, dict)
+        assert isinstance(self.init_values, dict)
+
+    def validate(self):
+        """
+        Checks that all expressions are well-typed, variables are declared, etc.
+        Returns True on success, False on failure.
+
+        TODO more robust error handling
+        """
+        errs = []
+        def report(s):
+            print(s)
+            errs.append(s)
+        def get_var_counts(l):
+            counts = defaultdict(lambda: 0) # maps variable name to appearances in l
+            for v in l:
+                counts[v.name] += 1
+            return counts
+        in_counts = get_var_counts(self.inputs)
+        out_counts = get_var_counts(self.outputs)
+        state_counts = get_var_counts(self.state)
+        uf_counts = get_var_counts(self.ufs)
+        # First pass: no variable is declared multiple times
+        # TODO don't be stateful!
+        for s, count in in_counts.items():
+            if count > 1:
+                report(f"input {s} was declared multiple times")
+            if s in out_counts:
+                report(f"input {s} was also declared as an output")
+            if s in state_counts:
+                report(f"input {s} was also declared as a state variable")
+            if s in uf_counts:
+                report(f"input {s} was also declared as an uninterpreted function")
+        for s, count in out_counts.items():
+            if count > 1:
+                report(f"output {s} was declared multiple times")
+            if s in state_counts:
+                report(f"output {s} was also declared as a state variable")
+            if s in uf_counts:
+                report(f"output {s} was also declared as an uninterpreted function")
+        for s, count in state_counts.items():
+            if count > 1:
+                report(f"state variable {s} was declared multiple times")
+            if s in uf_counts:
+                report(f"output {s} was also declared as an uninterpreted function") 
+        for s, count in uf_counts.items():
+            if count > 1:
+                report(f"uninterpreted function {s} was declared multiple times")
+        # Second pass: all state and output have assigned expressions xor transition relations
+        # and that inputs + UFs do NOT have declared logic
+        logic_and_next = {v.name for v in self.logic}
+        next_keys = set()
+        for l in self.default_next:
+            names = {v.name for v in l}
+            next_keys.update(names)
+            logic_and_next.update(names)
+        for v in self.inputs:
+            if v.name in self.logic:
+                report(f"input variable {v.name} had illegal declared logic")
+            if v.name in next_keys:
+                report(f"input variable {v.name} had illegal declared transition relation")
+        for v in self.state:
+            if v.name not in logic_and_next:
+                report(f"state variable {v.name} had no declared logic or transition relation")
+        for v in self.outputs:
+            if v.name not in logic_and_next:
+                report(f"output variable {v.name} had no declared logic or transition relation")
+        for v in self.ufs:
+            if v.name in self.logic:
+                report(f"uninterpreted function {v.name} had illegal declared logic")
+            if v.name in next_keys:
+                report(f"uninterpreted function {v.name} had illegal declared transition relation")
+        # nth pass: init values correspond to valid variables
+        # TODO
+        # nth pass: transition relations and expressions type check and are valid
+        # TODO
+        return len(errs) == 0
+
     def print(self):
         print(textwrap.dedent(f"""\
             Model(
@@ -51,7 +142,7 @@ class Model:
                 outputs={self.outputs},
                 state={self.state},
                 ufs={self.ufs},
-                submodules={self.submodules},
+                instances={self.instances},
                 logic={self.logic},
                 default_next={self.default_next},
                 instructions={self.instructions},

@@ -1,145 +1,11 @@
-"""
-Provides in-memory representations of SMT expressions and grammars, which can then be translated
-to solver backends like CVC5 and Z3.
-
-TODO add str methods to everything
-"""
 
 from abc import ABC, ABCMeta, abstractmethod
-from dataclasses import dataclass
 from enum import Enum, EnumMeta, auto
-from typing import Dict, List, Set, Tuple, Optional
 
 import pycvc5
 
 import easyila.verification as v
-
-class TargetFormat(Enum):
-    """
-    Represents a format to translate objects in this file to different representations.
-    """
-    CVC5 = auto()
-    SYGUS2 = auto()
-    VERILOG = auto()
-    UCLID = auto()
-    VERIF_DSL = auto()
-
-class Translatable(ABC):
-    """
-    Mixin to define common methods for translating to other representations.
-    """
-
-    @abstractmethod
-    def to_target_format(self, tgt: TargetFormat, **kwargs):
-        raise NotImplementedError()
-
-    def to_cvc5(self, cvc5_ctx):
-        return self.to_target_format(TargetFormat.CVC5, cvc5_ctx=cvc5_ctx)
-
-    def to_sygus2(self):
-        return self.to_target_format(TargetFormat.SYGUS2)
-
-    def to_verilog_str(self):
-        return self.to_target_format(TargetFormat.VERILOG)
-
-    def to_uclid(self):
-        return self.to_target_format(TargetFormat.UCLID)
-
-    def to_verif_dsl(self):
-        return self.to_target_format(TargetFormat.VERIF_DSL)
-
-
-# === BEGIN SMT Sorts ===
-
-class Sort(Translatable, ABC):
-    @staticmethod
-    def from_cvc5(cvc5_sort):
-        if cvc5_sort.isBitVector():
-            return BVSort(cvc5_sort.getBitVectorSize())
-        elif cvc5_sort.isBoolean():
-            return BoolSort()
-        elif cvc5_sort.isFunction():
-            return FunctionSort.from_cvc5(cvc5_sort)
-        elif cvc5_sort.isUninterpretedSort():
-            return UninterpretedSort.from_cvc5(cvc5_sort)
-        raise NotImplementedError(f"Cannot convert from CVC5 sort {cvc5_sort}")
-
-
-@dataclass(frozen=True)
-class BVSort(Sort):
-    bitwidth: int
-
-    def to_target_format(self, tgt: TargetFormat, **kwargs):
-        if tgt == TargetFormat.CVC5:
-            cvc5_ctx = kwargs["cvc5_ctx"]
-            # No need to memoize, since the context already memoizes sorts
-            # In fact, memoizing on this class is incorrect in case the context is cleared
-            return cvc5_ctx.solver.mkBitVectorSort(self.bitwidth)
-        elif tgt == TargetFormat.SYGUS2:
-            return f"(_ BitVec {self.bitwidth})"
-        elif tgt == TargetFormat.VERILOG:
-            return f"[{int(self.bitwidth) - 1}:0]"
-        elif tgt == TargetFormat.UCLID:
-            return f"bv{self.bitwidth}"
-        raise NotImplementedError("cannot convert bvsort to " + str(tgt))
-
-
-@dataclass(frozen=True)
-class BoolSort(Sort):
-
-    def to_target_format(self, tgt: TargetFormat, **kwargs):
-        if tgt == TargetFormat.CVC5:
-            cvc5_ctx = kwargs["cvc5_ctx"]
-            return cvc5_ctx.solver.getBooleanSort()
-        elif tgt == TargetFormat.SYGUS:
-            return "Bool"
-        elif tgt == TargetFormat.VERILOG:
-            return ""
-        elif tgt == TargetFormat.UCLID:
-            return "boolean"
-
-
-@dataclass(frozen=True)
-class FunctionSort(Sort):
-    args: Tuple[Sort, ...] # argument sorts
-    codomain: Sort # return sort
-
-    @staticmethod
-    def from_cvc5(cvc5_sort):
-        assert cvc5_sort.isFunction()
-        return FunctionSort(
-            [Sort.from_cvc5(s) for s in cvc5_sort.getFunctionDomainSorts()],
-            Sort.from_cvc5(cvc5_sort.getFunctionCodomainSort())
-        )
-
-    def to_target_format(self, tgt: TargetFormat, **kwargs):
-        if tgt == TargetFormat.CVC5:
-            cvc5_ctx = kwargs["cvc5_ctx"]
-            return cvc5_ctx.solver.mkFunctionSort([a.to_cvc5(cvc5_ctx) for a in self.args], self.codomain.to_cvc5(cvc5_ctx))
-        elif tgt == TargetFormat.SYGUS2:
-            return "(-> " + " ".join([a.to_sygus2() for a in self.args]) + self.codomain.to_sygus2() + ")"
-        raise NotImplementedError("cannot convert FunctionSort to " + str(tgt))
-
-@dataclass(frozen=True)
-class UninterpretedSort(Sort):
-    name: str
-
-    @staticmethod
-    def from_cvc5(cvc5_sort):
-        assert cvc5_sort.isUninterpretedSort()
-        return UninterpretedSort(cvc5_sort.getUninterpretedSortName())
-
-    def to_target_format(self, tgt: TargetFormat, **kwargs):
-        if tgt == TargetFormat.CVC5:
-            cvc5_ctx = kwargs["cvc5_ctx"]
-            # TODO need to memoize?
-            return cvc5_ctx.solver.mkUninterpretedSort(self.name)
-        elif tgt == TargetFormat.SYGUS2:
-            return self.name
-        raise NotImplementedError("cannot convert FunctionSort to " + str(tgt))
-
-
-# === END SMT Sorts ===
+from .sorts import *
 
 class Kind(Enum):
     # https://cvc5.github.io/docs/api/cpp/kind.html
@@ -220,6 +86,7 @@ _OP_SYGUS_SYMBOLS = {
     Kind.Exists: "exists",
     Kind.ForAll: "forall",
 }
+
 
 
 # === BEGIN SMT TERMS ===
@@ -338,7 +205,7 @@ class Term(Translatable, ABC):
         if isinstance(key, int):
             return OpTerm(Kind.BVExtract, (wrap(key), wrap(key), self))
         elif isinstance(key, slice):
-            hi = warp(max(key.start, key.stop))
+            hi = wrap(max(key.start, key.stop))
             lo = wrap(min(key.start, key.stop))
             return OpTerm(Kind.BVExtract, (hi, lo, self))
         else:
@@ -529,7 +396,7 @@ class OpTerm(Term):
             }
             if v in unops:
                 a0_str = wrap(self.args[0])
-                return f"{unops[v].to_verilog_str()}{a0_str}"
+                return f"{unops[v]}{a0_str}"
             binops = {
                 Kind.BVAdd: "+",
                 Kind.BVSub: "-",
@@ -543,7 +410,7 @@ class OpTerm(Term):
             if v in binops:
                 a0_str = wrap(self.args[0])
                 a1_str = wrap(self.args[1])
-                return f"{a0_str} {unops[v].to_verilog_str()} {a1_str}"
+                return f"{a0_str} {unops[v]} {a1_str}"
             if v == Kind.Implies:
                 a0_str = wrap(self.args[0])
                 a1_str = wrap(self.args[1])
@@ -684,8 +551,8 @@ class LambdaTerm(Term):
             else:
                 cvc5_kind = pycvc5.Kind.Lambda
                 # TODO this needs to be tested
-                vlist = cvc5_ctx.solver.mkTerm(pycvc5.Kind.VariableList, [p.to_cvc5() for p in self.params])
-                t = cvc5_ctx.solver.mkTerm(cvc5_kind, vlist, [v.to_cvc5(cvc5_ctx) for v in self.body])
+                vlist = cvc5_ctx.solver.mkTerm(pycvc5.Kind.VariableList, [p.to_cvc5(cvc5_ctx) for p in self.params])
+                t = cvc5_ctx.solver.mkTerm(cvc5_kind, vlist, [self.body.to_cvc5(cvc5_ctx)])
                 cvc5_ctx.terms[self] = t
                 return t
         elif tgt in (TargetFormat.SYGUS2, TargetFormat.UCLID):
@@ -736,8 +603,8 @@ class QuantTerm(Term):
             else:
                 cvc5_kind = self.kind.to_cvc5(cvc5_ctx)
                 # TODO this needs to be tested
-                vlist = cvc5_ctx.solver.mkTerm(pycvc5.Kind.VariableList, [p.to_cvc5() for p in self.bound_vars])
-                t = cvc5_ctx.solver.mkTerm(cvc5_kind, vlist, [v.to_cvc5(cvc5_ctx) for v in self.body])
+                vlist = cvc5_ctx.solver.mkTerm(pycvc5.Kind.VariableList, [p.to_cvc5(cvc5_ctx) for p in self.bound_vars])
+                t = cvc5_ctx.solver.mkTerm(cvc5_kind, vlist, [self.body.to_cvc5(cvc5_ctx)])
                 cvc5_ctx.terms[self] = t
                 return t
         elif tgt in (TargetFormat.SYGUS2, TargetFormat.UCLID):
@@ -846,216 +713,3 @@ class BVConst(Term):
 
 
 # === END SMT TERMS ===
-
-
-@dataclass
-class Grammar:
-    bound_vars: Tuple[Variable, ...]
-    input_vars: Tuple[Variable, ...]
-    """
-    Maps a non-terminal Term to a list of reduction rules, each of which could either be another
-    nonterminal or a variable.
-    """
-    terms: Dict[Term, Tuple[Term, ...]]
-
-    @property
-    def _all_terms(self) -> List[Term]:
-        all_terms = []
-        term_set = set()
-        for term, rules in self.terms.items():
-            all_terms.append(term)
-            term_set.add(term)
-            for subterm in rules:
-                # TODO probably need some kind of recursion/stack-based approach
-                # to handle fnterms that are children of other fnterms
-                if subterm not in term_set:
-                    term_set.add(subterm)
-                    all_terms.append(subterm)
-        return all_terms
-
-
-@dataclass
-class SynthFun:
-    name: str
-    bound_vars: Tuple[Variable, ...]
-    return_sort: Sort
-    grammar: Grammar
-
-    def new_solver(self) -> "Solver":
-        """
-        Creates a new Solver instance to synthesize this function.
-        """
-        # sorts, variables get automatically read
-        return Solver(terms=self.grammar._all_terms, synthfuns=[self])
-
-    def to_cvc5(self, cvc5_ctx) -> Term:
-        return cvc5_ctx.synthfuns[self.name]
-
-
-@dataclass
-class SygusConstraint:
-    term: Term
-
-
-@dataclass
-class Cvc5Ctx:
-    solver: pycvc5.Solver
-    sorts: Dict[Sort, pycvc5.Sort]
-    terms: Dict[Term, pycvc5.Term]
-    grammars: List[pycvc5.Grammar]
-    synthfuns: Dict[str, pycvc5.Term]
-    constraints: List[pycvc5.Term]
-
-    def __post_init__(self):
-        sv = self.solver
-        sv.setOption("lang", "sygus2")
-        sv.setOption("incremental", "false")
-        sv.setLogic("BV")
-
-    def try_add_sort(self, sort: Sort):
-        if sort not in self.sorts:
-            self.sorts[sort] = sort.to_cvc5(self)
-
-    def add_term(self, term):
-        # TODO handle nonterminals being used as arguments?
-        k = term
-        if isinstance(term, Variable):
-            v = term.to_cvc5(self)
-        elif isinstance(term, OpTerm):
-            v = term.to_cvc5(self)
-        elif isinstance(term, BoolConst):
-            v = term.to_cvc5(self)
-        else:
-            raise Exception(f"invalid term: {term}")
-        self.terms[k] = v
-
-    def _add_grammar(self, grammar):
-        g = self.solver.mkSygusGrammar(
-            [v.to_cvc5(self) for v in grammar.bound_vars],
-            # TODO merge nt map with variables
-            [t.to_cvc5(self) for t in grammar.terms.keys()]
-        )
-        for t, rules in grammar.terms.items():
-            g.addRules(t.to_cvc5(self), [ s.to_cvc5(self) for s in rules ])
-        for v in grammar.input_vars:
-            g.addAnyVariable(v.to_cvc5(self))
-        self.grammars.append(g)
-        return g
-
-    def add_synthfun(self, sf):
-        g = self._add_grammar(sf.grammar)
-        self.synthfuns[sf.name] = self.solver.synthFun(
-            sf.name,
-            [v.to_cvc5(self) for v in sf.bound_vars],
-            sf.return_sort.to_cvc5(self),
-            g
-        )
-
-    def add_sygus_constraint(self, constraint):
-        constraint_term = constraint.term.to_cvc5(self)
-        self.solver.addSygusConstraint(constraint_term)
-        self.constraints.append(constraint_term)
-
-
-class Solver:
-    sorts: Set[Sort]
-    terms: List[Term]
-    synthfuns: List[SynthFun]
-    constraints: List[SygusConstraint]
-    _cvc5_wrapper: Optional[Cvc5Ctx]
-
-    def __init__(self, sorts=None, terms=None, synthfuns=None, constraints=None, backend="cvc5"):
-        # can't make these default args, since the same instance of a default arg is shared
-        # across every call to __init__
-        sorts = set(sorts or set())
-        terms = list(terms or [])
-        synthfuns = list(synthfuns or [])
-        constraints = list(constraints or [])
-        self.sorts = sorts
-        # This needs to be initialized one term at a time in order for the CVC5 wrapper
-        # to be able to process each term 
-        # The CVC5 wrapper also needs a reference to this list
-        self.terms = terms
-        self.synthfuns = synthfuns
-        self.constraints = constraints
-        if backend == "cvc5":
-            self.reinit_cvc5()
-        else:
-            self._cvc5_wrapper = None
-
-    def reinit_cvc5(self):
-        wrapper = Cvc5Ctx(
-            solver=pycvc5.Solver(),
-            sorts={},
-            terms={},
-            grammars=[],
-            synthfuns={},
-            constraints=[],
-        )
-        # TODO Don't know why this is necessary, but it is?
-        wrapper.solver.mkBitVector(8, 0)
-        for sort in self.sorts:
-            wrapper.try_add_sort(sort)
-        for term in self.terms:
-            wrapper.add_term(term)
-        for sf in self.synthfuns:
-            wrapper.add_synthfun(sf)
-        for constraint in self.constraints:
-            wrapper.add_sygus_constraint(constraint)
-        self._cvc5_wrapper = wrapper
-
-    def add_sort(self, sort: Sort) -> Sort:
-        self.sorts.add(sort)
-        if self._cvc5_wrapper:
-            self._cvc5_wrapper.try_add_sort(sort)
-        return sort
-
-    def add_variable(self, name: str, sort: Sort) -> Variable:
-        # warn if overwriting a variable?
-        newvar = Variable(name, sort)
-        self.add_term(newvar)
-        return newvar
-
-    def add_term(self, term: Term) -> Term:
-        self.terms.append(term)
-        if self._cvc5_wrapper:
-            self._cvc5_wrapper.add_term(term)
-        return term
-
-    # TODO restrict this to be a term that's a predicate
-    def add_sygus_constraint(self, term: Term) -> SygusConstraint:
-        newconstraint = SygusConstraint(term)
-        if self._cvc5_wrapper:
-            self._cvc5_wrapper.add_sygus_constraint(newconstraint)
-        return newconstraint
-
-    def add_synthfun(self, fn: SynthFun) -> SynthFun:
-        self.synthfuns.append(fn)
-        if self._cvc5_wrapper:
-            self._cvc5_wrapper.add_synthfun(fn)
-        return fn
-
-    def check_synth(self):
-        if self._cvc5_wrapper:
-            # TODO choose specific synth functions
-            c_slv = self.get_cvc5_solver()
-            t = list(self._cvc5_wrapper.synthfuns.values())[0]
-            s = c_slv.checkSynth()
-            if not s.isUnsat():
-                return SynthResult(False, None)
-            else:
-                return SynthResult(
-                    True,
-                    LambdaTerm.from_cvc5(c_slv.getSynthSolution(t)),
-                )
-        raise NotImplementedError()
-
-    def get_cvc5_solver(self):
-        # no consistency guarantees lol
-        return self._cvc5_wrapper.solver
-
-
-@dataclass
-class SynthResult:
-    is_unsat: bool
-    solution: Optional[LambdaTerm]

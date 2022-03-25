@@ -67,6 +67,11 @@ def verilog_to_model(
 
     If `inline_renames` is `True` (the default), then pyverilog-generated "rename" variables
     (starting with `_rnN` for some number `N`) are replaced with their corresponding expressions.
+
+
+    PERF NOTE: at a cursory glance, it seems like most of the runtime is spent in yacc within
+    pyverilog, so algorithmic improvements here probably won't help that much. Perhaps for
+    models of multiple RTL modules, the same VerilogDataflowAnalyzer can be reused?
     """
     if important_signals is None:
         important_signals = []
