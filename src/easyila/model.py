@@ -67,7 +67,7 @@ class Model:
         """
         errs = []
         def report(s):
-            print(s)
+            print(self.name, s)
             errs.append(s)
         def get_var_counts(l):
             counts = defaultdict(lambda: 0) # maps variable name to appearances in l
@@ -78,6 +78,10 @@ class Model:
         out_counts = get_var_counts(self.outputs)
         state_counts = get_var_counts(self.state)
         uf_counts = get_var_counts(self.ufs)
+        # Zeroth pass: validate all submodules
+        for subname, sub in self.instances.items():
+            if not sub.validate():
+                report(f"validation error(s) in submodule {subname} (see above output)")
         # First pass: no variable is declared multiple times
         # TODO don't be stateful!
         for s, count in in_counts.items():

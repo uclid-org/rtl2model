@@ -105,13 +105,30 @@ def verilog_to_model(
         if missing_signal_names:
             raise Exception("Signal names not found in pyverilog terms: " + ",".join([f"'{s}'" for s in missing_signal_names]))
     submodules: Dict[str, Model] = {}
-    needed_instances: List[str] = []
+    """Maps MODULE name (not instance name) to Model object."""
+    needed_submodules: List[str] = []
+    """Lists MODULE names that need to be traversed."""
+    instance_names: Dict[str, str] = {}
+    """Maps INSTANCE names to the corresponding MODULE name."""
     if defined_modules is not None:
         for m in defined_modules:
             submodules[m.name] = m
-    for inst_name in analyzer.getInstances():
-        if inst_name not in submodules:
-            needed_instances.append(inst_name)
+    for inst_name, mod_name in analyzer.getInstances():
+        # TODO generalize
+        if maybe_scope_chain_to_str(inst_name) == top_name:
+            continue
+        unqual_inst_name = maybe_scope_chain_to_str(inst_name[1:])
+        print(unqual_inst_name, mod_name)
+        instance_names[unqual_inst_name] = mod_name
+        if mod_name not in submodules:
+            needed_submodules.append(mod_name)
+
+    # === RECURSIVE GENERATION FOR SUBMODULES ===
+    # TODO factor out helper fn
+    for mod_name in needed_submodules:
+        submodules[mod_name] = verilog_to_model(
+
+        )
 
     # === DEPENDENCY GRAPH STUFF ===
 
@@ -244,6 +261,7 @@ def verilog_to_model(
         ufs=ufs,
         logic=logic,
         default_next=[next_updates],
+        instances={i_name: submodules[m_name] for i_name, m_name in instance_names.items()},
         instructions={},
         init_values={
             # TODO read init values (may require pyverilog editing)

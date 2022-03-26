@@ -303,9 +303,13 @@ class TestVerilogParse:
         # but the output itself is non-important
         assert False
 
-    def test_verilog_one_child_module(self):
+    def test_bv_index(self):
+        """
+        Tests behavior of bitvector indexing.
+        This indirectly tests behavior of bitvector width checking.
+        """
         rtl = textwrap.dedent("""\
-            module inner(input clk, input rst, input i_inner, output o_inner);
+            module top(input clk, input rst, input i_inner, output o_inner);
                 reg [2:0] i_state;
                 always @(posedge clk) begin
                     if (rst) begin
@@ -315,6 +319,42 @@ class TestVerilogParse:
                     end
                 end
                 assign o_inner = i_state[0];
+            endmodule
+            """
+        )
+        model = verilog_to_model(rtl, "top")
+        model.print()
+        boolsort = smt.BoolSort()
+        boolvar = smt.BoolVariable
+        rst = boolvar("rst")
+        i_state = smt.BVVariable("i_state", 3)
+        i_inner = boolvar("i_inner")
+        o_inner = boolvar("o_inner")
+        assert model.validate()
+        assert model == Model(
+            "top",
+            inputs=[rst, i_inner],
+            outputs=[boolvar("o_inner")],
+            state=[i_state],
+            default_next=[{
+                # TODO implicitly zero pad i_inner?
+                i_state: rst.ite(smt.BVConst(0, 3), i_inner | i_state)
+            }],
+            logic={o_inner: i_state[0]}
+        )
+
+    def test_verilog_one_child_module(self):
+        rtl = textwrap.dedent("""\
+            module inner(input clk, input rst, input i_inner, output o_inner);
+                reg i_state;
+                always @(posedge clk) begin
+                    if (rst) begin
+                        i_state = 3'h0;
+                    end else begin
+                        i_state = i_inner | i_state;
+                    end
+                end
+                assign o_inner = i_state;
             endmodule
 
             module top(input clk, input rst, input i_top, output reg o_top);
@@ -336,17 +376,59 @@ class TestVerilogParse:
         # TODO this example also currently parses incorrectly because of bv indexing:
         # i_state[0] has LHS of bv1, but we need some other mechanism to figure out the
         # bitwidth of i_state (probably because we're traversing the AST the wrong way)
-        # TODO to allow for composition of child modules, and specifying important_signals for those
+        # TODO specifying important_signals for children
+        var = smt.Variable
+        rst = var("rst", smt.BoolSort())
+        i_inner = var("i_inner", smt.BoolSort())
+        i_state = var("i_state", smt.BoolSort())
+        i_top = var("i_top", smt.BoolSort())
+        i_top_last = var("i_top_last", smt.BoolSort())
+        i_out_next = var("i_out_next", smt.BoolSort())
+        o_inner = var("o_inner", smt.BoolSort())
+        o_top = var("o_top", smt.BoolSort())
+        exp_submodel = Model(
+            "inner",
+            inputs=[rst, i_inner],
+            outputs=[o_inner],
+            state=[i_state],
+            default_next=[{
+                i_state: rst.ite(smt.BoolConst.F, i_inner | i_state)
+            }],
+            logic={o_inner: i_state}
+        )
+        assert exp_submodel.validate()
+        exp_top = Model(
+            "top",
+            inputs=[rst, i_top],
+            outputs=[o_top],
+            state=[i_top_last, i_out_next],
+            default_next=[{i_top_last: i_top, o_top: i_out_next}],
+            logic={
+                rst: var("sub.rst", smt.BoolSort()),
+                i_top_last: var("sub.i_inner", smt.BoolSort()),
+                i_out_next: var("sub.o_inner", smt.BoolSort()),
+            }
+        )
+        assert exp_top.validate()
         model = verilog_to_model(rtl, "top")
-        model.print()
-        assert model.validate()
-        submodel = verilog_to_model(rtl, "inner")
+        submodel = model.instances["sub"]
         submodel.print()
         assert submodel.validate()
+        assert submodel == exp_submodel
+        model.print()
+        assert model.validate()
+        assert model == exp_top
+
+    def test_verilog_nested_child(self):
         """
-        TODO submodule handling V
-        we may internally need to make multiple calls to pyverilog.Dataflowwhatever
-        because calling on the top level will follow dependencies into submodules,
-        which isn't necessarily desirable behavior
+        Tests behavior for when a child module itself has another child module.
         """
+        ...
+        assert False
+
+    def test_verilog_reused_child(self):
+        """
+        Tests when a module has multiple instances within a design.
+        """
+        ...
         assert False
