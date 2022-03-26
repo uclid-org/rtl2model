@@ -53,6 +53,7 @@ def verilog_to_model(
     important_signals: Optional[List[str]]=None,
     coi_conf=COIConf.NO_COI,
     inline_renames=True,
+    defined_modules: Optional[List[Model]]=None,
 ) -> Model:
     """
     Given a verilog modules and a list of important_signals, returns a list of
@@ -68,11 +69,16 @@ def verilog_to_model(
     If `inline_renames` is `True` (the default), then pyverilog-generated "rename" variables
     (starting with `_rnN` for some number `N`) are replaced with their corresponding expressions.
 
+    `defined_modules` optionally provides a list of existing Model definitions. If any of those
+    modules are encountered within this verilog modules, they will be replaced with these definitions
+    instead of generating new submodules.
+
 
     PERF NOTE: at a cursory glance, it seems like most of the runtime is spent in yacc within
     pyverilog, so algorithmic improvements here probably won't help that much. Perhaps for
     models of multiple RTL modules, the same VerilogDataflowAnalyzer can be reused?
     """
+    # === ARGUMENT PROCESSING ===
     if important_signals is None:
         important_signals = []
     preserve_all_signals = len(important_signals) == 0
@@ -81,6 +87,7 @@ def verilog_to_model(
 
     terms = analyzer.getTerms()
     binddict = analyzer.getBinddict()
+    print(binddict)
     all_signals = [maybe_scope_chain_to_str(t) for t in terms]
     all_signals = [s for s in all_signals if s.split(".")[-1] != clock_name]
     if preserve_all_signals:
@@ -97,6 +104,16 @@ def verilog_to_model(
                     important_signals[i] = qual_name
         if missing_signal_names:
             raise Exception("Signal names not found in pyverilog terms: " + ",".join([f"'{s}'" for s in missing_signal_names]))
+    submodules: Dict[str, Model] = {}
+    needed_instances: List[str] = []
+    if defined_modules is not None:
+        for m in defined_modules:
+            submodules[m.name] = m
+    for inst_name in analyzer.getInstances():
+        if inst_name not in submodules:
+            needed_instances.append(inst_name)
+
+    # === DEPENDENCY GRAPH STUFF ===
 
     # TODO for restricting important signals, look into fast COI computation
     # "Fast Cone-Of-Influence computation and estimation in problems with multiple properties"
