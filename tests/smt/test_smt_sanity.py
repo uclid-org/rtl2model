@@ -2,10 +2,10 @@
 import random
 import os
 
+import pycvc5
+
 from easyila.lynth import smt
 from easyila.lynth.oracleinterface import *
-
-import pycvc5
 
 class TestSygus:
     """

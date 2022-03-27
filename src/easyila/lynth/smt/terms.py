@@ -26,6 +26,8 @@ class Kind(Enum):
     Equal       = auto()
     Exists      = auto()
     ForAll      = auto()
+    Select      = auto()
+    Store       = auto()
 
     def to_cvc5(self, _cvc5_ctx):
         try:
@@ -65,6 +67,9 @@ _OP_KIND_MAPPING = {
     Kind.Lambda:    pycvc5.Kind.Lambda,
     Kind.Exists:    pycvc5.Kind.Exists,
     Kind.ForAll:    pycvc5.Kind.Forall,
+
+    Kind.Select:    pycvc5.Kind.Select,
+    Kind.Store:     pycvc5.Kind.Store
 }
 # ...and vice versa
 _OP_KIND_REV_MAPPING = {v: k for k, v in _OP_KIND_MAPPING.items()}
@@ -86,7 +91,6 @@ _OP_SYGUS_SYMBOLS = {
     Kind.Exists: "exists",
     Kind.ForAll: "forall",
 }
-
 
 
 # === BEGIN SMT TERMS ===
@@ -196,6 +200,17 @@ class Term(Translatable, ABC):
         return OpTerm(op, (self, other))
 
     def __getitem__(self, key):
+        if isinstance(self.sort, ArraySort):
+            # Array indexing
+            if isinstance(key, type(self.sort.idx_sort)):
+                return OpTerm(Kind.Select, (self, key))
+            elif isinstance(key, int):
+                # Convert key to appropriate index sort
+                i_key = type(self.sort.idx_sort)(key)
+                return OpTerm(Kind.Select, (self, i_key))
+            else:
+                raise TypeError(key)
+        # Bitvector indexing
         if isinstance(self.sort, BoolSort):
             width = 1
         else:
@@ -208,8 +223,25 @@ class Term(Translatable, ABC):
             hi = wrap(max(key.start, key.stop))
             lo = wrap(min(key.start, key.stop))
             return OpTerm(Kind.BVExtract, (hi, lo, self))
-        else:
-            raise KeyError(key)
+        raise TypeError(key)
+
+    def __setitem__(self, key, value):
+        if isinstance(self.sort, ArraySort):
+            if isinstance(key, type(self.sort.idx_sort)):
+                pass
+            elif isinstance(key, int):
+                # Convert key to appropriate index sort
+                key = type(self.sort.idx_sort)(key)
+            else:
+                raise TypeError(key)
+            if isinstance(value, type(self.sort.elem_sort)):
+                pass
+            elif isinstance(key, int):
+                value = type(self.sort.elem_sort)(key)
+            else:
+                raise TypeError(key)
+            return OpTerm(Kind.Store, (self, key, value))
+        raise TypeError(key)
 
     # === ABSTRACT AND SHARED STATIC METHODS ===
     @staticmethod
@@ -374,7 +406,7 @@ class OpTerm(Term):
             cvc5_ctx = kwargs["cvc5_ctx"]
             cvc5_kind = self.kind.to_cvc5(self)
             if self.kind == Kind.BVExtract:
-                # TODO special case BVExtract for from_cvc5?
+                # TODO special case BVExtract, Select, and Store for from_cvc5?
                 assert isinstance(self.args[0], BVConst)
                 assert isinstance(self.args[1], BVConst)
                 op = cvc5_ctx.solver.mkOp(cvc5_kind, self.args[0].val, self.args[1].val)

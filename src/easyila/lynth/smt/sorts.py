@@ -18,6 +18,8 @@ class Sort(Translatable, ABC):
             return FunctionSort.from_cvc5(cvc5_sort)
         elif cvc5_sort.isUninterpretedSort():
             return UninterpretedSort.from_cvc5(cvc5_sort)
+        elif cvc5_sort.isArray():
+            return ArraySort.from_cvc5(cvc5_sort)
         raise NotImplementedError(f"Cannot convert from CVC5 sort {cvc5_sort}")
 
 
@@ -53,6 +55,29 @@ class BoolSort(Sort):
             return ""
         elif tgt == TargetFormat.UCLID:
             return "boolean"
+        raise NotImplementedError("cannot convert boolsort to " + str(tgt))
+
+
+@dataclass(frozen=True)
+class ArraySort(Sort):
+    idx_sort: Sort
+    elem_sort: Sort
+
+    @staticmethod
+    def from_cvc5(cvc5_sort):
+        assert cvc5_sort.isArray()
+        return ArraySort(
+            Sort.from_cvc5(cvc5_sort.getArrayIndexSort()),
+            Sort.from_cvc5(cvc5_sort.getArrayElementSort())
+        )
+
+    def to_target_format(self, tgt: TargetFormat, **kwargs):
+        if tgt == TargetFormat.CVC5:
+            cvc5_ctx = kwargs["cvc5_ctx"]
+            return cvc5_ctx.solver.mkArraySort(self.idx_sort.to_cvc5(cvc5_ctx), self.elem_sort.to_cvc5(cvc5_ctx))
+        # elif tgt == TargetFormat.SYGUS2:
+        # elif tgt == TargetFormat.VERILOG:
+        # elif tgt == TargetFormat.UCLID:
         raise NotImplementedError("cannot convert boolsort to " + str(tgt))
 
 

@@ -164,10 +164,10 @@ class Model:
         u_append(self.outputs, True)
         u_append(self.state, True)
         u_append(self.ufs, False)
-        u_vars = textwrap.indent("\n".join(u_vars), 4 * '    ')
+        u_vars_s = textwrap.indent("\n".join(u_vars), 4 * '    ')
         return textwrap.dedent(f"""\
             module {self.name} {{
-{u_vars}
+{u_vars_s}
 
                 init {{
 
