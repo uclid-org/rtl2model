@@ -1,12 +1,11 @@
 
 import textwrap
-from typing import List, Optional
 
 import pytest
 
 import easyila.lynth.smt as smt
 from easyila.verilog import verilog_to_model, COIConf
-from easyila.model import Model
+from easyila.model import Model, Instance
 
 class TestVerilogParse:
     """
@@ -378,14 +377,15 @@ class TestVerilogParse:
         # bitwidth of i_state (probably because we're traversing the AST the wrong way)
         # TODO specifying important_signals for children
         var = smt.Variable
-        rst = var("rst", smt.BoolSort())
-        i_inner = var("i_inner", smt.BoolSort())
-        i_state = var("i_state", smt.BoolSort())
-        i_top = var("i_top", smt.BoolSort())
-        i_top_last = var("i_top_last", smt.BoolSort())
-        i_out_next = var("i_out_next", smt.BoolSort())
-        o_inner = var("o_inner", smt.BoolSort())
-        o_top = var("o_top", smt.BoolSort())
+        boolsort = smt.BoolSort()
+        rst = var("rst", boolsort)
+        i_inner = var("i_inner", boolsort)
+        i_state = var("i_state", boolsort)
+        i_top = var("i_top", boolsort)
+        i_top_last = var("i_top_last", boolsort)
+        i_out_next = var("i_out_next", boolsort)
+        o_inner = var("o_inner", boolsort)
+        o_top = var("o_top", boolsort)
         exp_submodel = Model(
             "inner",
             inputs=[rst, i_inner],
@@ -402,26 +402,33 @@ class TestVerilogParse:
             inputs=[rst, i_top],
             outputs=[o_top],
             state=[i_top_last, i_out_next],
-            default_next=[{i_top_last: i_top, o_top: i_out_next}],
             logic={
-                rst: var("sub.rst", smt.BoolSort()),
-                i_top_last: var("sub.i_inner", smt.BoolSort()),
-                i_out_next: var("sub.o_inner", smt.BoolSort()),
-            }
+                i_out_next: var("sub.o_inner", boolsort),
+            },
+            default_next=[{i_top_last: i_top, o_top: i_out_next}],
+            # TODO figure out how to do port assignments
+            instances={"sub": Instance(exp_submodel, {rst: rst, i_inner: i_top_last})},
         )
         assert exp_top.validate()
         model = verilog_to_model(rtl, "top")
-        submodel = model.instances["sub"]
+        model.print()
+        submodel = model.instances["sub"].model
         submodel.print()
         assert submodel.validate()
         assert submodel == exp_submodel
-        model.print()
         assert model.validate()
         assert model == exp_top
 
     def test_verilog_nested_child(self):
         """
         Tests behavior for when a child module itself has another child module.
+        """
+        ...
+        assert False
+
+    def test_verilog_nested_child_coi(self):
+        """
+        Tests behavior when COI options are enabled and child submodules are traversed.
         """
         ...
         assert False

@@ -27,7 +27,7 @@ class Model:
     ufs: List[smt.UFTerm] = field(default_factory=list)
     # memories: List[]
     # how do we incorporate child-ILA transitions? how do we connect modules?
-    instances: Dict[str, "Model"] = field(default_factory=dict)
+    instances: Dict[str, "Instance"] = field(default_factory=dict)
     """
     Maps instance names to coresponding Model objects. I/O connections should be declared through
     the `logic` field.
@@ -67,7 +67,7 @@ class Model:
         """
         errs = []
         def report(s):
-            print(self.name, s)
+            print(f"{self.name}:", s)
             errs.append(s)
         def get_var_counts(l):
             counts = defaultdict(lambda: 0) # maps variable name to appearances in l
@@ -78,10 +78,20 @@ class Model:
         out_counts = get_var_counts(self.outputs)
         state_counts = get_var_counts(self.state)
         uf_counts = get_var_counts(self.ufs)
-        # Zeroth pass: validate all submodules
+        # Zeroth pass: validate all instances and port bindings
         for subname, sub in self.instances.items():
-            if not sub.validate():
+            if not sub.model.validate():
                 report(f"validation error(s) in submodule {subname} (see above output)")
+            needed_inputs = sub.model.inputs
+            for missing_input in set(needed_inputs) - set(sub.inputs.keys()):
+                report(f"instance {subname} is missing input {missing_input}")
+            for extra_input in set(sub.inputs.keys()) - set(needed_inputs):
+                report(f"instance {subname} has unknown output {extra_input}")
+            # needed_outputs = sub.model.outputs
+            # for missing_output in set(needed_outputs) - set(sub.outputs.keys()):
+            #     report(f"instance {subname} is missing output {missing_output}")
+            # for extra_output in set(sub.outputs.keys()) - set(needed_outputs):
+            #     report(f"instance {subname} has unknown output {extra_output}")
         # First pass: no variable is declared multiple times
         # TODO don't be stateful!
         for s, count in in_counts.items():
@@ -179,12 +189,20 @@ class Model:
             }}
             """)
 
+
 @dataclass
-class ManualModel(Model):
+class Instance:
     """
-    An ILA model constructed by hand.
+    A class representing the concrete instantiation of a model.
     """
-    pass
+
+    model: Model
+    inputs: Dict[smt.Variable, smt.Term]
+    """
+    Maps UNQUALIFIED input names to an expression in the parent module (all variable references
+    within the expression are relative to that parent.)
+    """
+
 
 class CaseSplitModel(Model):
     ...
