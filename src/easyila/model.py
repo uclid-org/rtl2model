@@ -11,7 +11,7 @@ of state variables to expressions computing their next values.
 
 A single instruction is considered to be atomic.
 """
-Instruction = List[Dict[smt.Variable, smt.Term]]
+Instruction = List[Dict[smt.Term, smt.Term]]
 
 # models should look something like this?
 # TODO instead of having separate uf/logic/next logic, should they all be values of
@@ -32,11 +32,13 @@ class Model:
     Maps instance names to coresponding Model objects. I/O connections should be declared through
     the `logic` field.
     """
-    logic: Dict[smt.Variable, smt.Term] = field(default_factory=dict)
+    logic: Dict[smt.Term, smt.Term] = field(default_factory=dict)
     """Same-cycle logic expressions."""
 
     """
     TODO
+
+    TODO account for assignments to memories/arrays in logic and default_next
 
     should we be able to have multiple submodules of the same instance? this
     has a common use case for stuff like memories that are repeated
@@ -93,7 +95,7 @@ class Model:
             # for extra_output in set(sub.outputs.keys()) - set(needed_outputs):
             #     report(f"instance {subname} has unknown output {extra_output}")
         # First pass: no variable is declared multiple times
-        # TODO don't be stateful!
+        # TODO don't be stateful if isinstance(v, smt.Variable)!
         for s, count in in_counts.items():
             if count > 1:
                 report(f"input {s} was declared multiple times")
@@ -120,28 +122,28 @@ class Model:
                 report(f"uninterpreted function {s} was declared multiple times")
         # Second pass: all state and output have assigned expressions xor transition relations
         # and that inputs + UFs do NOT have declared logic
-        logic_and_next = {v.name for v in self.logic}
+        logic_and_next = {v.name for v in self.logic if isinstance(v, smt.Variable)}
         next_keys = set()
         for l in self.default_next:
-            names = {v.name for v in l}
+            names = {v.name for v in l if isinstance(v, smt.Variable)}
             next_keys.update(names)
             logic_and_next.update(names)
         for v in self.inputs:
             if v.name in self.logic:
-                report(f"input variable {v.name} had illegal declared logic")
+                report(f"input variable {v.name} has illegal declared logic")
             if v.name in next_keys:
-                report(f"input variable {v.name} had illegal declared transition relation")
+                report(f"input variable {v.name} has illegal declared transition relation")
         for v in self.state:
-            if v.name not in logic_and_next:
-                report(f"state variable {v.name} had no declared logic or transition relation")
+            if not isinstance(v.sort, smt.ArraySort) and v.name not in logic_and_next:
+                report(f"state variable {v.name} has no declared logic or transition relation")
         for v in self.outputs:
             if v.name not in logic_and_next:
-                report(f"output variable {v.name} had no declared logic or transition relation")
+                report(f"output variable {v.name} has no declared logic or transition relation")
         for v in self.ufs:
             if v.name in self.logic:
-                report(f"uninterpreted function {v.name} had illegal declared logic")
+                report(f"uninterpreted function {v.name} has illegal declared logic")
             if v.name in next_keys:
-                report(f"uninterpreted function {v.name} had illegal declared transition relation")
+                report(f"uninterpreted function {v.name} has illegal declared transition relation")
         # nth pass: init values correspond to valid variables
         # TODO
         # nth pass: transition relations and expressions type check and are valid

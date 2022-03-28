@@ -419,6 +419,44 @@ class TestVerilogParse:
         assert model.validate()
         assert model == exp_top
 
+    def test_verilog_array(self):
+        """
+        Tests parsing of verilog arrays.
+        """
+        rtl = textwrap.dedent("""
+            module top(
+                input clk,
+                input wen,
+                input [2:0] ra,
+                input [3:0] wdata,
+                output [3:0] rdata
+            );
+                reg [3:0] arr [2:0]; // 8 4-bit elements
+                always @(posedge clk) begin
+                    if (wen) begin
+                        arr[ra] <= wdata;
+                    end
+                end
+                assign rdata = arr[ra];
+            endmodule
+            """)
+        model = verilog_to_model(rtl, "top")
+        model.print()
+        wdata = smt.Variable("wdata", smt.BVSort(4))
+        wen = smt.Variable("wen", smt.BoolSort())
+        reg = smt.Variable("ra", smt.BVSort(3))
+        arr = smt.Variable("arr", smt.ArraySort(smt.BVSort(3), smt.BVSort(4)))
+        rdata = smt.Variable("rdata", smt.BVSort(4))
+        assert model.validate()
+        assert model == Model(
+            "top",
+            inputs=[wen, reg, wdata],
+            outputs=[rdata],
+            state=[arr],
+            logic={rdata: arr[reg]},
+            default_next=[{arr[reg]: wen.ite(wdata, arr[reg])}],
+        )
+
     def test_verilog_nested_child(self):
         """
         Tests behavior for when a child module itself has another child module.

@@ -13,7 +13,15 @@ from typing import Dict, List, Optional, Set
 
 import pyverilog
 from pyverilog.dataflow.dataflow_analyzer import VerilogDataflowAnalyzer
-from pyverilog.dataflow.dataflow import DFTerminal, DFNotTerminal, DFBranch, DFIntConst, DFPartselect, DFOperator
+from pyverilog.dataflow.dataflow import (
+    DFTerminal,
+    DFNotTerminal,
+    DFBranch,
+    DFIntConst,
+    DFOperator,
+    DFPartselect,
+    DFPointer
+)
 from pyverilog.utils.scope import ScopeChain, ScopeLabel
 from pyverilog.utils import signaltype
 
@@ -257,7 +265,7 @@ def _verilog_model_helper(
                 for p in binddict[sc]:
                     # In this context, there should never be an empty else branch, so we
                     # make the default branch field None to loudly error
-                    rename_substitutions[s] = pv_to_smt_expr(p.tree, width, None, mod_depth)
+                    rename_substitutions[s] = pv_to_smt_expr(p.tree, width, terms, None, mod_depth)
         # TODO replace renames with other renames (may require modifying SMT tree,
         # or using dependency graph info to topo sort)
 
@@ -301,20 +309,27 @@ def _verilog_model_helper(
             if not signaltype.isInput(termtype) or len(sc) == mod_depth + 2:
                 parents = binddict[sc]
                 for p in parents:
-                    # Not entirely sure why there's multiple parents
+                    assert p.msb is None and p.lsb is None, "slice assignment not yet supported"
+                    if p.ptr is not None:
+                        assert isinstance(v.sort, smt.ArraySort)
+                        idx_width = v.sort.idx_sort.bitwidth
+                        assignee = v[pv_to_smt_expr(p.ptr, idx_width, terms, None, mod_depth, rename_substitutions)]
+                    else:
+                        assignee = v
                     if p.tree is not None:
-                        expr = pv_to_smt_expr(p.tree, width, v, mod_depth, rename_substitutions)
+                        expr = pv_to_smt_expr(p.tree, width, terms, assignee, mod_depth, rename_substitutions)
                         if is_curr_scope:
                             if p.alwaysinfo is not None and p.alwaysinfo.isClockEdge():
                                 # Clocked state update
-                                next_updates[v] = expr
+                                next_updates[assignee] = expr
                             else:
                                 # Combinatorial logic
-                                logic[v] = expr
+                                logic[assignee] = expr
                         elif signaltype.isInput(termtype):
                             # Instance input
                             # mod_depth + 1 removes the instance name from the variable scope
                             # - 1 when indexing because in "top.x.y" at depth 2, we want "x" at index 1
+                            assert p.ptr is None # No array input assignment shenanigans
                             v = term_to_smt_var(s, terms, mod_depth + 1)
                             instance_inputs[str(sc[mod_depth])][v] = expr
     return Model(
@@ -345,9 +360,20 @@ def get_term_width(s, terms):
 
 
 def term_to_smt_var(s, terms, scope_depth):
-    width = get_term_width(s, terms)
-    # TODO deal with `dims` for arrays?
+    sc = str_to_scope_chain(s)
     unqual_s = ".".join(s.split(".")[scope_depth:])
+    term = terms[sc]
+    if term.dims:
+        # Arrays
+        if len(term.dims) != 1:
+            raise NotImplementedError("only 1D array indexing is supported")
+        data_width = term.msb.eval() - term.lsb.eval() + 1
+        idx_width = abs(term.dims[0][0].eval() - term.dims[0][1].eval()) + 1
+        idx_sort = smt.BoolSort() if idx_width == 1 else smt.BVSort(idx_width)
+        data_sort = smt.BoolSort() if data_width == 1 else smt.BVSort(data_width)
+        arr_sort = smt.ArraySort(idx_sort, data_sort)
+        return smt.Variable(unqual_s, arr_sort)
+    width = get_term_width(s, terms)
     # TODO distinguish between bv1 and booleans
     if width == 1:
         v = smt.Variable(unqual_s, smt.BoolSort())
@@ -514,13 +540,16 @@ def find_direct_parent_nodes(p, parents=None) -> List[str]:
     return parents
 
 
-def pv_to_smt_expr(node, width, assignee, mod_depth, substitutions=None):
+def pv_to_smt_expr(node, width: Optional[int], terms, assignee, mod_depth, substitutions=None):
     """
     Converts the pyverilog AST tree into an expression in our SMT DSL.
 
-    `width` is the bit width needed of this expression.
+    If specified, `width` is the bit width needed of this expression. This is used for situations
+    like inferring the width of a verilog integer constant.
 
-    `assignee` is the variable the original AST parent of this expression is being
+    `terms` is the pyverilog term dictionary, mapping variable scope chains to metadata.
+
+    `assignee` is the SMT term the original AST parent of this expression is being
     assigned to. This is necessary because pyverilog generates ITE blocks with missing
     t/f branches for constructs like `if (...) begin r <= a; end`, which implicitly has
     the branch `else r <= r;`. This might fail in situations where `r` has multiple
@@ -546,12 +575,15 @@ def pv_to_smt_expr(node, width, assignee, mod_depth, substitutions=None):
             return substitutions[qual_name]
         unqual_name = maybe_scope_chain_to_str(node.name[mod_depth:])
         # TODO distinguish bv1 and bool
-        if width == 1:
+        varwidth = get_term_width(qual_name, terms)
+        if varwidth == 1:
             return smt.BoolVariable(unqual_name)
         else:
-            return smt.BVVariable(unqual_name, width)
+            return smt.BVVariable(unqual_name, varwidth)
     elif isinstance(node, DFIntConst):
         v = node.eval()
+        if width is None:
+            width = node.width
         if width == 1:
             return smt.BoolConst.T if v else smt.BoolConst.F
         else:
@@ -562,31 +594,31 @@ def pv_to_smt_expr(node, width, assignee, mod_depth, substitutions=None):
             raise NotImplementedError("only constant bit slices can translated")
         lsb_v = node.lsb.eval()
         msb_v = node.msb.eval()
-        # TODO width here can be arbitrary?
-        return pv_to_smt_expr(node.var, width, assignee, mod_depth, substitutions)[msb_v:lsb_v]
+        return pv_to_smt_expr(node.var, None, terms, assignee, mod_depth, substitutions)[msb_v:lsb_v]
         # lsb = pv_to_smt_expr(node.lsb)
         # msb = pv_to_smt_expr(node.msb)
         # mask = ~(-1 << (msb - lsb + 1)) << lsb
         # return full_val & mask
     elif isinstance(node, DFBranch):
         assert node.condnode is not None, node.tocode()
-        cond = pv_to_smt_expr(node.condnode, 1, assignee, mod_depth, substitutions)
+        cond = pv_to_smt_expr(node.condnode, 1, terms ,assignee, mod_depth, substitutions)
         truenode = assignee
         falsenode = assignee
         # truenode and falsenode can both be None for "if/else if/else" blocks that
         if node.truenode is not None:
-            truenode = pv_to_smt_expr(node.truenode, width, assignee, mod_depth, substitutions)
+            truenode = pv_to_smt_expr(node.truenode, width, terms, assignee, mod_depth, substitutions)
         else:
-            assert isinstance(assignee, smt.Term)
+            assert isinstance(assignee, smt.Term), (node.tocode(), assignee)
         if node.falsenode is not None:
-            falsenode = pv_to_smt_expr(node.falsenode, width, assignee, mod_depth, substitutions)
+            falsenode = pv_to_smt_expr(node.falsenode, width, terms, assignee, mod_depth, substitutions)
         else:
-            assert isinstance(assignee, smt.Term)
+            assert isinstance(assignee, smt.Term), (node.tocode(), assignee)
         return smt.OpTerm(smt.Kind.Ite, (cond, truenode, falsenode))
     elif isinstance(node, DFOperator):
         op = node.operator
         # TODO figure out how to deal with width-changing operations
-        evaled_children = [pv_to_smt_expr(c, width, assignee, mod_depth, substitutions) for c in node.nextnodes]
+        # (implicit zpad/sext?)
+        evaled_children = [pv_to_smt_expr(c, None, terms, assignee, mod_depth, substitutions) for c in node.nextnodes]
         # https://github.com/PyHDI/Pyverilog/blob/5847539a9d4178a521afe66dbe2b1a1cf36304f3/pyverilog/utils/signaltype.py#L87
         # Assume that arity checks are already done for us
         binops = {
@@ -619,10 +651,16 @@ def pv_to_smt_expr(node, width, assignee, mod_depth, substitutions=None):
         elif op == "Uor":
             assert len(evaled_children) == 1
             # unary OR just checks if any bit is nonzero
-            raise evaled_children[0] != smt.BVConst(0, width)
+            return evaled_children[0] != smt.BVConst(0, width)
         raise NotImplementedError("operator translation not implemented yet: " + str(op))
+    elif isinstance(node, DFPointer):
+        # Array indexing
+        arr = term_to_smt_var(maybe_scope_chain_to_str(node.var.name), terms, mod_depth)
+        assert isinstance(arr.sort, smt.ArraySort)
+        idx_width = arr.sort.idx_sort.bitwidth
+        idx_term = pv_to_smt_expr(node.ptr, idx_width, terms, assignee, mod_depth, substitutions)
+        return arr[idx_term]
     else:
-        # return None
         raise NotImplementedError(type(node))
 
 

@@ -98,8 +98,8 @@ _OP_SYGUS_SYMBOLS = {
 class Term(Translatable, ABC):
     def _op_type_check(self, other):
         assert isinstance(other, Term), f"cannot add {self} with {other}"
-        assert hasattr(self, "sort")
-        assert hasattr(other, "sort")
+        assert hasattr(self, "sort"), self
+        assert hasattr(other, "sort"), other
         assert self.sort == other.sort, f"cannot add value of sort {self.sort} to {other.sort}"
 
     # === OPERATOR OVERRIDES ===
@@ -202,7 +202,9 @@ class Term(Translatable, ABC):
     def __getitem__(self, key):
         if isinstance(self.sort, ArraySort):
             # Array indexing
-            if isinstance(key, type(self.sort.idx_sort)):
+            if isinstance(key, Term):
+                if not key.sort == self.sort.idx_sort:
+                    raise TypeError(f"cannot index {self} with {key}")
                 return OpTerm(Kind.Select, (self, key))
             elif isinstance(key, int):
                 # Convert key to appropriate index sort
@@ -216,14 +218,14 @@ class Term(Translatable, ABC):
         else:
             assert isinstance(self.sort, BVSort), "only BV terms support indexing, instead term was " + str(self)
             width = self.sort.bitwidth
-        wrap = lambda i: BVConst(i, width)
         if isinstance(key, int):
+            wrap = lambda i: BVConst(i, width)
             return OpTerm(Kind.BVExtract, (wrap(key), wrap(key), self))
         elif isinstance(key, slice):
             hi = wrap(max(key.start, key.stop))
             lo = wrap(min(key.start, key.stop))
             return OpTerm(Kind.BVExtract, (hi, lo, self))
-        raise TypeError(key)
+        raise TypeError(f"cannot index {self} with {key}")
 
     def __setitem__(self, key, value):
         if isinstance(self.sort, ArraySort):
@@ -384,6 +386,9 @@ class OpTerm(Term):
         bitops = { Kind.Or, Kind.And, Kind.Xor, Kind.Not, Kind.Equal }
         if self.kind in bitops:
             return BoolSort()
+        if self.kind == Kind.Select:
+            assert isinstance(self.args[0].sort, ArraySort)
+            return self.args[0].sort.elem_sort
         raise NotImplementedError(f"Cannot get Sort for kind {self.kind}")
 
     @property
