@@ -17,6 +17,7 @@ from pyverilog.dataflow.dataflow import (
     DFTerminal,
     DFNotTerminal,
     DFBranch,
+    DFConcat,
     DFIntConst,
     DFOperator,
     DFPartselect,
@@ -256,8 +257,8 @@ def _verilog_model_helper(
     """
     if inline_renames:
         for sc, term in terms.items():
-            assert isinstance(term.msb, DFIntConst)
-            assert isinstance(term.lsb, DFIntConst)
+            assert isinstance(term.msb, DFIntConst), term.msb
+            assert isinstance(term.lsb, DFIntConst), term.lsb
             # TODO deal with `dims` for arrays?
             width = term.msb.eval() - term.lsb.eval() + 1
             s = maybe_scope_chain_to_str(sc)
@@ -306,7 +307,7 @@ def _verilog_model_helper(
                     m_state.append(v)
             # Get expression tree
             # len(sc) == depth + 2 occurs when referencing an instance field
-            if not signaltype.isInput(termtype) or len(sc) == mod_depth + 2:
+            if sc in binddict and not signaltype.isInput(termtype) or len(sc) == mod_depth + 2:
                 parents = binddict[sc]
                 for p in parents:
                     assert p.msb is None and p.lsb is None, "slice assignment not yet supported"
@@ -359,7 +360,7 @@ def get_term_width(s, terms):
     return term.msb.eval() - term.lsb.eval() + 1
 
 
-def term_to_smt_var(s, terms, scope_depth):
+def term_to_smt_var(s, terms, scope_depth, tall=False):
     sc = str_to_scope_chain(s)
     unqual_s = ".".join(s.split(".")[scope_depth:])
     term = terms[sc]
@@ -573,13 +574,7 @@ def pv_to_smt_expr(node, width: Optional[int], terms, assignee, mod_depth, subst
         qual_name = maybe_scope_chain_to_str(node.name)
         if qual_name in substitutions:
             return substitutions[qual_name]
-        unqual_name = maybe_scope_chain_to_str(node.name[mod_depth:])
-        # TODO distinguish bv1 and bool
-        varwidth = get_term_width(qual_name, terms)
-        if varwidth == 1:
-            return smt.BoolVariable(unqual_name)
-        else:
-            return smt.BVVariable(unqual_name, varwidth)
+        return term_to_smt_var(qual_name, terms, mod_depth)
     elif isinstance(node, DFIntConst):
         v = node.eval()
         if width is None:
@@ -589,16 +584,16 @@ def pv_to_smt_expr(node, width: Optional[int], terms, assignee, mod_depth, subst
         else:
             return smt.BVConst(v, width)
     elif isinstance(node, DFPartselect):
-        # TODO need to get concrete values for LSB/MS
-        if not isinstance(node.lsb, DFIntConst) and not isinstance(node.msb, DFIntConst):
-            raise NotImplementedError("only constant bit slices can translated")
-        lsb_v = node.lsb.eval()
-        msb_v = node.msb.eval()
-        return pv_to_smt_expr(node.var, None, terms, assignee, mod_depth, substitutions)[msb_v:lsb_v]
-        # lsb = pv_to_smt_expr(node.lsb)
-        # msb = pv_to_smt_expr(node.msb)
-        # mask = ~(-1 << (msb - lsb + 1)) << lsb
-        # return full_val & mask
+        body_expr = pv_to_smt_expr(node.var, None, terms, assignee, mod_depth, substitutions)
+        if isinstance(node.lsb, DFIntConst) and isinstance(node.msb, DFIntConst):
+            lsb_v = node.lsb.eval()
+            msb_v = node.msb.eval()
+            return body_expr[msb_v:lsb_v]
+        else:
+            assert node.msb == node.lsb, "MSB and LSB of non-constant index must be identical"
+            # Convert the body into an array
+            idx_expr = pv_to_smt_expr(node.msb, None, terms, assignee, mod_depth, substitutions)
+            return body_expr[idx_expr]
     elif isinstance(node, DFBranch):
         assert node.condnode is not None, node.tocode()
         cond = pv_to_smt_expr(node.condnode, 1, terms ,assignee, mod_depth, substitutions)
@@ -626,13 +621,15 @@ def pv_to_smt_expr(node, width: Optional[int], terms, assignee, mod_depth, subst
             "Lor": smt.Kind.Or,
             "And": smt.Kind.And if width == 1 else smt.Kind.BVAnd,
             "Land": smt.Kind.And,
-            # "LessThan": lambda a, b: a < b,
-            # "GreaterThan": lambda a, b: a > b,
-            # "LassEq": lambda a, b: a <= b, # [sic]
-            # "GreaterEq": lambda a, b: a >= b,
+            # TODO distinguish signedness
+            "LessThan": smt.Kind.BVUlt,
+            "GreaterThan": smt.Kind.BVUgt,
+            "LassEq": smt.Kind.BVUle, # [sic]
+            "GreaterEq": smt.Kind.BVUge,
             "Eq": smt.Kind.Equal,
             # what are "Eql" and "NotEql"???
             "Plus": smt.Kind.BVAdd, # TODO is this saturating for booleans?
+            "Minus": smt.Kind.BVSub,
         }
         if op in binops or op == "Neq":
             assert len(evaled_children) == 2
@@ -644,14 +641,11 @@ def pv_to_smt_expr(node, width: Optional[int], terms, assignee, mod_depth, subst
         unops = {
             "Unot": smt.Kind.Not if width == 1 else smt.Kind.BVNot,
             "Ulnot": smt.Kind.Not,
+            "Uor": smt.Kind.BVOrr,
         }
         if op in unops:
             assert len(evaled_children) == 1
             return smt.OpTerm(unops[op], (evaled_children[0],))
-        elif op == "Uor":
-            assert len(evaled_children) == 1
-            # unary OR just checks if any bit is nonzero
-            return evaled_children[0] != smt.BVConst(0, width)
         raise NotImplementedError("operator translation not implemented yet: " + str(op))
     elif isinstance(node, DFPointer):
         # Array indexing
@@ -660,6 +654,9 @@ def pv_to_smt_expr(node, width: Optional[int], terms, assignee, mod_depth, subst
         idx_width = arr.sort.idx_sort.bitwidth
         idx_term = pv_to_smt_expr(node.ptr, idx_width, terms, assignee, mod_depth, substitutions)
         return arr[idx_term]
+    elif isinstance(node, DFConcat):
+        evaled_children = [pv_to_smt_expr(c, None, terms, assignee, mod_depth, substitutions) for c in node.nextnodes]
+        return evaled_children[0].concat(*evaled_children[1:])
     else:
         raise NotImplementedError(type(node))
 

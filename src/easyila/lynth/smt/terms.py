@@ -16,6 +16,12 @@ class Kind(Enum):
     BVNot       = auto()
     BVXor       = auto()
     BVExtract   = auto()
+    BVConcat    = auto()
+    BVOrr       = auto()
+    BVUle       = auto()
+    BVUlt       = auto()
+    BVUge       = auto()
+    BVUgt       = auto()
     Or          = auto()
     And         = auto()
     Not         = auto()
@@ -55,6 +61,14 @@ _OP_KIND_MAPPING = {
     Kind.BVNot:     pycvc5.Kind.BVNot,
     Kind.BVXor:     pycvc5.Kind.BVXor,
     Kind.BVExtract: pycvc5.Kind.BVExtract,
+    Kind.BVConcat:  pycvc5.Kind.BVConcat,
+
+    Kind.BVOrr:     pycvc5.Kind.BVRedor,
+
+    Kind.BVUle:     pycvc5.Kind.BVUle,
+    Kind.BVUlt:     pycvc5.Kind.BVUlt,
+    Kind.BVUge:     pycvc5.Kind.BVUge,
+    Kind.BVUgt:     pycvc5.Kind.BVUgt,
 
     Kind.Equal:     pycvc5.Kind.Equal,
     Kind.Or:        pycvc5.Kind.Or,
@@ -97,10 +111,10 @@ _OP_SYGUS_SYMBOLS = {
 
 class Term(Translatable, ABC):
     def _op_type_check(self, other):
-        assert isinstance(other, Term), f"cannot add {self} with {other}"
+        assert isinstance(other, Term), f"cannot combine {self} with {other}"
         assert hasattr(self, "sort"), self
         assert hasattr(other, "sort"), other
-        assert self.sort == other.sort, f"cannot add value of sort {self.sort} to {other.sort}"
+        assert self.sort == other.sort, f"cannot combine value {self} of sort {self.sort} to {other} of sort {other.sort}"
 
     # === OPERATOR OVERRIDES ===
     def ite(self, t_term, f_term):
@@ -121,12 +135,11 @@ class Term(Translatable, ABC):
 
     def __lt__(self, other):
         self._op_type_check(other)
-        ...
+        return OpTerm(Kind.BVUlt, (self, other))
 
     def __le__(self, other):
         self._op_type_check(other)
-        ...
-        # return OpTerm(Kind.BVLe, self, other)
+        return OpTerm(Kind.BVUle, (self, other))
 
     def op_eq(self, other):
         """
@@ -142,11 +155,11 @@ class Term(Translatable, ABC):
 
     def __gt__(self, other):
         self._op_type_check(other)
-        ...
+        return OpTerm(Kind.BVUgt, (self, other))
 
     def __ge__(self, other):
         self._op_type_check(other)
-        ...
+        return OpTerm(Kind.BVUge, (self, other))
 
     def __add__(self, other):
         if isinstance(other, int):
@@ -218,8 +231,8 @@ class Term(Translatable, ABC):
         else:
             assert isinstance(self.sort, BVSort), "only BV terms support indexing, instead term was " + str(self)
             width = self.sort.bitwidth
+        wrap = lambda i: BVConst(i, width)
         if isinstance(key, int):
-            wrap = lambda i: BVConst(i, width)
             return OpTerm(Kind.BVExtract, (wrap(key), wrap(key), self))
         elif isinstance(key, slice):
             hi = wrap(max(key.start, key.stop))
@@ -244,6 +257,9 @@ class Term(Translatable, ABC):
                 raise TypeError(key)
             return OpTerm(Kind.Store, (self, key, value))
         raise TypeError(key)
+
+    def concat(self, *others):
+        return OpTerm(Kind.BVConcat, (self, *others))
 
     # === ABSTRACT AND SHARED STATIC METHODS ===
     @staticmethod
@@ -429,7 +445,8 @@ class OpTerm(Term):
                     return term.to_verilog_str()
             unops = {
                 Kind.Not: "!",
-                Kind.BVNot: "~"
+                Kind.BVNot: "~",
+                Kind.BVOrr: "|",
             }
             if v in unops:
                 a0_str = wrap(self.args[0])
@@ -457,6 +474,8 @@ class OpTerm(Term):
                 a1_str = wrap(self.args[1])
                 a2_str = wrap(self.args[2])
                 return f"{a0_str} ? {a1_str} : {a2_str}"
+            if v == Kind.BVConcat:
+                return "{" + ",".join(wrap(a) for a in self.args) + "}"
             raise NotImplementedError(v)
         elif tgt == TargetFormat.VERIF_DSL:
             o = v.Operators
