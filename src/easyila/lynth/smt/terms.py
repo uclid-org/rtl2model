@@ -9,31 +9,34 @@ from .sorts import *
 
 class Kind(Enum):
     # https://cvc5.github.io/docs/api/cpp/kind.html
-    BVAdd       = auto()
-    BVSub       = auto()
-    BVOr        = auto()
-    BVAnd       = auto()
-    BVNot       = auto()
-    BVXor       = auto()
-    BVExtract   = auto()
-    BVConcat    = auto()
-    BVOrr       = auto()
-    BVUle       = auto()
-    BVUlt       = auto()
-    BVUge       = auto()
-    BVUgt       = auto()
-    Or          = auto()
-    And         = auto()
-    Not         = auto()
-    Xor         = auto()
-    Implies     = auto()
-    Ite         = auto()
-    Lambda      = auto()
-    Equal       = auto()
-    Exists      = auto()
-    ForAll      = auto()
-    Select      = auto()
-    Store       = auto()
+    BVAdd           = auto()
+    BVSub           = auto()
+    BVOr            = auto()
+    BVAnd           = auto()
+    BVNot           = auto()
+    BVXor           = auto()
+    BVExtract       = auto()
+    BVConcat        = auto()
+    BVOrr           = auto()
+    BVUle           = auto()
+    BVUlt           = auto()
+    BVUge           = auto()
+    BVUgt           = auto()
+    BVZeroPad       = auto()
+    BVSignExtend    = auto()
+    Or              = auto()
+    And             = auto()
+    Not             = auto()
+    Xor             = auto()
+    Implies         = auto()
+    Ite             = auto()
+    Lambda          = auto()
+    Equal           = auto()
+    Distinct        = auto()
+    Exists          = auto()
+    ForAll          = auto()
+    Select          = auto()
+    Store           = auto()
 
     def to_cvc5(self, _cvc5_ctx):
         try:
@@ -54,36 +57,40 @@ class Kind(Enum):
 
 # Maps our Kind class to pycvc5.Kind...
 _OP_KIND_MAPPING = {
-    Kind.BVAdd:     pycvc5.Kind.BVAdd,
-    Kind.BVSub:     pycvc5.Kind.BVSub,
-    Kind.BVOr:      pycvc5.Kind.BVOr,
-    Kind.BVAnd:     pycvc5.Kind.BVAnd,
-    Kind.BVNot:     pycvc5.Kind.BVNot,
-    Kind.BVXor:     pycvc5.Kind.BVXor,
-    Kind.BVExtract: pycvc5.Kind.BVExtract,
-    Kind.BVConcat:  pycvc5.Kind.BVConcat,
+    Kind.BVAdd:         pycvc5.Kind.BVAdd,
+    Kind.BVSub:         pycvc5.Kind.BVSub,
+    Kind.BVOr:          pycvc5.Kind.BVOr,
+    Kind.BVAnd:         pycvc5.Kind.BVAnd,
+    Kind.BVNot:         pycvc5.Kind.BVNot,
+    Kind.BVXor:         pycvc5.Kind.BVXor,
+    Kind.BVExtract:     pycvc5.Kind.BVExtract,
+    Kind.BVConcat:      pycvc5.Kind.BVConcat,
 
-    Kind.BVOrr:     pycvc5.Kind.BVRedor,
+    Kind.BVOrr:         pycvc5.Kind.BVRedor,
 
-    Kind.BVUle:     pycvc5.Kind.BVUle,
-    Kind.BVUlt:     pycvc5.Kind.BVUlt,
-    Kind.BVUge:     pycvc5.Kind.BVUge,
-    Kind.BVUgt:     pycvc5.Kind.BVUgt,
+    Kind.BVUle:         pycvc5.Kind.BVUle,
+    Kind.BVUlt:         pycvc5.Kind.BVUlt,
+    Kind.BVUge:         pycvc5.Kind.BVUge,
+    Kind.BVUgt:         pycvc5.Kind.BVUgt,
 
-    Kind.Equal:     pycvc5.Kind.Equal,
-    Kind.Or:        pycvc5.Kind.Or,
-    Kind.And:       pycvc5.Kind.And,
-    Kind.Not:       pycvc5.Kind.Not,
-    Kind.Xor:       pycvc5.Kind.Xor,
-    Kind.Implies:   pycvc5.Kind.Implies,
-    Kind.Ite:       pycvc5.Kind.Ite,
+    Kind.BVZeroPad:     pycvc5.Kind.BVZeroExtend,
+    Kind.BVSignExtend:  pycvc5.Kind.BVSignExtend,
 
-    Kind.Lambda:    pycvc5.Kind.Lambda,
-    Kind.Exists:    pycvc5.Kind.Exists,
-    Kind.ForAll:    pycvc5.Kind.Forall,
+    Kind.Equal:         pycvc5.Kind.Equal,
+    Kind.Distinct:      pycvc5.Kind.Distinct,
+    Kind.Or:            pycvc5.Kind.Or,
+    Kind.And:           pycvc5.Kind.And,
+    Kind.Not:           pycvc5.Kind.Not,
+    Kind.Xor:           pycvc5.Kind.Xor,
+    Kind.Implies:       pycvc5.Kind.Implies,
+    Kind.Ite:           pycvc5.Kind.Ite,
 
-    Kind.Select:    pycvc5.Kind.Select,
-    Kind.Store:     pycvc5.Kind.Store
+    Kind.Lambda:        pycvc5.Kind.Lambda,
+    Kind.Exists:        pycvc5.Kind.Exists,
+    Kind.ForAll:        pycvc5.Kind.Forall,
+
+    Kind.Select:        pycvc5.Kind.Select,
+    Kind.Store:         pycvc5.Kind.Store
 }
 # ...and vice versa
 _OP_KIND_REV_MAPPING = {v: k for k, v in _OP_KIND_MAPPING.items()}
@@ -151,7 +158,7 @@ class Term(Translatable, ABC):
 
     def __ne__(self, other):
         self._op_type_check(other)
-        return OpTerm(Kind.Not, (OpTerm(Kind.Equal, (self, other)),))
+        return OpTerm(Kind.Distinct, (self, other))
 
     def __gt__(self, other):
         self._op_type_check(other)
@@ -233,11 +240,19 @@ class Term(Translatable, ABC):
             width = self.sort.bitwidth
         wrap = lambda i: BVConst(i, width)
         if isinstance(key, int):
-            return OpTerm(Kind.BVExtract, (wrap(key), wrap(key), self))
+            return OpTerm(Kind.BVExtract, (self, wrap(key), wrap(key)))
+        elif isinstance(key, Term):
+            return OpTerm(Kind.BVExtract, (self, key, key))
         elif isinstance(key, slice):
-            hi = wrap(max(key.start, key.stop))
-            lo = wrap(min(key.start, key.stop))
-            return OpTerm(Kind.BVExtract, (hi, lo, self))
+            if isinstance(key.start, int):
+                hi = wrap(max(key.start, key.stop))
+            else:
+                hi = key.start
+            if isinstance(key.stop, int):
+                lo = wrap(min(key.start, key.stop))
+            else:
+                lo = key.stop
+            return OpTerm(Kind.BVExtract, (self, hi, lo))
         raise TypeError(f"cannot index {self} with {key}")
 
     def __setitem__(self, key, value):
@@ -260,6 +275,14 @@ class Term(Translatable, ABC):
 
     def concat(self, *others):
         return OpTerm(Kind.BVConcat, (self, *others))
+
+    def zero_pad(self, extra_bits):
+        """Zero pads this term with an addition `extra_bits` bits."""
+        return OpTerm(Kind.BVZeroPad, (self, extra_bits))
+
+    def sign_extend(self, extra_bits):
+        """Sign extends this term with an addition `extra_bits` bits."""
+        return OpTerm(Kind.BVSignExtend, (self, extra_bits))
 
     # === ABSTRACT AND SHARED STATIC METHODS ===
     @staticmethod
@@ -394,12 +417,16 @@ class OpTerm(Term):
             # TODO fix this hack: in the CVC5 API, BVExtract must first be turned into
             # an operator via Solver::mkOp(BVExtract, high, low)
             # As a workaround, we store the high/low parameters as BVConst arguments
-            assert isinstance(self.args[0], BVConst)
             assert isinstance(self.args[1], BVConst)
-            return BVSort(self.args[0].val - self.args[1].val + 1)
+            assert isinstance(self.args[2], BVConst)
+            return BVSort(self.args[1].val - self.args[2].val + 1)
+        elif self.kind in (Kind.BVZeroPad, Kind.BVSignExtend):
+            assert isinstance(self.args[1], BVConst)
+            assert isinstance(self.args[0], BVSort)
+            return BVSort(self.args[0].sort.bitwidth + self.args[1].val)
         elif self.kind == Kind.Ite:
             return self.args[1].sort
-        bitops = { Kind.Or, Kind.And, Kind.Xor, Kind.Not, Kind.Equal }
+        bitops = { Kind.Or, Kind.And, Kind.Xor, Kind.Not, Kind.Equal, Kind.Distinct }
         if self.kind in bitops:
             return BoolSort()
         if self.kind == Kind.Select:
@@ -428,10 +455,14 @@ class OpTerm(Term):
             cvc5_kind = self.kind.to_cvc5(self)
             if self.kind == Kind.BVExtract:
                 # TODO special case BVExtract, Select, and Store for from_cvc5?
-                assert isinstance(self.args[0], BVConst)
                 assert isinstance(self.args[1], BVConst)
-                op = cvc5_ctx.solver.mkOp(cvc5_kind, self.args[0].val, self.args[1].val)
-                return cvc5_ctx.solver.mkTerm(op, self.args[2].to_cvc5(cvc5_ctx))
+                assert isinstance(self.args[2], BVConst)
+                op = cvc5_ctx.solver.mkOp(cvc5_kind, self.args[1].val, self.args[2].val)
+                return cvc5_ctx.solver.mkTerm(op, self.args[0].to_cvc5(cvc5_ctx))
+            elif self.kind in (Kind.BVZeroPad, Kind.BVSignExtend):
+                assert isinstance(self.args[1], BVConst)
+                op = cvc5_ctx.solver.mkOp(cvc5_kind, self.args[1].val)
+                return cvc5_ctx.solver.mkTerm(op, self.args[0].to_cvc5(cvc5_ctx))
             t = cvc5_ctx.solver.mkTerm(cvc5_kind, *[v.to_cvc5(cvc5_ctx) for v in self.args])
             return t
         elif tgt == TargetFormat.SYGUS2:
@@ -460,6 +491,8 @@ class OpTerm(Term):
                 Kind.Or: "||",
                 Kind.And: "&&",
                 Kind.Xor: "^", # TODO check if this differs from bv xor
+                Kind.Equal: "==",
+                Kind.Distinct: "!=",
             }
             if v in binops:
                 a0_str = wrap(self.args[0])

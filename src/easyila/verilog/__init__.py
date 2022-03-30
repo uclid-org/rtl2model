@@ -18,6 +18,7 @@ from pyverilog.dataflow.dataflow import (
     DFNotTerminal,
     DFBranch,
     DFConcat,
+    DFEvalValue,
     DFIntConst,
     DFOperator,
     DFPartselect,
@@ -310,12 +311,21 @@ def _verilog_model_helper(
             if sc in binddict and not signaltype.isInput(termtype) or len(sc) == mod_depth + 2:
                 parents = binddict[sc]
                 for p in parents:
-                    assert p.msb is None and p.lsb is None, "slice assignment not yet supported"
-                    if p.ptr is not None:
+                    # assert p.msb is None and p.lsb is None, "slice assignment not yet supported"
+                    if p.msb and p.lsb:
+                        # BV slice assignment
+                        assert isinstance(v.sort, smt.BVSort)
+                        idx_width = v.sort.bitwidth
+                        msb_expr = pv_to_smt_expr(p.msb, idx_width, terms, None, mod_depth, rename_substitutions)
+                        lsb_expr = pv_to_smt_expr(p.lsb, idx_width, terms, None, mod_depth, rename_substitutions)
+                        assignee = v[msb_expr:lsb_expr]
+                    elif p.ptr is not None:
+                        # Array index assignment
                         assert isinstance(v.sort, smt.ArraySort)
                         idx_width = v.sort.idx_sort.bitwidth
                         assignee = v[pv_to_smt_expr(p.ptr, idx_width, terms, None, mod_depth, rename_substitutions)]
                     else:
+                        # Plain old variable assignment
                         assignee = v
                     if p.tree is not None:
                         expr = pv_to_smt_expr(p.tree, width, terms, assignee, mod_depth, rename_substitutions)
@@ -575,7 +585,7 @@ def pv_to_smt_expr(node, width: Optional[int], terms, assignee, mod_depth, subst
         if qual_name in substitutions:
             return substitutions[qual_name]
         return term_to_smt_var(qual_name, terms, mod_depth)
-    elif isinstance(node, DFIntConst):
+    elif isinstance(node, DFIntConst) or isinstance(node, DFEvalValue):
         v = node.eval()
         if width is None:
             width = node.width
@@ -627,16 +637,14 @@ def pv_to_smt_expr(node, width: Optional[int], terms, assignee, mod_depth, subst
             "LassEq": smt.Kind.BVUle, # [sic]
             "GreaterEq": smt.Kind.BVUge,
             "Eq": smt.Kind.Equal,
+            "NotEq": smt.Kind.Distinct,
             # what are "Eql" and "NotEql"???
             "Plus": smt.Kind.BVAdd, # TODO is this saturating for booleans?
             "Minus": smt.Kind.BVSub,
         }
-        if op in binops or op == "Neq":
+        if op in binops:
             assert len(evaled_children) == 2
-            if op == "Neq":
-                return evaled_children[0] != evaled_children[1]
-            else:
-                return smt.OpTerm(binops[op], tuple(evaled_children))
+            return smt.OpTerm(binops[op], tuple(evaled_children))
         # By testing, it seems that "Unot" is ~ and "Ulnot" is ! (presumably "Unary Logical NOT")
         unops = {
             "Unot": smt.Kind.Not if width == 1 else smt.Kind.BVNot,
@@ -658,7 +666,7 @@ def pv_to_smt_expr(node, width: Optional[int], terms, assignee, mod_depth, subst
         evaled_children = [pv_to_smt_expr(c, None, terms, assignee, mod_depth, substitutions) for c in node.nextnodes]
         return evaled_children[0].concat(*evaled_children[1:])
     else:
-        raise NotImplementedError(type(node))
+        raise NotImplementedError(type(node), node.__dict__, node.tocode())
 
 
 def maybe_scope_chain_to_str(sc):
