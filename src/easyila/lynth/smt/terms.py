@@ -203,6 +203,7 @@ class Term(Translatable, ABC):
     def __add__(self, other):
         if isinstance(other, int):
             # Automatically generate appropriate-width constant
+            # TODO do this for other values as well
             assert isinstance(self.sort, BVSort)
             other = BVConst(other, self.sort.bitwidth)
         else:

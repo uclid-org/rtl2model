@@ -471,9 +471,9 @@ class TestVerilogParse:
             module inner2(input clk, input [3:0] value, output [3:0] o);
                 reg [3:0] state;
                 always @(posedge clk) begin
-                    state = value + 1;
+                    state = value + 4'h1;
                 end
-                assign o = state ^ 3'b111;
+                assign o = state ^ 4'b1111;
             endmodule
 
             module inner1(input clk, input [3:0] value, output [3:0] o);
@@ -486,7 +486,7 @@ class TestVerilogParse:
                 always @(posedge clk) begin
                     state = inner_s ^ value;
                 end
-                assign o = state | 3'b110;
+                assign o = state | 4'b110;
             endmodule
 
             module top(input clk, input [3:0] value, output [3:0] o);
@@ -503,16 +503,16 @@ class TestVerilogParse:
             endmodule
             """)
         bvar = smt.BVVariable
-        value = bvar("value", 3)
-        o = bvar("o", 3)
-        state = bvar("state", 3)
-        inner_s = bvar("inner_s", 3)
+        value = bvar("value", 4)
+        o = bvar("o", 4)
+        state = bvar("state", 4)
+        inner_s = bvar("inner_s", 4)
         exp_inner2 = Model(
             "inner2",
             inputs=[value],
             outputs=[o],
             state=[state],
-            logic={o: state ^ smt.BVConst(0b111, 3)},
+            logic={o: state ^ smt.BVConst(0b1111, 4)},
             default_next=[{state: value + 1}],
         )
         exp_inner1 = Model(
@@ -520,8 +520,8 @@ class TestVerilogParse:
             inputs=[value],
             outputs=[o],
             state=[state, inner_s],
-            instances={"inst": Instance(exp_inner2, {value: state})},
-            logic={inner_s: bvar("inst.o", 3), o: state | value},
+            instances={"inst": Instance(exp_inner2, {value: value})},
+            logic={inner_s: bvar("inst.o", 4), o: state | smt.BVConst(0b0110, 4)},
             default_next=[{state: inner_s ^ value}],
         )
         exp_top = Model(
@@ -530,15 +530,15 @@ class TestVerilogParse:
             outputs=[o],
             state=[state, inner_s],
             instances={"inst": Instance(exp_inner1, {value: state})},
-            logic={inner_s: bvar("inst.o", 3), o: inner_s},
+            logic={inner_s: bvar("inst.o", 4), o: inner_s},
             default_next=[{state: inner_s & value}]
         )
         assert exp_inner2.validate()
         assert exp_inner1.validate()
         assert exp_top.validate()
-        model = verilog_to_model(rtl, "top")
-        model.print()
-        inner1 = model.instances["inst"].model
+        top = verilog_to_model(rtl, "top")
+        top.print()
+        inner1 = top.instances["inst"].model
         inner1.print()
         inner2 = inner1.instances["inst"].model
         inner2.print()
