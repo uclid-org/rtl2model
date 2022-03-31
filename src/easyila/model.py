@@ -153,36 +153,50 @@ class Model:
 
     def pretty_str(self, indent_level=0):
         # Weird things happen with escaped chars in f-strings
-        newline = ',\n' + ' ' * 24
-        noind_newline = '\n'
-        return textwrap.indent(
-            textwrap.dedent(f"""\
-                Model(
-                    name="{self.name}",
-                    inputs=
-                        {newline.join([str(a.get_decl()) for a in self.inputs])},
-                    outputs=
-                        {newline.join([str(a.get_decl()) for a in self.outputs])},
-                    state=
-                        {newline.join([str(a.get_decl()) for a in self.state])},
-                    ufs=
-                        {newline.join([str(a) for a in self.ufs])},
-                    instances=
-                        {newline.join(str(m) + ':' + i.pretty_str(28) for m, i in self.instances.items())}
-                    ,
-                    logic=
-                        {newline.join(str(m) + ': ' + str(e) for m, e in self.logic.items())}
-                    ,
-                    default_next=
-                        {newline.join(str(m) + ': ' + str(e) for m, e in self.default_next[0].items())}
-                    ,
-                    instructions={self.instructions},
-                    init_values={self.init_values},
-                )\
-                """
-            ),
-            ' ' * indent_level
-        )
+        newline = '\n' + ' ' * 20
+        c_newline = "," + newline
+        if len(self.inputs) > 0:
+            input_block = newline + c_newline.join([str(a.get_decl()) for a in self.inputs])
+        else:
+            input_block = ""
+        if len(self.outputs) > 0:
+            output_block = newline + c_newline.join([str(a.get_decl()) for a in self.outputs])
+        else:
+            output_block = ""
+        if len(self.state) > 0:
+            state_block = newline + c_newline.join([str(a.get_decl()) for a in self.state])
+        else:
+            state_block = ""
+        if len(self.ufs) > 0:
+            uf_block = newline + c_newline.join([str(a) for a in self.ufs])
+        else:
+            uf_block = ""
+        if len(self.instances) > 0:
+            inst_block = newline + c_newline.join(str(m) + ':' + i.pretty_str(24) for m, i in self.instances.items())
+        else:
+            inst_block = ""
+        if len(self.logic) > 0:
+            logic_block = newline + c_newline.join(str(m) + ': ' + str(e) for m, e in self.logic.items())
+        else:
+            logic_block = ""
+        if len(self.default_next) > 0:
+            next_block = newline + c_newline.join(str(m) + ': ' + str(e) for m, e in self.default_next[0].items())
+        else:
+            next_block = ""
+        return textwrap.indent(textwrap.dedent(f"""\
+            Model(
+                name="{self.name}",
+                inputs={input_block},
+                outputs={output_block},
+                state={state_block},
+                ufs={uf_block},
+                instances={inst_block},
+                logic={logic_block},
+                default_next={next_block},
+                instructions={self.instructions},
+                init_values={self.init_values},
+            )"""
+        ), ' ' * indent_level)
 
     def print(self):
         print(self.pretty_str())
@@ -231,15 +245,18 @@ class Instance:
     """
 
     def pretty_str(self, indent_level=0):
-        newline = ',\n' + ' ' * 16
+        newline = '\n' + ' ' * 12
+        c_newline = "," + newline
+        if len(self.inputs) > 0:
+            input_block = newline + c_newline.join(str(v) + ": " + str(e) for v, e in self.inputs.items())
+        else:
+            input_block = ""
+        # maybe there's a cleaner way to do this f string :)
         return textwrap.indent(textwrap.dedent(f"""\
 
-            input_bindings:
-                {newline.join(str(v) + ": " + str(e) for v, e in self.inputs.items())}
-            ,
+            input_bindings={input_block},
             model:
-                {self.model.pretty_str()}\
-            """),
+{self.model.pretty_str(16)}"""),
             ' ' * indent_level
         )
 
