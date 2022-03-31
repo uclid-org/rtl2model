@@ -136,6 +136,8 @@ def verilog_to_model(
     for mod_name in needed_submodules:
         submodules[mod_name] = _verilog_model_helper(
             mod_name,
+            # TODO generalize for multiple instances of the same submodule
+            [i_name for i_name, m in instance_names.items() if m == mod_name][0],
             terms,
             binddict,
             {}, # TODO figure out how to get child instance_names
@@ -148,6 +150,7 @@ def verilog_to_model(
             inline_renames
         )
     return _verilog_model_helper(
+        top_name,
         top_name,
         terms,
         binddict,
@@ -163,6 +166,7 @@ def verilog_to_model(
 
 def _verilog_model_helper(
     mod_name: str,
+    instance_name: str,
     terms,
     binddict,
     instance_names: Dict[str, str],
@@ -176,6 +180,10 @@ def _verilog_model_helper(
 ):
     """
     Helper method for verilog model generation.
+
+    `instance_name` is the fully qualified name of this module's instance.
+    For the designated top module, this should be the same as `mod_name`.
+    TODO deal with multiple instances of the same module.
 
     Parameters are as described in `verilog_to_model`, though all arguments are now mandatory.
 
@@ -293,7 +301,7 @@ def _verilog_model_helper(
         # Categorize input, output, or state
         sc = str_to_scope_chain(s)
         termtype = terms[sc].termtype
-        is_curr_scope = len(sc) == mod_depth + 1
+        is_curr_scope = maybe_scope_chain_to_str(sc[-1]) == instance_name
         if not inline_renames or not signaltype.isRename(termtype):
             # Only add signals belonging to this module
             # TODO figure out how to deal with this for nested instances,
