@@ -225,7 +225,7 @@ class Term(Translatable, ABC):
             op = Kind.BVNot
         return OpTerm(op, (self,))
 
-    def __mul__(self):
+    def __mul__(self, other):
         self._op_type_check(other)
         return OpTerm(Kind.BVMul, (self, other))
 
@@ -250,7 +250,7 @@ class Term(Translatable, ABC):
     def __rshift__(self, other):
         # Python right shift is technically arithmetic since integers
         # don't have a fixed size
-        return self.shra(other)
+        return self.sra(other)
 
     def srl(self, other):
         return OpTerm(Kind.BVSrl, (self, other))

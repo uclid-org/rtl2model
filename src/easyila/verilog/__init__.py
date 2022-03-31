@@ -609,7 +609,7 @@ def pv_to_smt_expr(node, width: Optional[int], terms, assignee, mod_depth, subst
         v = node.eval()
         if width is None:
             # Pyverilog being quirky again -- DFIntConst makes width a method
-            width = node.width() if callable(node.width) else width
+            width = node.width() if callable(node.width) else node.width
         if width == 1:
             return smt.BoolConst.T if v else smt.BoolConst.F
         else:
