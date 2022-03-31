@@ -71,13 +71,15 @@ class TestModelToUclid:
                 }
 
                 next {
-                    // Transition functions
-                    s_b' = __next_s_b;
-                    // Combinatorial relations
+                    // Instance transitions
                     o_a' = uf_a() + s_a';
                     o_b' = s_a' + s_b';
                     s_a' = i_a' | i_b';
                     __next_s_b = if (i_a'[0:0] == 1bv1) then i_a' else s_b';
+                    // Transition logic
+                    s_b' = __next_s_b;
+                    // Instance transitions
+
                 }
             }
             """)

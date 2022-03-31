@@ -204,28 +204,53 @@ class Model:
 
     def to_uclid(self):
         u_vars = []
-        def u_append(lst, use_decl):
+        def u_append(lst, prefix):
             nonlocal u_vars
             if len(lst) > 0:
-                u_vars.extend((s.get_decl() if use_decl else s).to_uclid() for s in lst)
-        u_append(self.inputs, True)
-        u_append(self.outputs, True)
-        u_append(self.state, True)
-        u_append(self.ufs, False)
-        u_vars_s = textwrap.indent("\n".join(u_vars), 4 * '    ')
+                u_vars.extend(prefix + " " + str(s.get_decl()) + ";" for s in lst)
+        u_append(self.inputs, "input")
+        u_append(self.outputs, "output")
+        u_append(self.state, "var")
+        if len(self.ufs) > 0:
+            u_vars.extend(s.to_uclid() for s in self.ufs)
+        newline = ' ' * 16
+        u_vars_s = textwrap.indent("\n".join(u_vars), newline)
+        instances_s = textwrap.indent("\n".join(i.to_uclid(n) for n, i in self.instances.items()), newline)
+        logic_s = textwrap.indent(
+            "\n".join(f"{lhs.to_uclid()} = {rhs.to_uclid()};" for lhs, rhs in self.logic.items()),
+            newline + "    "
+        )
+        if len(self.default_next) > 0:
+            next_s = textwrap.indent(
+                "\n".join(f"{lhs.to_uclid()}' = {rhs.to_uclid()};" for lhs, rhs in self.default_next[0].items()),
+                newline + "    "
+            )
+        else:
+            next_s = newline
+        if len(self.instances) > 0:
+            child_next_s = textwrap.indent(
+                "\n".join(f"next({n});" for n in self.instances),
+                newline + "    "
+            )
         return textwrap.dedent(f"""\
             module {self.name} {{
 {u_vars_s}
+
+{instances_s}
 
                 init {{
 
                 }}
 
                 next {{
-
+                    // Combinatorial logic
+{logic_s}
+                    // Transition logic
+{next_s}
+                    // Instance transitions
+{child_next_s}
                 }}
-            }}
-            """)
+            }}""")
 
 
 @dataclass
@@ -260,6 +285,17 @@ class Instance:
 {self.model.pretty_str(16)}"""),
             ' ' * indent_level
         )
+
+    def to_uclid(self, instance_name):
+        newline = ",\n" + (' ' * 16)
+        i_lines = (' ' * 16) + newline.join(
+            f"{lhs.name} : ({rhs.to_uclid()})" for lhs, rhs in self.inputs.items()
+        )
+        return textwrap.dedent(f"""\
+            instance {instance_name} : {self.model.name}
+            (
+{i_lines}
+            );""")
 
 
 class CaseSplitModel(Model):
