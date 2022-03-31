@@ -98,7 +98,7 @@ def verilog_to_model(
 
     terms = analyzer.getTerms()
     binddict = analyzer.getBinddict()
-    all_signals = [maybe_scope_chain_to_str(t) for t in terms]
+    all_signals = [str(t) for t in terms]
     all_signals = [s for s in all_signals if s.split(".")[-1] != clock_name]
     if preserve_all_signals:
         important_signals = all_signals
@@ -125,9 +125,9 @@ def verilog_to_model(
             submodules[m.name] = m
     for inst_name, mod_name in analyzer.getInstances():
         # TODO generalize
-        if maybe_scope_chain_to_str(inst_name) == top_name:
+        if str(inst_name) == top_name:
             continue
-        instance_names[maybe_scope_chain_to_str(inst_name)] = mod_name
+        instance_names[str(inst_name)] = mod_name
         if mod_name not in submodules:
             needed_submodules.append(mod_name)
 
@@ -270,14 +270,14 @@ def _verilog_model_helper(
     """
     if inline_renames:
         for sc, term in terms.items():
-            is_curr_scope = maybe_scope_chain_to_str(sc[:-1]) == instance_name
+            is_curr_scope = str(sc[:-1]) == instance_name
             if not is_curr_scope:
                 continue
             assert isinstance(term.msb, DFIntConst), term.msb
             assert isinstance(term.lsb, DFIntConst), term.lsb
             # TODO deal with `dims` for arrays?
             width = term.msb.eval() - term.lsb.eval() + 1
-            s = maybe_scope_chain_to_str(sc)
+            s = str(sc)
             if signaltype.isRename(term.termtype):
                 for p in binddict[sc]:
                     # In this context, there should never be an empty else branch, so we
@@ -310,7 +310,7 @@ def _verilog_model_helper(
         width = get_term_width(s, terms)
         # Categorize input, output, or state
         termtype = terms[sc].termtype
-        is_curr_scope = maybe_scope_chain_to_str(sc[:-1]) == instance_name
+        is_curr_scope = str(sc[:-1]) == instance_name
         if not inline_renames or not signaltype.isRename(termtype):
             # Only add signals belonging to this module
             # TODO figure out how to deal with this for nested instances,
@@ -546,7 +546,7 @@ def find_direct_parent_nodes(p, parents=None) -> List[str]:
         # "_rnN_" wires are the value of the wire on the next timestep
         # TODO account for reassigning w/in always@ block? what if there
         # are multiple always@ blocks?
-        sc_str = maybe_scope_chain_to_str(p.name)
+        sc_str = str(p.name)
         # unqualified_name = sc_str.split(".")[-1]
         parents.append(sc_str)
     elif isinstance(p, DFIntConst):
@@ -605,7 +605,7 @@ def pv_to_smt_expr(node, width: Optional[int], terms, assignee, mod_depth, subst
     if substitutions is None:
         substitutions = {}
     if isinstance(node, DFTerminal):
-        qual_name = maybe_scope_chain_to_str(node.name)
+        qual_name = str(node.name)
         if qual_name in substitutions:
             return substitutions[qual_name]
         return term_to_smt_var(qual_name, terms, mod_depth)
@@ -694,7 +694,7 @@ def pv_to_smt_expr(node, width: Optional[int], terms, assignee, mod_depth, subst
         raise NotImplementedError("operator translation not implemented yet: " + str(op))
     elif isinstance(node, DFPointer):
         # Array indexing
-        arr = term_to_smt_var(maybe_scope_chain_to_str(node.var.name), terms, mod_depth)
+        arr = term_to_smt_var(str(node.var.name), terms, mod_depth)
         assert isinstance(arr.sort, smt.ArraySort)
         idx_width = arr.sort.idx_sort.bitwidth
         idx_term = pv_to_smt_expr(node.ptr, idx_width, terms, assignee, mod_depth, substitutions)
@@ -704,13 +704,6 @@ def pv_to_smt_expr(node, width: Optional[int], terms, assignee, mod_depth, subst
         return evaled_children[0].concat(*evaled_children[1:])
     else:
         raise NotImplementedError(type(node), node.__dict__, node.tocode())
-
-
-def maybe_scope_chain_to_str(sc):
-    if isinstance(sc, ScopeChain):
-        return repr(sc)
-    else: # pray it's a string
-        return sc
 
 
 def str_to_scope_chain(s):
