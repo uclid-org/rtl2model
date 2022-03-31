@@ -89,11 +89,6 @@ class Model:
                 report(f"instance {subname} is missing input {missing_input}")
             for extra_input in set(sub.inputs.keys()) - set(needed_inputs):
                 report(f"instance {subname} has unknown output {extra_input}")
-            # needed_outputs = sub.model.outputs
-            # for missing_output in set(needed_outputs) - set(sub.outputs.keys()):
-            #     report(f"instance {subname} is missing output {missing_output}")
-            # for extra_output in set(sub.outputs.keys()) - set(needed_outputs):
-            #     report(f"instance {subname} has unknown output {extra_output}")
         # First pass: no variable is declared multiple times
         # TODO don't be stateful if isinstance(v, smt.Variable)!
         for s, count in in_counts.items():
@@ -147,24 +142,49 @@ class Model:
         # nth pass: init values correspond to valid variables
         # TODO
         # nth pass: transition relations and expressions type check and are valid
-        # TODO
+        for v, e in self.logic.items():
+            if not e.typecheck():
+                report(f"type error in logic for {v} (see above output)")
+        for l in self.default_next:
+            for v, e in l:
+                if not e.typecheck():
+                    report(f"type error in transition logic for {v} (see above output)")
         return len(errs) == 0
 
+    def pretty_str(self, indent_level=0):
+        # Weird things happen with escaped chars in f-strings
+        newline = ',\n' + ' ' * 24
+        return textwrap.indent(
+            textwrap.dedent(f"""\
+                Model(
+                    name="{self.name}",
+                    inputs=
+                        {newline.join([str(a.get_decl()) for a in self.inputs])},
+                    outputs=
+                        {newline.join([str(a.get_decl()) for a in self.outputs])},
+                    state=
+                        {newline.join([str(a.get_decl()) for a in self.state])},
+                    ufs=
+                        {newline.join([str(a) for a in self.ufs])},
+                    instances=
+                        {newline.join(str(m) + ': ' + i.pretty_str(indent_level + 4) for m, i in self.instances.items())}
+                    ,
+                    logic=
+                        {newline.join(str(m) + ': ' + str(e) for m, e in self.logic.items())}
+                    ,
+                    default_next=
+                        {newline.join(str(m) + ': ' + str(e) for m, e in self.default_next[0].items())}
+                    ,
+                    instructions={self.instructions},
+                    init_values={self.init_values},
+                )
+                """
+            ),
+            ' ' * indent_level
+        )
+
     def print(self):
-        print(textwrap.dedent(f"""\
-            Model(
-                name="{self.name}",
-                inputs={self.inputs},
-                outputs={self.outputs},
-                state={self.state},
-                ufs={self.ufs},
-                instances={self.instances},
-                logic={self.logic},
-                default_next={self.default_next},
-                instructions={self.instructions},
-                init_values={self.init_values},
-            )
-            """))
+        print(self.pretty_str())
 
     def to_uclid(self):
         u_vars = []
@@ -196,6 +216,10 @@ class Model:
 class Instance:
     """
     A class representing the concrete instantiation of a model.
+
+    Input bindings are represented in the `inputs` field.
+
+    Output bindings are specified only by the parent module.
     """
 
     model: Model
@@ -204,6 +228,17 @@ class Instance:
     Maps UNQUALIFIED input names to an expression in the parent module (all variable references
     within the expression are relative to that parent.)
     """
+
+    def pretty_str(self, indent_level=0):
+        newline = ',\n' + ' ' * 16
+        return textwrap.indent(f"""\
+            Instance(
+                {newline.join(str(v.to_decl()) + ":" + str(e) for v, e in self.inputs.items())},
+                {self.model.pretty_str(indent_level + 4)}
+            )
+            """,
+            ' ' * indent_level
+        )
 
 
 class CaseSplitModel(Model):

@@ -27,6 +27,9 @@ class Sort(Translatable, ABC):
 class BVSort(Sort):
     bitwidth: int
 
+    def __str__(self):
+        return f"bv{self.bitwidth}"
+
     def to_target_format(self, tgt: TargetFormat, **kwargs):
         if tgt == TargetFormat.CVC5:
             cvc5_ctx = kwargs["cvc5_ctx"]
@@ -48,6 +51,9 @@ class BoolSort(Sort):
     def bitwidth(self):
         return 1
 
+    def __str__(self):
+        return "bool"
+
     def to_target_format(self, tgt: TargetFormat, **kwargs):
         if tgt == TargetFormat.CVC5:
             cvc5_ctx = kwargs["cvc5_ctx"]
@@ -65,6 +71,9 @@ class BoolSort(Sort):
 class ArraySort(Sort):
     idx_sort: Sort
     elem_sort: Sort
+
+    def __str__(self):
+        return f"[{self.idx_sort}]{self.elem_sort}"
 
     @staticmethod
     def from_cvc5(cvc5_sort):
@@ -89,6 +98,9 @@ class FunctionSort(Sort):
     args: Tuple[Sort, ...] # argument sorts
     codomain: Sort # return sort
 
+    def __str__(self):
+        return f"({','.join(str(a) for a in self.args)}) -> {self.codomain}"
+
     @staticmethod
     def from_cvc5(cvc5_sort):
         assert cvc5_sort.isFunction()
@@ -108,6 +120,9 @@ class FunctionSort(Sort):
 @dataclass(frozen=True)
 class UninterpretedSort(Sort):
     name: str
+
+    def __str__(self):
+        return self.name
 
     @staticmethod
     def from_cvc5(cvc5_sort):

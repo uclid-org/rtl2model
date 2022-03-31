@@ -588,7 +588,8 @@ def pv_to_smt_expr(node, width: Optional[int], terms, assignee, mod_depth, subst
     elif isinstance(node, DFIntConst) or isinstance(node, DFEvalValue):
         v = node.eval()
         if width is None:
-            width = node.width
+            # Pyverilog being quirky again -- DFIntConst makes width a method
+            width = node.width() if callable(node.width) else width
         if width == 1:
             return smt.BoolConst.T if v else smt.BoolConst.F
         else:
@@ -602,8 +603,9 @@ def pv_to_smt_expr(node, width: Optional[int], terms, assignee, mod_depth, subst
         else:
             # assert node.msb == node.lsb, "MSB and LSB of non-constant index must be identical"
             # TODO handle the distinction between array and BV indexing?
-            idx_expr = pv_to_smt_expr(node.msb, None, terms, assignee, mod_depth, substitutions)
-            return body_expr[idx_expr]
+            msb_expr = pv_to_smt_expr(node.msb, None, terms, assignee, mod_depth, substitutions)
+            lsb_expr = pv_to_smt_expr(node.lsb, None, terms, assignee, mod_depth, substitutions)
+            return body_expr[msb_expr:lsb_expr]
     elif isinstance(node, DFBranch):
         assert node.condnode is not None, node.tocode()
         cond = pv_to_smt_expr(node.condnode, 1, terms ,assignee, mod_depth, substitutions)

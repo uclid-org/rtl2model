@@ -133,10 +133,27 @@ _OP_SYGUS_SYMBOLS = {
 
 class Term(Translatable, ABC):
     def _op_type_check(self, other):
+        """Checks that two operands have the same sort."""
         assert isinstance(other, Term), f"cannot combine {self} with {other}"
         assert hasattr(self, "sort"), self
         assert hasattr(other, "sort"), other
         assert self.sort == other.sort, f"cannot combine value {self} of sort {self.sort} to {other} of sort {other.sort}"
+
+    def typecheck(self) -> bool:
+        """
+        Performs rudimentary type checking (no scope/semantic checking).
+        Returns True on success, False on failure. Short circuits.
+
+        TODO for now, this just ensures everything in the tree is a term
+        TODO error reporting
+        """
+        for s in self._children:
+            if not isinstance(s, Term):
+                print(f"type error: child term {s} is not a Term object")
+                return False
+            if not s.typecheck():
+                return False
+        return True
 
     # === OPERATOR OVERRIDES ===
     def ite(self, t_term, f_term):
@@ -342,8 +359,12 @@ class Term(Translatable, ABC):
         raise NotImplementedError()
 
     @property
-    @abstractmethod
     def _has_children(self):
+        return len(self._children) > 0
+
+    @property
+    @abstractmethod
+    def _children(self):
         raise NotImplementedError()
 
 
@@ -361,6 +382,9 @@ class Variable(Term):
 
     name: str
     _sort: Sort
+
+    def __str__(self):
+        return f"{self.name}"
 
     def to_uf(self):
         """Converts this variable to a 0-arity UFTerm."""
@@ -387,8 +411,8 @@ class Variable(Term):
         return self._sort
 
     @property
-    def _has_children(self):
-        return False
+    def _children(self):
+        return []
 
     def to_target_format(self, tgt: TargetFormat, **kwargs):
         if tgt == TargetFormat.CVC5:
@@ -416,6 +440,9 @@ BVVariable = lambda s, w: Variable(s, BVSort(w))
 class VarDecl(Translatable):
     name: str
     sort: Sort
+
+    def __str__(self):
+        return f"{self.name} : {self.sort}"
 
     def get_ref(self):
         return Variable(self.name, self.sort)
@@ -468,8 +495,11 @@ class OpTerm(Term):
         raise NotImplementedError(f"Cannot get Sort for kind {self.kind}")
 
     @property
-    def _has_children(self):
-        return True
+    def _children(self):
+        return list(self.args)
+
+    def __str__(self):
+        return self.to_verilog_str()
 
     @staticmethod
     def from_cvc5(cvc5_term):
@@ -511,6 +541,7 @@ class OpTerm(Term):
                 Kind.Not: "!",
                 Kind.BVNot: "~",
                 Kind.BVOrr: "|",
+                Kind.BVXorr: "^",
             }
             if v in unops:
                 a0_str = wrap(self.args[0])
@@ -518,9 +549,17 @@ class OpTerm(Term):
             binops = {
                 Kind.BVAdd: "+",
                 Kind.BVSub: "-",
+                Kind.BVMul: "*",
                 Kind.BVOr: "|",
                 Kind.BVAnd: "&",
                 Kind.BVXor: "^",
+                Kind.BVSll: "<<",
+                Kind.BVSra: ">>",
+                Kind.BVSrl: ">>>",
+                Kind.BVUlt: "<",
+                Kind.BVUle: "<=",
+                Kind.BVUgt: ">",
+                Kind.BVUge: ">=",
                 Kind.Or: "||",
                 Kind.And: "&&",
                 Kind.Xor: "^", # TODO check if this differs from bv xor
@@ -530,7 +569,7 @@ class OpTerm(Term):
             if v in binops:
                 a0_str = wrap(self.args[0])
                 a1_str = wrap(self.args[1])
-                return f"{a0_str} {unops[v]} {a1_str}"
+                return f"{a0_str} {binops[v]} {a1_str}"
             if v == Kind.Implies:
                 a0_str = wrap(self.args[0])
                 a1_str = wrap(self.args[1])
@@ -542,6 +581,15 @@ class OpTerm(Term):
                 return f"{a0_str} ? {a1_str} : {a2_str}"
             if v == Kind.BVConcat:
                 return "{" + ",".join(wrap(a) for a in self.args) + "}"
+            if v == Kind.BVExtract:
+                a0_str = wrap(self.args[0])
+                a1_str = wrap(self.args[1])
+                a2_str = wrap(self.args[2])
+                return f"{a0_str}[{a1_str}:{a2_str}]"
+            if v == Kind.BVSignExtend:
+                return f"$signed({self.args[0].to_verilog_str()})"
+            if v == Kind.BVZeroPad:
+                return wrap(self.args[0])
             raise NotImplementedError(v)
         elif tgt == TargetFormat.VERIF_DSL:
             o = v.Operators
@@ -585,6 +633,10 @@ class OpTerm(Term):
                 Kind.BVOr: "|",
                 Kind.BVAnd: "&",
                 Kind.BVXor: "^",
+                Kind.BVUlt: "<_u",
+                Kind.BVUle: "<=_u",
+                Kind.BVUgt: ">_u",
+                Kind.BVUge: ">=_u",
                 Kind.Or: "||",
                 Kind.And: "&&",
                 Kind.Xor: "^", # TODO check if this differs from bv xor
@@ -610,6 +662,9 @@ class UFTerm(Term):
     _sort: Sort
     params: Tuple[Variable, ...]
 
+    def __str__(self):
+        return self.name
+
     @property
     def arity(self):
         return len(self.params)
@@ -623,8 +678,8 @@ class UFTerm(Term):
         return self._sort
 
     @property
-    def _has_children(self):
-        return False
+    def _children(self):
+        return []
 
     def to_target_format(self, tgt: TargetFormat, **kwargs):
         if tgt == TargetFormat.CVC5:
@@ -650,8 +705,11 @@ class LambdaTerm(Term):
         return FunctionSort(tuple([p.sort for p in self.params]), self.body.sort)
 
     @property
-    def _has_children(self):
-        return True
+    def _children(self):
+        return self.body
+
+    def __str__(self):
+        return f"({','.join(self.params)}) -> {self.body}"
 
     @staticmethod
     def from_cvc5(cvc5_term):
@@ -700,8 +758,8 @@ class QuantTerm(Term):
         return BoolSort()
 
     @property
-    def _has_children(self):
-        return True
+    def _children(self):
+        return self.body
 
     @staticmethod
     def from_cvc5(cvc5_term):
@@ -751,8 +809,8 @@ class ApplyUF(Term):
         raise NotImplementedError()
 
     @property
-    def _has_children(self):
-        return True
+    def _children(self):
+        return list(self.input_values)
 
     @staticmethod
     def from_cvc5(cvc5_term):
@@ -779,8 +837,11 @@ class BoolConst(Term, Enum, metaclass=_TermMeta):
         return BoolSort()
 
     @property
-    def _has_children(self):
-        return False
+    def _children(self):
+        return []
+
+    def __str__(self):
+        return "true" if self == self.T else "false"
 
     def to_target_format(self, tgt: TargetFormat, **kwargs):
         if tgt == TargetFormat.CVC5:
@@ -806,8 +867,11 @@ class BVConst(Term):
         return BVSort(self.width)
 
     @property
-    def _has_children(self):
-        return False
+    def _children(self):
+        return []
+
+    def __str__(self):
+        return f"{self.val}bv{self.width}"
 
     @staticmethod
     def from_cvc5(cvc5_term):
