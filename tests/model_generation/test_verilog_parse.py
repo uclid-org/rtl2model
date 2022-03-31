@@ -302,7 +302,7 @@ class TestVerilogParse:
         # but the output itself is non-important
         assert False
 
-    def test_bv_index(self):
+    def test_bv_int_index(self):
         """
         Tests behavior of bitvector indexing.
         This indirectly tests behavior of bitvector width checking.
@@ -342,6 +342,13 @@ class TestVerilogParse:
             logic={o_inner: i_state[0]}
         )
 
+    def test_verilog_bv_var_index(self):
+        """
+        Tests indexing a bitvector with a variable.
+        """
+        ...
+        assert False
+
     def test_verilog_one_child_module(self):
         rtl = textwrap.dedent("""\
             module inner(input clk, input rst, input i_inner, output o_inner);
@@ -372,9 +379,6 @@ class TestVerilogParse:
             endmodule
             """
         )
-        # TODO this example also currently parses incorrectly because of bv indexing:
-        # i_state[0] has LHS of bv1, but we need some other mechanism to figure out the
-        # bitwidth of i_state (probably because we're traversing the AST the wrong way)
         # TODO specifying important_signals for children
         var = smt.Variable
         boolsort = smt.BoolSort()
@@ -427,7 +431,7 @@ class TestVerilogParse:
             module top(
                 input clk,
                 input wen,
-                input [2:0] ra,
+                input [1:0] ra,
                 input [3:0] wdata,
                 output [3:0] rdata
             );
@@ -444,7 +448,7 @@ class TestVerilogParse:
         model.print()
         wdata = smt.Variable("wdata", smt.BVSort(4))
         wen = smt.Variable("wen", smt.BoolSort())
-        reg = smt.Variable("ra", smt.BVSort(3))
+        reg = smt.Variable("ra", smt.BVSort(2))
         arr = smt.Variable("arr", smt.ArraySort(smt.BVSort(2), smt.BVSort(4)))
         rdata = smt.Variable("rdata", smt.BVSort(4))
         assert model.validate()
@@ -457,12 +461,93 @@ class TestVerilogParse:
             default_next=[{arr[reg]: wen.ite(wdata, arr[reg])}],
         )
 
-    def test_verilog_nested_child(self):
+    def test_verilog_nested_child_no_coi(self):
         """
         Tests behavior for when a child module itself has another child module.
+
+        Note also that there are many shared signal names.
         """
-        ...
-        assert False
+        rtl = textwrap.dedent("""
+            module inner2(input clk, input [3:0] value, output [3:0] o);
+                reg [3:0] state;
+                always @(posedge clk) begin
+                    state = value + 1;
+                end
+                assign o = state ^ 3'b111;
+            endmodule
+
+            module inner1(input clk, input [3:0] value, output [3:0] o);
+                reg [3:0] state;
+                wire [3:0] inner_s;
+                inner2 inst(
+                    .value(value),
+                    .o(inner_s)
+                );
+                always @(posedge clk) begin
+                    state = inner_s ^ value;
+                end
+                assign o = state | 3'b110;
+            endmodule
+
+            module top(input clk, input [3:0] value, output [3:0] o);
+                reg [3:0] state;
+                wire [3:0] inner_s;
+                inner1 inst(
+                    .value(state),
+                    .o(inner_s)
+                );
+                always @(posedge clk) begin
+                    state = inner_s & value;
+                end
+                assign o = inner_s;
+            endmodule
+            """)
+        bvar = smt.BVVariable
+        value = bvar("value", 3)
+        o = bvar("o", 3)
+        state = bvar("state", 3)
+        inner_s = bvar("inner_s", 3)
+        exp_inner2 = Model(
+            "inner2",
+            inputs=[value],
+            outputs=[o],
+            state=[state],
+            logic={o: state ^ smt.BVConst(0b111, 3)},
+            default_next=[{state: value + 1}],
+        )
+        exp_inner1 = Model(
+            "inner1",
+            inputs=[value],
+            outputs=[o],
+            state=[state, inner_s],
+            instances={"inst": Instance(exp_inner2, {value: state})},
+            logic={inner_s: bvar("inst.o", 3), o: state | value},
+            default_next=[{state: inner_s ^ value}],
+        )
+        exp_top = Model(
+            "top",
+            inputs=[value],
+            outputs=[o],
+            state=[state, inner_s],
+            instances={"inst": Instance(exp_inner1, {value: state})},
+            logic={inner_s: bvar("inst.o", 3), o: inner_s},
+            default_next=[{state: inner_s & value}]
+        )
+        assert exp_inner2.validate()
+        assert exp_inner1.validate()
+        assert exp_top.validate()
+        model = verilog_to_model(rtl, "top")
+        model.print()
+        inner1 = model.instances["inst"].model
+        inner1.print()
+        inner2 = inner1.instances["inst"].model
+        inner2.print()
+        assert inner2.validate()
+        assert inner1.validate()
+        assert top.validate()
+        assert inner2 == exp_inner2
+        assert inner1 == exp_inner1
+        assert top == exp_top
 
     def test_verilog_nested_child_coi(self):
         """
@@ -475,5 +560,6 @@ class TestVerilogParse:
         """
         Tests when a module has multiple instances within a design.
         """
+        # Note: in our case studies, rvmini reuses a module just once (the cache)
         ...
         assert False
