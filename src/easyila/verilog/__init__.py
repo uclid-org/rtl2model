@@ -408,7 +408,7 @@ def term_to_smt_var(s, terms, scope_depth, tall=False):
         idx_1 = term.dims[0][1].eval()
         assert idx_0 == 0, f"array indices must start at 0 (was {idx_0})"
         assert idx_1 >= idx_0, f"array second index must be geq first ({idx_0}:{idx_1})"
-        idx_width = int(math.log2(idx_1 - idx_0 + 1)) + 1
+        idx_width = int(math.log2(idx_1 - idx_0)) + 1
         idx_sort = smt.BoolSort() if idx_width == 1 else smt.BVSort(idx_width)
         data_sort = smt.BoolSort() if data_width == 1 else smt.BVSort(data_width)
         arr_sort = smt.ArraySort(idx_sort, data_sort)
