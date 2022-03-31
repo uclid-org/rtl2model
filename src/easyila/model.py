@@ -86,9 +86,9 @@ class Model:
                 report(f"validation error(s) in submodule {subname} (see above output)")
             needed_inputs = sub.model.inputs
             for missing_input in set(needed_inputs) - set(sub.inputs.keys()):
-                report(f"instance {subname} is missing input {missing_input}")
+                report(f"instance {subname} is missing binding for input {missing_input}")
             for extra_input in set(sub.inputs.keys()) - set(needed_inputs):
-                report(f"instance {subname} has unknown output {extra_input}")
+                report(f"instance {subname} has binding for unknown input {extra_input}")
         # First pass: no variable is declared multiple times
         # TODO don't be stateful if isinstance(v, smt.Variable)!
         for s, count in in_counts.items():
@@ -235,7 +235,7 @@ class Instance:
         return textwrap.indent(textwrap.dedent(f"""\
 
             input_bindings:
-                {newline.join(str(v.get_decl()) + ":" + str(e) for v, e in self.inputs.items())}
+                {newline.join(str(v) + ": " + str(e) for v, e in self.inputs.items())}
             ,
             model:
                 {self.model.pretty_str()}\

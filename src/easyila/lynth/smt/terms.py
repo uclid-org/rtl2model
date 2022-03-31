@@ -383,6 +383,9 @@ class Variable(Term):
     name: str
     _sort: Sort
 
+    def __post_init__(self):
+        assert isinstance(self.name, str) and len(self.name) > 0
+
     def __str__(self):
         return f"{self.name}"
 
