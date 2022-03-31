@@ -274,7 +274,7 @@ class Term(Translatable, ABC):
             # Array indexing
             if isinstance(key, Term):
                 if not key.sort == self.sort.idx_sort:
-                    raise TypeError(f"cannot index {self} with {key}")
+                    raise TypeError(f"cannot index {self} (sort {self.sort}) with {key} (sort {key.sort})")
                 return OpTerm(Kind.Select, (self, key))
             elif isinstance(key, int):
                 # Convert key to appropriate index sort
@@ -586,6 +586,10 @@ class OpTerm(Term):
                 a1_str = wrap(self.args[1])
                 a2_str = wrap(self.args[2])
                 return f"{a0_str}[{a1_str}:{a2_str}]"
+            if v == Kind.Select:
+                a0_str = wrap(self.args[0])
+                a1_str = wrap(self.args[1])
+                return f"{a0_str}[{a1_str}]"
             if v == Kind.BVSignExtend:
                 return f"$signed({self.args[0].to_verilog_str()})"
             if v == Kind.BVZeroPad:

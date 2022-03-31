@@ -146,7 +146,7 @@ class Model:
             if not e.typecheck():
                 report(f"type error in logic for {v} (see above output)")
         for l in self.default_next:
-            for v, e in l:
+            for v, e in l.items():
                 if not e.typecheck():
                     report(f"type error in transition logic for {v} (see above output)")
         return len(errs) == 0
@@ -154,6 +154,7 @@ class Model:
     def pretty_str(self, indent_level=0):
         # Weird things happen with escaped chars in f-strings
         newline = ',\n' + ' ' * 24
+        noind_newline = '\n'
         return textwrap.indent(
             textwrap.dedent(f"""\
                 Model(
@@ -167,7 +168,7 @@ class Model:
                     ufs=
                         {newline.join([str(a) for a in self.ufs])},
                     instances=
-                        {newline.join(str(m) + ': ' + i.pretty_str(indent_level + 4) for m, i in self.instances.items())}
+                        {newline.join(str(m) + ':' + i.pretty_str(28) for m, i in self.instances.items())}
                     ,
                     logic=
                         {newline.join(str(m) + ': ' + str(e) for m, e in self.logic.items())}
@@ -177,7 +178,7 @@ class Model:
                     ,
                     instructions={self.instructions},
                     init_values={self.init_values},
-                )
+                )\
                 """
             ),
             ' ' * indent_level
@@ -231,12 +232,14 @@ class Instance:
 
     def pretty_str(self, indent_level=0):
         newline = ',\n' + ' ' * 16
-        return textwrap.indent(f"""\
-            Instance(
-                {newline.join(str(v.to_decl()) + ":" + str(e) for v, e in self.inputs.items())},
-                {self.model.pretty_str(indent_level + 4)}
-            )
-            """,
+        return textwrap.indent(textwrap.dedent(f"""\
+
+            input_bindings:
+                {newline.join(str(v.get_decl()) + ":" + str(e) for v, e in self.inputs.items())}
+            ,
+            model:
+                {self.model.pretty_str()}\
+            """),
             ' ' * indent_level
         )
 

@@ -431,7 +431,7 @@ class TestVerilogParse:
                 input [3:0] wdata,
                 output [3:0] rdata
             );
-                reg [3:0] arr [2:0]; // 8 4-bit elements
+                reg [3:0] arr [0:2]; // 3 4-bit elements, indexed 0 through 2
                 always @(posedge clk) begin
                     if (wen) begin
                         arr[ra] <= wdata;
@@ -445,7 +445,7 @@ class TestVerilogParse:
         wdata = smt.Variable("wdata", smt.BVSort(4))
         wen = smt.Variable("wen", smt.BoolSort())
         reg = smt.Variable("ra", smt.BVSort(3))
-        arr = smt.Variable("arr", smt.ArraySort(smt.BVSort(3), smt.BVSort(4)))
+        arr = smt.Variable("arr", smt.ArraySort(smt.BVSort(2), smt.BVSort(4)))
         rdata = smt.Variable("rdata", smt.BVSort(4))
         assert model.validate()
         assert model == Model(

@@ -8,6 +8,7 @@ This code uses the pyverilog library for parsing and dataflow analysis.
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum, auto
+import math
 import textwrap
 from typing import Dict, List, Optional, Set
 
@@ -379,7 +380,11 @@ def term_to_smt_var(s, terms, scope_depth, tall=False):
         if len(term.dims) != 1:
             raise NotImplementedError("only 1D array indexing is supported")
         data_width = term.msb.eval() - term.lsb.eval() + 1
-        idx_width = abs(term.dims[0][0].eval() - term.dims[0][1].eval()) + 1
+        idx_0 = term.dims[0][0].eval()
+        idx_1 = term.dims[0][1].eval()
+        assert idx_0 == 0, f"array indices must start at 0 (was {idx_0})"
+        assert idx_1 >= idx_0, f"array second index must be geq first ({idx_0}:{idx_1})"
+        idx_width = int(math.log2(idx_1 - idx_0 - 1)) + 1
         idx_sort = smt.BoolSort() if idx_width == 1 else smt.BVSort(idx_width)
         data_sort = smt.BoolSort() if data_width == 1 else smt.BVSort(data_width)
         arr_sort = smt.ArraySort(idx_sort, data_sort)
@@ -638,6 +643,7 @@ def pv_to_smt_expr(node, width: Optional[int], terms, assignee, mod_depth, subst
             "LessThan": smt.Kind.BVUlt,
             "GreaterThan": smt.Kind.BVUgt,
             "LassEq": smt.Kind.BVUle, # [sic]
+            "LessEq": smt.Kind.BVUle, # [sic]
             "GreaterEq": smt.Kind.BVUge,
             "Eq": smt.Kind.Equal,
             "NotEq": smt.Kind.Distinct,
@@ -646,6 +652,8 @@ def pv_to_smt_expr(node, width: Optional[int], terms, assignee, mod_depth, subst
             "Minus": smt.Kind.BVSub,
             "Times": smt.Kind.BVMul,
             "Sll": smt.Kind.BVSll,
+            "Srl": smt.Kind.BVSrl,
+            "Sra": smt.Kind.BVSra,
         }
         if op in binops:
             assert len(evaled_children) == 2
@@ -660,6 +668,10 @@ def pv_to_smt_expr(node, width: Optional[int], terms, assignee, mod_depth, subst
         if op in unops:
             assert len(evaled_children) == 1
             return smt.OpTerm(unops[op], (evaled_children[0],))
+        if op == "Uminus":
+            # 2s complement trick
+            assert len(evaled_children) == 1
+            return ~evaled_children[0] + 1
         raise NotImplementedError("operator translation not implemented yet: " + str(op))
     elif isinstance(node, DFPointer):
         # Array indexing
