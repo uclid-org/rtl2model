@@ -116,8 +116,8 @@ def verilog_to_model(
             raise Exception("Signal names not found in pyverilog terms: " + ",".join([f"'{s}'" for s in missing_signal_names]))
     submodules: Dict[str, Model] = {}
     """Maps MODULE name (not instance name) to Model object."""
-    needed_submodules: List[str] = []
-    """Lists MODULE names that need to be traversed."""
+    needed_submodules: Set[str] = set()
+    """Set of MODULE names that need to be traversed."""
     instance_names: Dict[str, str] = {}
     """Maps fully qualified INSTANCE names to the corresponding MODULE name."""
     if defined_modules is not None:
@@ -128,12 +128,15 @@ def verilog_to_model(
             continue
         instance_names[str(inst_name)] = mod_name
         if mod_name not in submodules:
-            needed_submodules.append(mod_name)
+            needed_submodules.add(mod_name)
+        # TODO raise a warning if a defined submodule is not a needed submodule?
 
     # === TOP AND SUBMODULE GENERATION ===
     # We can get a topological sort of instances by the length of their scope chain
     # that is, the number of periods in the name from least to greatest
     for inst_name, mod_name in sorted(instance_names.items(), key=lambda p: -p[0].count(".")):
+        if mod_name not in needed_submodules:
+            continue
         if mod_name in submodules:
             # TODO generalize for multiple instances of the same submodule
             print("***WARNING: multiples instances of submodule", mod_name, "(doesn't work yet)***")

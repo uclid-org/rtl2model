@@ -410,7 +410,6 @@ class TestVerilogParse:
                 i_out_next: var("sub.o_inner", boolsort),
             },
             default_next=[{i_top_last: i_top, o_top: i_out_next}],
-            # TODO figure out how to do port assignments
             instances={"sub": Instance(exp_submodel, {rst: rst, i_inner: i_top_last})},
         )
         assert exp_top.validate()
@@ -420,6 +419,71 @@ class TestVerilogParse:
         submodel.print()
         assert submodel.validate()
         assert submodel == exp_submodel
+        assert model.validate()
+        assert model == exp_top
+
+    def test_verilog_substitute_child(self):
+        rtl = textwrap.dedent("""\
+            module inner(input clk, input rst, input i_inner, output o_inner);
+                reg i_state;
+                always @(posedge clk) begin
+                    if (rst) begin
+                        i_state = 3'h0;
+                    end else begin
+                        i_state = i_inner | i_state;
+                    end
+                end
+                assign o_inner = i_state;
+            endmodule
+
+            module top(input clk, input rst, input i_top, output reg o_top);
+                reg i_top_last;
+                wire i_out_next;
+                inner sub(
+                    .clk(clk),
+                    .rst(rst),
+                    .i_inner(i_top_last),
+                    .o_inner(i_out_next)
+                );
+                always @(posedge clk) begin
+                    i_top_last = i_top;
+                    o_top = i_out_next;
+                end
+            endmodule
+            """
+        )
+        var = smt.Variable
+        boolsort = smt.BoolSort()
+        rst = var("rst", boolsort)
+        i_inner = var("i_inner", boolsort)
+        i_top = var("i_top", boolsort)
+        i_top_last = var("i_top_last", boolsort)
+        i_out_next = var("i_out_next", boolsort)
+        o_inner = var("o_inner", boolsort)
+        o_top = var("o_top", boolsort)
+        inner_def = Model(
+            "inner",
+            inputs=[rst, i_inner],
+            outputs=[o_inner],
+            logic={o_inner: smt.BoolConst.F},
+        )
+        assert inner_def.validate()
+        exp_top = Model(
+            "top",
+            inputs=[rst, i_top],
+            outputs=[o_top],
+            state=[i_top_last, i_out_next],
+            logic={
+                i_out_next: var("sub.o_inner", boolsort),
+            },
+            default_next=[{i_top_last: i_top, o_top: i_out_next}],
+            instances={"sub": Instance(inner_def, {rst: rst, i_inner: i_top_last})},
+        )
+        assert exp_top.validate()
+        model = verilog_to_model(rtl, "top", defined_modules=[inner_def])
+        model.print()
+        submodel = model.instances["sub"].model
+        assert submodel == inner_def
         assert model.validate()
         assert model == exp_top
 

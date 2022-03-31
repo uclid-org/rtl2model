@@ -105,8 +105,8 @@ class Model:
                 report(f"output {s} was declared multiple times")
             if s in state_counts:
                 report(f"output {s} was also declared as a state variable")
-            if s in uf_counts:
-                report(f"output {s} was also declared as an uninterpreted function")
+            # if s in uf_counts:
+            #     report(f"output {s} was also declared as an uninterpreted function")
         for s, count in state_counts.items():
             if count > 1:
                 report(f"state variable {s} was declared multiple times")
@@ -117,6 +117,7 @@ class Model:
                 report(f"uninterpreted function {s} was declared multiple times")
         # Second pass: all state and output have assigned expressions xor transition relations
         # and that inputs + UFs do NOT have declared logic
+        # TODO for now, outputs can also be UFs
         logic_and_next = {v.name for v in self.logic if isinstance(v, smt.Variable)}
         next_keys = set()
         for l in self.default_next:
@@ -132,7 +133,7 @@ class Model:
             if not isinstance(v.sort, smt.ArraySort) and v.name not in logic_and_next:
                 report(f"state variable {v.name} has no declared logic or transition relation")
         for v in self.outputs:
-            if v.name not in logic_and_next:
+            if v.name not in logic_and_next and v.name not in uf_counts:
                 report(f"output variable {v.name} has no declared logic or transition relation")
         for v in self.ufs:
             if v.name in self.logic:
