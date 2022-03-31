@@ -314,7 +314,7 @@ def _verilog_model_helper(
                     # assert p.msb is None and p.lsb is None, "slice assignment not yet supported"
                     if p.msb and p.lsb:
                         # BV slice assignment
-                        assert isinstance(v.sort, smt.BVSort)
+                        assert isinstance(v.sort, smt.BVSort) or isinstance(v.sort, smt.BoolSort), v
                         idx_width = v.sort.bitwidth
                         msb_expr = pv_to_smt_expr(p.msb, idx_width, terms, None, mod_depth, rename_substitutions)
                         lsb_expr = pv_to_smt_expr(p.lsb, idx_width, terms, None, mod_depth, rename_substitutions)
@@ -600,8 +600,8 @@ def pv_to_smt_expr(node, width: Optional[int], terms, assignee, mod_depth, subst
             msb_v = node.msb.eval()
             return body_expr[msb_v:lsb_v]
         else:
-            assert node.msb == node.lsb, "MSB and LSB of non-constant index must be identical"
-            # Convert the body into an array
+            # assert node.msb == node.lsb, "MSB and LSB of non-constant index must be identical"
+            # TODO handle the distinction between array and BV indexing?
             idx_expr = pv_to_smt_expr(node.msb, None, terms, assignee, mod_depth, substitutions)
             return body_expr[idx_expr]
     elif isinstance(node, DFBranch):
@@ -631,6 +631,7 @@ def pv_to_smt_expr(node, width: Optional[int], terms, assignee, mod_depth, subst
             "Lor": smt.Kind.Or,
             "And": smt.Kind.And if width == 1 else smt.Kind.BVAnd,
             "Land": smt.Kind.And,
+            "Xor": smt.Kind.Xor if width == 1 else smt.Kind.BVXor,
             # TODO distinguish signedness
             "LessThan": smt.Kind.BVUlt,
             "GreaterThan": smt.Kind.BVUgt,
@@ -641,6 +642,8 @@ def pv_to_smt_expr(node, width: Optional[int], terms, assignee, mod_depth, subst
             # what are "Eql" and "NotEql"???
             "Plus": smt.Kind.BVAdd, # TODO is this saturating for booleans?
             "Minus": smt.Kind.BVSub,
+            "Times": smt.Kind.BVMul,
+            "Sll": smt.Kind.BVSll,
         }
         if op in binops:
             assert len(evaled_children) == 2
@@ -650,6 +653,7 @@ def pv_to_smt_expr(node, width: Optional[int], terms, assignee, mod_depth, subst
             "Unot": smt.Kind.Not if width == 1 else smt.Kind.BVNot,
             "Ulnot": smt.Kind.Not,
             "Uor": smt.Kind.BVOrr,
+            "Uxor": smt.Kind.BVXorr,
         }
         if op in unops:
             assert len(evaled_children) == 1

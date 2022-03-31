@@ -8,22 +8,26 @@ import easyila.verification as v
 from .sorts import *
 
 class Kind(Enum):
-    # https://cvc5.github.io/docs/api/cpp/kind.html
     BVAdd           = auto()
     BVSub           = auto()
+    BVMul           = auto()
     BVOr            = auto()
     BVAnd           = auto()
     BVNot           = auto()
     BVXor           = auto()
     BVExtract       = auto()
     BVConcat        = auto()
-    BVOrr           = auto()
-    BVUle           = auto()
-    BVUlt           = auto()
-    BVUge           = auto()
-    BVUgt           = auto()
+    BVOrr           = auto() # OR reduction
+    BVXorr          = auto() # XOR reduction
+    BVUle           = auto() # Unsigned less than/equal
+    BVUlt           = auto() # Unsigned less than
+    BVUge           = auto() # Unsigned greater than/equal
+    BVUgt           = auto() # unsigned greater than
     BVZeroPad       = auto()
     BVSignExtend    = auto()
+    BVSll           = auto() # Shift left (logical)
+    BVSrl           = auto() # Shift right (logical)
+    BVSra           = auto() # Shift right (arithmetic)
     Or              = auto()
     And             = auto()
     Not             = auto()
@@ -55,14 +59,21 @@ class Kind(Enum):
         raise NotImplementedError()
 
 
+# https://cvc5.github.io/docs/api/cpp/kind.html
 # Maps our Kind class to pycvc5.Kind...
 _OP_KIND_MAPPING = {
     Kind.BVAdd:         pycvc5.Kind.BVAdd,
     Kind.BVSub:         pycvc5.Kind.BVSub,
+    Kind.BVMul:         pycvc5.Kind.BVMult,
+
     Kind.BVOr:          pycvc5.Kind.BVOr,
     Kind.BVAnd:         pycvc5.Kind.BVAnd,
     Kind.BVNot:         pycvc5.Kind.BVNot,
     Kind.BVXor:         pycvc5.Kind.BVXor,
+    Kind.BVSll:         pycvc5.Kind.BVShl,
+    Kind.BVSrl:         pycvc5.Kind.BVLshr,
+    Kind.BVSra:         pycvc5.Kind.BVAshr,
+
     Kind.BVExtract:     pycvc5.Kind.BVExtract,
     Kind.BVConcat:      pycvc5.Kind.BVConcat,
 
@@ -98,16 +109,20 @@ _OP_KIND_REV_MAPPING = {v: k for k, v in _OP_KIND_MAPPING.items()}
 _OP_SYGUS_SYMBOLS = {
     Kind.BVAdd: "bvadd",
     Kind.BVSub: "bvsub",
+    Kind.BVMul: "bvmult",
     Kind.BVOr: "bvor",
     Kind.BVAnd: "bvand",
     Kind.BVNot: "bvnot",
     Kind.BVXor: "bvxor",
+    Kind.BVSll: "bvshl",
+    Kind.BVSrl: "bvashr",
+    Kind.BVSra: "bvlshr",
     # extract is a special case
     Kind.Or: "or",
     Kind.And: "and",
     Kind.Not: "not",
     Kind.Xor: "xor",
-    Kind.Equal: "eq",
+    Kind.Equal: "=",
     Kind.Ite: "ite",
     Kind.Exists: "exists",
     Kind.ForAll: "forall",
@@ -192,6 +207,10 @@ class Term(Translatable, ABC):
             op = Kind.BVNot
         return OpTerm(op, (self,))
 
+    def __mul__(self):
+        self._op_type_check(other)
+        return OpTerm(Kind.BVMul, (self, other))
+
     def __neg__(self):
         raise NotImplementedError()
 
@@ -203,13 +222,27 @@ class Term(Translatable, ABC):
             op = Kind.BVOr
         return OpTerm(op, (self, other))
 
+    def __lshift__(self, other):
+        return self.sll(other)
+
+    def sll(self, other):
+        # TODO typecheck all shifts
+        return OpTerm(Kind.BVSll, (self, other))
+
     def __rshift__(self, other):
-        self._op_type_check(other)
-        ...
+        # Python right shift is technically arithmetic since integers
+        # don't have a fixed size
+        return self.shra(other)
+
+    def srl(self, other):
+        return OpTerm(Kind.BVSrl, (self, other))
+
+    def sra(self, other):
+        return OpTerm(Kind.BVSra, (self, other))
 
     def __sub__(self, other):
         self._op_type_check(other)
-        ...
+        return OpTerm(Kind.BVSub, (self, other))
 
     def __xor__(self, other):
         self._op_type_check(other)

@@ -44,6 +44,9 @@ class BVSort(Sort):
 
 @dataclass(frozen=True)
 class BoolSort(Sort):
+    @property
+    def bitwidth(self):
+        return 1
 
     def to_target_format(self, tgt: TargetFormat, **kwargs):
         if tgt == TargetFormat.CVC5:
