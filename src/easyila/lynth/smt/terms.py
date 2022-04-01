@@ -5,7 +5,7 @@ from typing import Callable, TypeVar
 
 import pycvc5
 
-import easyila.verification as v
+import easyila.verification
 from .sorts import *
 
 class Kind(Enum):
@@ -132,7 +132,7 @@ _OP_SYGUS_SYMBOLS = {
 
 # === BEGIN SMT TERMS ===
 
-_T = TypeVar("T")
+_T = TypeVar("_T")
 
 class Term(Translatable, ABC):
     def _binop_type_check(self, other, sext=False, zpad=True, cast_int=True) -> Tuple["Term", "Term"]:
@@ -182,8 +182,9 @@ class Term(Translatable, ABC):
                     return self.ite(BVConst(1, o_bw), BVConst(0, o_bw)), other
                 return self.zero_pad(BVConst(o_bw - s_bw, s_bw)), other
         assert self.sort == other.sort, f"cannot combine value {self} of sort {self.sort} to {other} of sort {other.sort}"
+        return self, other
 
-    def preorder_visit_tree(visit_fn: Callable[["Term"], _T], shortcircuit=True) -> _T:
+    def preorder_visit_tree(self, visit_fn: Callable[["Term"], _T], shortcircuit=True) -> _T:
         """
         Calls `visit_fn` on this node, then recursively on all children.
         Returns whatever `visit_fn(self)` returns.
@@ -474,7 +475,7 @@ class Variable(Term):
         elif tgt == TargetFormat.VERIF_DSL:
             # TODO handle booleans
             assert isinstance(self.sort, BVSort)
-            return v.WireOrRegRef(self.name, self.sort.bitwidth)
+            return easyila.verification.WireOrRegRef(self.name, self.sort.bitwidth)
         raise NotImplementedError("cannot convert Variable to " + str(tgt))
 
 
@@ -644,13 +645,13 @@ class OpTerm(Term):
                 return wrap(self.args[0])
             raise NotImplementedError(v)
         elif tgt == TargetFormat.VERIF_DSL:
-            o = v.Operators
+            o = easyila.verification.Operators
             unops = {
                 Kind.Not: o.Not,
                 Kind.BVNot: o.BVNot
             }
             if self.kind in unops:
-                return v.UnOpExpr(unops[self.kind], self.args[0].to_verif_dsl())
+                return easyila.verification.UnOpExpr(unops[self.kind], self.args[0].to_verif_dsl())
             binops = {
                 Kind.BVAdd: o.BVAdd,
                 Kind.BVSub: o.BVSub,
@@ -663,13 +664,13 @@ class OpTerm(Term):
                 Kind.Equal: o.Equal,
             }
             if self.kind in binops:
-                return v.BinOpExpr(binops[self.kind], self.args[0].to_verif_dsl(), self.args[1].to_verif_dsl())
+                return easyila.verification.BinOpExpr(binops[self.kind], self.args[0].to_verif_dsl(), self.args[1].to_verif_dsl())
             # if v == kind.Implies:
             #     a0_str = wrap(self.args[0])
             #     a1_str = wrap(self.args[1])
             #     return f"!{a0_str} || {a1_str}"
             if self.kind == Kind.Ite:
-                return v.TernaryExpr(self.args[0].to_verif_dsl(), self.args[1].to_verif_dsl(), self.args[2].to_verif_dsl())
+                return easyila.verification.TernaryExpr(self.args[0].to_verif_dsl(), self.args[1].to_verif_dsl(), self.args[2].to_verif_dsl())
             raise NotImplementedError(self.kind)
         elif tgt == TargetFormat.UCLID:
             def wrap(term):
@@ -928,7 +929,7 @@ class BoolConst(Term, Enum, metaclass=_TermMeta):
         elif tgt in (TargetFormat.VERILOG, TargetFormat.SYGUS2, TargetFormat.UCLID):
             return "true" if self == self.T else "false"
         elif tgt == TargetFormat.VERIF_DSL:
-            return v.BoolConst(self == self.T)
+            return easyila.verification.BoolConst(self == self.T)
         raise NotImplementedError("cannot convert BoolConst to " + str(tgt))
 
 
@@ -967,7 +968,7 @@ class BVConst(Term):
         elif tgt == TargetFormat.VERILOG:
             return "{}'h{:x}".format(self.width, self.val)
         elif tgt == TargetFormat.VERIF_DSL:
-            return v.BVConst(self.val, self.width, v.Base.HEX)
+            return easyila.verification.BVConst(self.val, self.width, easyila.verification.Base.HEX)
         elif tgt == TargetFormat.UCLID:
             return "0x{:x}bv{}".format(self.val, self.width)
         raise NotImplementedError("cannot convert BVConst to " + str(tgt))

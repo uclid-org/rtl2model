@@ -11,7 +11,7 @@ from typing import List
 from easyila.common import *
 from easyila.guidance import Guidance, AnnoType
 from easyila.lynth import smt
-from easyila.testcase import TestCase
+from easyila.sketch import ProgramSketch
 import easyila.lynth.oracleinterface as oi
 import easyila.verification as v
 
@@ -66,15 +66,15 @@ class HwModel(ABC):
         pass
 
     @abstractmethod
-    def generate_program(self, inputs) -> TestCase:
+    def generate_program(self, inputs) -> ProgramSketch:
         """
-        Produces a TestCase program to be run during simulation.
+        Produces a ProgramSketch program to be run during simulation.
         INPUTS is a list of inputs to the model that may be used in constructing the program.
         """
         pass
 
     @abstractmethod
-    def simulate_and_read_signals(self, testcase) -> Tuple[List[int], List[List[int]]]:
+    def simulate_and_read_signals(self, sketch) -> Tuple[List[int], List[List[int]]]:
         """
         Invokes the simulation binary and reads the resulting signals.
 

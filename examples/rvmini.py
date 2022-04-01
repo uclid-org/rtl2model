@@ -5,7 +5,7 @@ import sys
 
 from easyila.guidance import Guidance, AnnoType
 from easyila.synthesis_template import *
-from easyila.testcase import *
+from easyila.sketch import *
 import easyila.gen_config as gen_config
 import easyila.lynth.smt as smt
 
@@ -31,21 +31,13 @@ class RvMiniModel(HwModel):
         )
         self.run_proc(["make", "verilatorM"], cwd=BASEDIR)
 
-    def generate_program(self, inputs) -> TestCase:
-        return TestCase(
-            xInstrWord(0, 8) * (31 * 4),    # @000 496 bytes of 0s
-            xInstrWord('00000013'),         # @496 nop
-            xInstrWord('00000013'),         # @500 nop
-            xInstrWord('00000013'),         # @504 nop
-            xInstrWord('00000013'),         # @508 nop
-            bInstrWord(f"{int(inputs[0]):0{12}b}00000000011000010011"), # @512 addi a2, x0, ???
-            bInstrWord(f"{int(inputs[1]):0{12}b}00000000010110010011"), # @516 addi a1, x0, ???
-            xInstrWord('00c586b3') * 20     # @520 (and later) add a3, a1, a2
-            # xInstrWord(0, 8) * 3,           # @500 through 511:  more 0s
-            # xInstrWord('00c586b3') * 2,     # @512 add a3, a1, a2
-            # bInstrWord(f"{int(inputs[0]):0{12}b}00000000011000010011"), # @516 addi a2, x0, ???
-            # bInstrWord(f"{int(inputs[1]):0{12}b}00000000010110010011"), # @520 addi a1, x0, ???
-            # xInstrWord('00c586b3') * 20     # @524 (and later) add a3, a1, a2
+    def generate_program(self, inputs) -> ProgramSketch:
+        return ProgramSketch(
+            Inst(SketchValue(0, 8)) * (31 * 4),     # @000 496 bytes of 0s
+            inst_word(0x132) * 4,        # @496 through 508: nop
+            Inst(SketchHole("a", 12), SketchValue(0b11000010011, 20)), # @512 addi a2, x0, ???
+            Inst(SketchHole("b", 12), SketchValue(0b10110010011, 20)), # @516 addi a1, x0, ???
+            inst_word(0xc586b3) * 20,   # @520 (and later) add a3, a1, a2
             # a1 is x11, a2 is x12, a3 is x13
             # remember that instructions don't commit until they reach the last stage, making
             # cycle 14 (IF_PC=532) the minimum -- we can overshoot safely though since there
@@ -53,10 +45,10 @@ class RvMiniModel(HwModel):
             # the trace seems to stall for some reason though? TODO ask adwait about that
             # for now, the pattern seems to be that 4 adds retire successfully, then the next add
             # stalls for an additional 3 cycles
-        )
+        ).fill({"a": int(inputs[0]), "b": int(inputs[1])})
 
-    def simulate_and_read_signals(self, testcase):
-        l = testcase._inject(BinaryRepr.HEX)
+    def simulate_and_read_signals(self, sketch):
+        l = sketch.to_hex_str_array()
         with open(os.path.join(BASEDIR, "src/test/resources/rv32ui-p-add2.hex"), 'w') as src_file:
             for i in range(int(len(l)/4)):
                 src_file.write(''.join(l[4*i:4*i+4]) +'\n')
@@ -104,9 +96,9 @@ def main():
     x = smt.Variable("__shadow_0", bv32)
     y = smt.Variable("__shadow_1", bv32)
     start = smt.Variable("start", bv32)
-    addbv = smt.OpTerm(smt.Kind.BVAdd, (start, start))
-    subbv = smt.OpTerm(smt.Kind.BVSub, (start, start))
-    orbv = smt.OpTerm(smt.Kind.BVOr, (start, start))
+    addbv = start + start
+    subbv = start - start
+    orbv = start | start
     solver = smt.SynthFun(
         "alu_add",
         (x, y),
