@@ -305,7 +305,7 @@ class TestVerilogParse:
     def test_bv_int_index(self):
         """
         Tests behavior of bitvector indexing.
-        This indirectly tests behavior of bitvector width checking.
+        This also indirectly tests behavior of bitvector width checking.
         """
         rtl = textwrap.dedent("""\
             module top(input clk, input rst, input i_inner, output o_inner);
@@ -336,8 +336,11 @@ class TestVerilogParse:
             outputs=[boolvar("o_inner")],
             state=[i_state],
             default_next=[{
-                # TODO implicitly zero pad i_inner?
-                i_state: rst.ite(smt.BVConst(0, 3), i_inner | i_state)
+                i_state: rst.ite(
+                    smt.BVConst(0, 3),
+                    # The expression i_inner | i_state should implicitly upcast
+                    i_inner.ite(smt.BVConst(1, 3), smt.BVConst(0, 3)) | i_state
+                )
             }],
             logic={o_inner: i_state[0]}
         )

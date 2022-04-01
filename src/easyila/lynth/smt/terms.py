@@ -135,11 +135,52 @@ _OP_SYGUS_SYMBOLS = {
 _T = TypeVar("T")
 
 class Term(Translatable, ABC):
-    def _op_type_check(self, other):
-        """Checks that two operands have the same sort."""
+    def _binop_type_check(self, other, sext=False, zpad=True, cast_int=True) -> Tuple["Term", "Term"]:
+        """
+        Checks that two operands have the same sort.
+
+        If sext or zpad are set, if both are bitvectors and one is shorter than the other,
+        then the one with the smaller width is zero-padded/sign-extended to the appropriate width.
+        If sext/zpad are set and one arg is a boolean but the other is a bitvector, the boolean will
+        be upcasted with an ITE statement.
+
+        When `cast_int` is set, if `other` is an int, it will automatically be wrapped in
+        a constant of the appropriate sort.
+        """
+        assert not (zpad and sext), "zpad and sext cannot both be set"
+        if cast_int and isinstance(other, int):
+            if isinstance(self.sort, BoolSort):
+                assert other in (0, 1), f"cannot coerce int {other} to {self.sort}"
+                return self, (BoolConst.T if other else BoolConst.F)
+            elif isinstance(self.sort, BVSort):
+                bitwidth = self.sort.bitwidth
+                assert other < (2 ** bitwidth), f"int constant {other} exceeds max value of bv{bitwidth}"
+                return self, BVConst(other, bitwidth)
         assert isinstance(other, Term), f"cannot combine {self} with {other}"
         assert hasattr(self, "sort"), self
         assert hasattr(other, "sort"), other
+        s_bw = self.sort.bitwidth
+        o_bw = other.sort.bitwidth
+        if s_bw == o_bw:
+            return self, other
+        if sext:
+            if s_bw > o_bw:
+                if isinstance(other.sort, BoolSort):
+                    return self, other.ite(BVConst((1 << o_bw) - 1, o_bw), BVConst(0, o_bw))
+                return self, other.sign_extend(BVConst(s_bw - o_bw, o_bw))
+            else:
+                if isinstance(self.sort, BoolSort):
+                    return self.ite(BVConst((1 << o_bw) - 1, o_bw), BVConst(0, o_bw)), other
+                return self.sign_extend(BVConst(o_bw - s_bw, s_bw)), other
+        if zpad:
+            if s_bw > o_bw:
+                if isinstance(other.sort, BoolSort):
+                    return self, other.ite(BVConst(1, o_bw), BVConst(0, o_bw))
+                return self, other.zero_pad(BVConst(s_bw - o_bw, o_bw))
+            else:
+                if isinstance(self.sort, BoolSort):
+                    return self.ite(BVConst(1, o_bw), BVConst(0, o_bw)), other
+                return self.zero_pad(BVConst(o_bw - s_bw, s_bw)), other
         assert self.sort == other.sort, f"cannot combine value {self} of sort {self.sort} to {other} of sort {other.sort}"
 
     def preorder_visit_tree(visit_fn: Callable[["Term"], _T], shortcircuit=True) -> _T:
@@ -187,54 +228,40 @@ class Term(Translatable, ABC):
         else:
             assert isinstance(self.sort, BoolSort)
             cond = self
-        t_term._op_type_check(f_term)
+        t_term, f_term = t_term._binop_type_check(f_term)
         return OpTerm(Kind.Ite, (cond, t_term, f_term))
 
     def __lt__(self, other):
-        self._op_type_check(other)
-        return OpTerm(Kind.BVUlt, (self, other))
+        return OpTerm(Kind.BVUlt, self._binop_type_check(other))
 
     def __le__(self, other):
-        self._op_type_check(other)
-        return OpTerm(Kind.BVUle, (self, other))
+        return OpTerm(Kind.BVUle, self._binop_type_check(other))
 
     def op_eq(self, other):
         """
         We can't override __eq__ without breaking a decent amount of stuff, so
         op_eq is syntactic sugar for an equality expression instead.
         """
-        self._op_type_check(other)
-        return OpTerm(Kind.Equal, (self, other))
+        return OpTerm(Kind.Equal, self._binop_type_check(other))
 
-    def __ne__(self, other):
-        self._op_type_check(other)
-        return OpTerm(Kind.Distinct, (self, other))
+    def op_ne(self, other):
+        return OpTerm(Kind.Distinct, self._binop_type_check(other))
 
     def __gt__(self, other):
-        self._op_type_check(other)
-        return OpTerm(Kind.BVUgt, (self, other))
+        return OpTerm(Kind.BVUgt, self._binop_type_check(other))
 
     def __ge__(self, other):
-        self._op_type_check(other)
-        return OpTerm(Kind.BVUge, (self, other))
+        return OpTerm(Kind.BVUge, self._binop_type_check(other))
 
     def __add__(self, other):
-        if isinstance(other, int):
-            # Automatically generate appropriate-width constant
-            # TODO do this for other values as well
-            assert isinstance(self.sort, BVSort)
-            other = BVConst(other, self.sort.bitwidth)
-        else:
-            self._op_type_check(other)
-        return OpTerm(Kind.BVAdd, (self, other))
+        return OpTerm(Kind.BVAdd, self._binop_type_check(other))
 
     def __and__(self, other):
-        self._op_type_check(other)
-        if isinstance(self.sort, BoolSort):
+        if isinstance(other.sort, BoolSort):
             op = Kind.And
         else:
             op = Kind.BVAnd
-        return OpTerm(op, (self, other))
+        return OpTerm(op, self._binop_type_check(other))
 
     def __invert__(self):
         if isinstance(self.sort, BoolSort):
@@ -244,26 +271,24 @@ class Term(Translatable, ABC):
         return OpTerm(op, (self,))
 
     def __mul__(self, other):
-        self._op_type_check(other)
-        return OpTerm(Kind.BVMul, (self, other))
+        return OpTerm(Kind.BVMul, self._binop_type_check(other))
 
     def __neg__(self):
         raise NotImplementedError()
 
     def __or__(self, other):
-        self._op_type_check(other)
-        if isinstance(self.sort, BoolSort):
+        if isinstance(other.sort, BoolSort):
             op = Kind.Or
         else:
             op = Kind.BVOr
-        return OpTerm(op, (self, other))
+        return OpTerm(op, self._binop_type_check(other))
 
     def __lshift__(self, other):
         return self.sll(other)
 
     def sll(self, other):
         # TODO typecheck all shifts
-        return OpTerm(Kind.BVSll, (self, other))
+        return OpTerm(Kind.BVSll, self._binop_type_check(other))
 
     def __rshift__(self, other):
         # Python right shift is technically arithmetic since integers
@@ -271,22 +296,20 @@ class Term(Translatable, ABC):
         return self.sra(other)
 
     def srl(self, other):
-        return OpTerm(Kind.BVSrl, (self, other))
+        return OpTerm(Kind.BVSrl, self._binop_type_check(other))
 
     def sra(self, other):
-        return OpTerm(Kind.BVSra, (self, other))
+        return OpTerm(Kind.BVSra, self._binop_type_check(other))
 
     def __sub__(self, other):
-        self._op_type_check(other)
-        return OpTerm(Kind.BVSub, (self, other))
+        return OpTerm(Kind.BVSub, self._binop_type_check(other))
 
     def __xor__(self, other):
-        self._op_type_check(other)
-        if isinstance(self.sort, BoolSort):
+        if isinstance(other.sort, BoolSort):
             op = Kind.Xor
         else:
             op = Kind.BVXor
-        return OpTerm(op, (self, other))
+        return OpTerm(op, self._binop_type_check(other))
 
     def __getitem__(self, key):
         if isinstance(self.sort, ArraySort):
@@ -345,11 +368,11 @@ class Term(Translatable, ABC):
     def concat(self, *others):
         return OpTerm(Kind.BVConcat, (self, *others))
 
-    def zero_pad(self, extra_bits):
+    def zero_pad(self, extra_bits: "BVConst"):
         """Zero pads this term with an addition `extra_bits` bits."""
         return OpTerm(Kind.BVZeroPad, (self, extra_bits))
 
-    def sign_extend(self, extra_bits):
+    def sign_extend(self, extra_bits: "BVConst"):
         """Sign extends this term with an addition `extra_bits` bits."""
         return OpTerm(Kind.BVSignExtend, (self, extra_bits))
 
@@ -503,8 +526,8 @@ class OpTerm(Term):
             assert isinstance(self.args[2], BVConst)
             return BVSort(self.args[1].val - self.args[2].val + 1)
         elif self.kind in (Kind.BVZeroPad, Kind.BVSignExtend):
-            assert isinstance(self.args[1], BVConst)
-            assert isinstance(self.args[0], BVSort)
+            assert isinstance(self.args[0].sort, BVSort), repr(self.args[0])
+            assert isinstance(self.args[1], BVConst), repr(self.args[1])
             return BVSort(self.args[0].sort.bitwidth + self.args[1].val)
         elif self.kind == Kind.Ite:
             return self.args[1].sort

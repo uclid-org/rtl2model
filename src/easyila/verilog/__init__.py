@@ -29,7 +29,7 @@ from pyverilog.dataflow.dataflow import (
 from pyverilog.utils.scope import ScopeChain, ScopeLabel
 from pyverilog.utils import signaltype
 
-from easyila.model import Model, Instance
+from easyila.model import Model, Instance, GeneratedBy
 import easyila.lynth.smt as smt
 
 class COIConf(Enum):
@@ -241,7 +241,8 @@ def _verilog_model_helper(
     all_missing.difference_update(important_signals)
     uf_names = set()
     for s in all_missing:
-        is_curr_scope = ".".join(scope_prefix(s)) == instance_name
+        is_curr_scope = scope_prefix(s) == instance_name
+        print(s, is_curr_scope)
         if is_curr_scope and (not inline_renames or not signaltype.isRename(terms[str_to_scope_chain(s)].termtype)):
             uf_names.add(s)
     if coi_conf == COIConf.NO_COI:
@@ -389,7 +390,8 @@ def _verilog_model_helper(
         instructions={},
         init_values={
             # TODO read init values (may require pyverilog editing)
-        }
+        },
+        _generated_by=GeneratedBy.VERILOG_PARSE
     )
 
 
@@ -644,7 +646,7 @@ def pv_to_smt_expr(node, width: Optional[int], terms, assignee, mod_depth, subst
             falsenode = pv_to_smt_expr(node.falsenode, width, terms, assignee, mod_depth, substitutions)
         else:
             assert isinstance(assignee, smt.Term), (node.tocode(), assignee)
-        return smt.OpTerm(smt.Kind.Ite, (cond, truenode, falsenode))
+        return cond.ite(truenode, falsenode)
     elif isinstance(node, DFOperator):
         op = node.operator
         # TODO figure out how to deal with width-changing operations
@@ -652,31 +654,33 @@ def pv_to_smt_expr(node, width: Optional[int], terms, assignee, mod_depth, subst
         evaled_children = [pv_to_smt_expr(c, None, terms, assignee, mod_depth, substitutions) for c in node.nextnodes]
         # https://github.com/PyHDI/Pyverilog/blob/5847539a9d4178a521afe66dbe2b1a1cf36304f3/pyverilog/utils/signaltype.py#L87
         # Assume that arity checks are already done for us
+        # Invoking the Term class's methods lets us benefit from implicit casts
+        t0 = evaled_children[0]
         binops = {
-            "Or": smt.Kind.Or if width == 1 else smt.Kind.BVOr,
-            "Lor": smt.Kind.Or,
-            "And": smt.Kind.And if width == 1 else smt.Kind.BVAnd,
-            "Land": smt.Kind.And,
-            "Xor": smt.Kind.Xor if width == 1 else smt.Kind.BVXor,
+            "Or": t0.__or__,
+            "Lor": t0.__or__,
+            "And": t0.__and__,
+            "Land": t0.__and__,
+            "Xor": t0.__xor__,
             # TODO distinguish signedness
-            "LessThan": smt.Kind.BVUlt,
-            "GreaterThan": smt.Kind.BVUgt,
-            "LassEq": smt.Kind.BVUle, # [sic]
-            "LessEq": smt.Kind.BVUle, # [sic]
-            "GreaterEq": smt.Kind.BVUge,
-            "Eq": smt.Kind.Equal,
-            "NotEq": smt.Kind.Distinct,
+            "LessThan": t0.__lt__,
+            "GreaterThan": t0.__gt__,
+            "LassEq": t0.__le__, # [sic]
+            "LessEq": t0.__le__,
+            "GreaterEq": t0.__ge__,
+            "Eq": t0.op_eq,
+            "NotEq": t0.op_ne,
             # what are "Eql" and "NotEql"???
-            "Plus": smt.Kind.BVAdd, # TODO is this saturating for booleans?
-            "Minus": smt.Kind.BVSub,
-            "Times": smt.Kind.BVMul,
-            "Sll": smt.Kind.BVSll,
-            "Srl": smt.Kind.BVSrl,
-            "Sra": smt.Kind.BVSra,
+            "Plus": t0.__add__, # TODO is this saturating for booleans?
+            "Minus": t0.__sub__,
+            "Times": t0.__mul__,
+            "Sll": t0.sll,
+            "Srl": t0.srl,
+            "Sra": t0.sra,
         }
         if op in binops:
             assert len(evaled_children) == 2
-            return smt.OpTerm(binops[op], tuple(evaled_children))
+            return binops[op](evaled_children[1])
         # By testing, it seems that "Unot" is ~ and "Ulnot" is ! (presumably "Unary Logical NOT")
         unops = {
             "Unot": smt.Kind.Not if width == 1 else smt.Kind.BVNot,
@@ -685,6 +689,7 @@ def pv_to_smt_expr(node, width: Optional[int], terms, assignee, mod_depth, subst
             "Uxor": smt.Kind.BVXorr,
         }
         if op in unops:
+            # TODO convert these into method invocations
             assert len(evaled_children) == 1
             return smt.OpTerm(unops[op], (evaled_children[0],))
         if op == "Uminus":
