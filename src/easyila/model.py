@@ -2,7 +2,7 @@ from collections import defaultdict
 import enum
 from dataclasses import dataclass, field
 import textwrap
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 import easyila.lynth.smt as smt
 
@@ -49,10 +49,10 @@ class Model:
     how do we distinguish between having ILA instructions to execute vs.
     having transitions? for now, just have a default "NEXT" instruction
     """
-    default_next: Instruction               = field(default_factory=list)
+    default_next: Instruction               = field(default_factory=lambda: [{}])
     instructions: Dict[str, Instruction]    = field(default_factory=dict)
     init_values: Dict[str, smt.BVConst]     = field(default_factory=dict)
-    _generated_by: GeneratedBy              = field(default=GeneratedBy.MANUAL, compare=False)
+    generated_by: GeneratedBy              = field(default=GeneratedBy.MANUAL, compare=False)
 
     def __post_init__(self):
         assert isinstance(self.inputs, list)
@@ -62,6 +62,9 @@ class Model:
         assert isinstance(self.logic, dict)
         assert isinstance(self.default_next, list)
         assert isinstance(self.instances, dict)
+        for i, m in self.instances.items():
+            assert isinstance(i, str), f"instance name {i} is not a str (was {type(i)})"
+            assert isinstance(m, Instance), f"value for instance {i} is not a Instance (was {type(m)})"
         assert isinstance(self.init_values, dict)
 
     def validate(self):
@@ -185,7 +188,7 @@ class Model:
         else:
             uf_block = ""
         if len(self.instances) > 0:
-            inst_block = newline + c_newline.join(str(m) + ':' + i.pretty_str(24) for m, i in self.instances.items())
+            inst_block = newline + (newline + c_newline).join(str(m) + ':\n' + i.pretty_str(24) for m, i in self.instances.items())
         else:
             inst_block = ""
         if len(self.logic) > 0:
@@ -197,17 +200,14 @@ class Model:
         else:
             next_block = ""
         return textwrap.indent(textwrap.dedent(f"""\
-            Model {self.name} (generated via {self._generated_by}):
-                name="{self.name}",
-                inputs={input_block},
-                outputs={output_block},
-                state={state_block},
-                ufs={uf_block},
-                instances={inst_block},
-                logic={logic_block},
-                default_next={next_block},
-                instructions={self.instructions},
-                init_values={self.init_values},
+            Model {self.name} (generated via {str(self.generated_by)}):
+                inputs={input_block}
+                outputs={output_block}
+                state={state_block}
+                ufs={uf_block}
+                instances={inst_block}
+                logic={logic_block}
+                default_next={next_block}
             """
         ), ' ' * indent_level)
 
@@ -282,6 +282,45 @@ class Model:
         self._get_submodules(submodels, visited_submodel_names)
         return "\n\n".join(s.to_uclid() for s in submodels)
 
+    def case_split(self, var_name: str, possible_values: Optional[List[int]]=None):
+        """
+        Automatically case splits this model on different values of `var_name`.
+        `var_name` must be a boolean or bitvector variable, and cannot be an output.
+
+        `possible_values` specifies the list of values that `var_name` can take on.
+        If not specified, then all values encompassed by `var_name`'s sort will be
+        used instead (e.g. a bv3 would have values 0-8).
+        """
+        for v in self.inputs:
+            if v.name == var_name:
+                # TODO validate possible_values if provided
+                if possible_values is None:
+                    if isinstance(v.sort, smt.BoolSort):
+                        possible_values = (True, False)
+                    elif isinstance(v.sort, smt.BVSort):
+                        possible_values = range(0, 2 ** v.sort.bitwidth)
+                    else:
+                        raise TypeError(f"cannot case split on input {v}: case splits can only be performed on bool/bv variables")
+                return self._case_split_input(v, possible_values)
+        for v in self.state_vars:
+            if isinstance(v, smt.Variable) and v.name == var_name:
+                # TODO validate possible_values if provided
+                if possible_values is None:
+                    if isinstance(v.sort, smt.BoolSort):
+                        possible_values = (True, False)
+                    elif isinstance(v.sort, smt.BVSort):
+                        possible_values = range(0, 2 ** v.sort.bitwidth)
+                    else:
+                        raise TypeError(f"cannot case split on input {v}: case splits can only be performed on bool/bv variables")
+                return self._case_split_input(v, possible_values)
+        return KeyError(f"cannot case split on {var_name}: no such input or state variable")
+
+    def _case_split_input(self, input_var: smt.Variable, possible_values: List[int]):
+        raise NotImplementedError()
+
+    def _case_split_var(self, state_var: smt.Variable, possible_values: List[int]):
+        raise NotImplementedError()
+
 @dataclass
 class Instance:
     """
@@ -305,10 +344,9 @@ class Instance:
         if len(self.inputs) > 0:
             input_block = newline + c_newline.join(str(v) + ": " + str(e) for v, e in self.inputs.items())
         else:
-            input_block = ""
+            input_block = newline
         # maybe there's a cleaner way to do this f string :)
         return textwrap.indent(textwrap.dedent(f"""\
-
             input_bindings={input_block},
             model:
 {self.model.pretty_str(16)}"""),

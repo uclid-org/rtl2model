@@ -391,7 +391,7 @@ def _verilog_model_helper(
         init_values={
             # TODO read init values (may require pyverilog editing)
         },
-        _generated_by=GeneratedBy.VERILOG_PARSE
+        generated_by=GeneratedBy.VERILOG_PARSE
     )
 
 

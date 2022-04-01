@@ -157,8 +157,8 @@ class Term(Translatable, ABC):
                 assert other < (2 ** bitwidth), f"int constant {other} exceeds max value of bv{bitwidth}"
                 return self, BVConst(other, bitwidth)
         assert isinstance(other, Term), f"cannot combine {self} with {other}"
-        assert hasattr(self, "sort"), self
-        assert hasattr(other, "sort"), other
+        assert hasattr(self, "sort"), repr(self)
+        assert hasattr(other, "sort"), repr(other)
         s_bw = self.sort.bitwidth
         o_bw = other.sort.bitwidth
         if s_bw == o_bw:
@@ -427,6 +427,7 @@ class Variable(Term):
 
     def __post_init__(self):
         assert isinstance(self.name, str) and len(self.name) > 0
+        assert isinstance(self._sort, Sort), f"{self._sort} is not a Sort instance"
 
     def __str__(self):
         return f"{self.name}"
@@ -529,6 +530,8 @@ class OpTerm(Term):
             assert isinstance(self.args[0].sort, BVSort), repr(self.args[0])
             assert isinstance(self.args[1], BVConst), repr(self.args[1])
             return BVSort(self.args[0].sort.bitwidth + self.args[1].val)
+        elif self.kind == Kind.BVConcat:
+            return BVSort(sum(a.sort.bitwidth for a in self.args))
         elif self.kind == Kind.Ite:
             return self.args[1].sort
         bitops = { Kind.Or, Kind.And, Kind.Xor, Kind.Not, Kind.Equal, Kind.Distinct }
@@ -715,6 +718,9 @@ class OpTerm(Term):
                 return " ++ ".join(wrap(a) for a in self.args)
             if self.kind == Kind.Select:
                 return wrap(self.args[0]) + "[" + self.args[1].to_uclid() + "]"
+            if self.kind == Kind.BVZeroPad:
+                assert isinstance(self.args[1], BVConst)
+                return f"bv_zero_extend({self.args[1].val}, {self.args[0].to_uclid()})"
             raise NotImplementedError(self.kind)
         raise NotImplementedError("cannot convert OpTerm to " + str(tgt))
 
