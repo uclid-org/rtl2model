@@ -119,6 +119,8 @@ class Model:
             if s in uf_counts:
                 report(f"output {s} was also declared as an uninterpreted function") 
         for s, count in uf_counts.items():
+            if "." in s:
+                report(f"uninterpreted function {s} cannot have . in its name")
             if count > 1:
                 report(f"uninterpreted function {s} was declared multiple times")
         # Second pass: all state and output have assigned expressions xor transition relations
@@ -232,18 +234,18 @@ class Model:
                 newline + "    "
             )
         else:
-            next_s = newline
+            next_s = ""
         if len(self.instances) > 0:
             child_next_s = textwrap.indent(
                 "\n".join(f"next({n});" for n in self.instances),
                 newline + "    "
             )
+        else:
+            child_next_s = ""
         return textwrap.dedent(f"""\
             module {self.name} {{
 {u_vars_s}
-
 {instances_s}
-
                 init {{
 
                 }}
@@ -258,6 +260,23 @@ class Model:
                 }}
             }}""")
 
+    def _get_submodules(self, submodel_list, visited_submodel_names):
+        for i in self.instances.values():
+            if i.model.name not in visited_submodel_names:
+                i.model._get_submodules(submodel_list, visited_submodel_names)
+        # DFS postorder traversal
+        submodel_list.append(self)
+        visited_submodel_names.add(self.name)
+
+    def to_uclid_with_children(self):
+        """
+        Generates a uclid model, as well as a uclid model for every child instance.
+        """
+        submodels = []
+        visited_submodel_names = set()
+        # Submodules are added in DFS postorder traversal
+        self._get_submodules(submodels, visited_submodel_names)
+        return "\n\n".join(s.to_uclid() for s in submodels)
 
 @dataclass
 class Instance:

@@ -646,13 +646,18 @@ class OpTerm(Term):
                 return v.TernaryExpr(self.args[0].to_verif_dsl(), self.args[1].to_verif_dsl(), self.args[2].to_verif_dsl())
             raise NotImplementedError(self.kind)
         elif tgt == TargetFormat.UCLID:
+            def wrap(term):
+                if term._has_children:
+                    return "(" + term.to_uclid() + ")"
+                else:
+                    return term.to_uclid()
             # TODO use uclid library
             unops = {
                 Kind.Not: "!",
                 Kind.BVNot: "~"
             }
             if self.kind in unops:
-                return unops[self.kind] + self.args[0].to_uclid()
+                return unops[self.kind] + wrap(self.args[0])
             binops = {
                 Kind.BVAdd: "+",
                 Kind.BVSub: "-",
@@ -663,15 +668,30 @@ class OpTerm(Term):
                 Kind.BVUle: "<=_u",
                 Kind.BVUgt: ">_u",
                 Kind.BVUge: ">=_u",
+                Kind.Equal: "==",
+                Kind.Distinct: "!=",
                 Kind.Or: "||",
                 Kind.And: "&&",
                 Kind.Xor: "^", # TODO check if this differs from bv xor
                 Kind.Implies: "==>",
             }
             if self.kind in binops:
-                return self.args[0].to_uclid() + " " + binops[self.kind] + " " + self.args[1].to_uclid()
+                return wrap(self.args[0]) + " " + binops[self.kind] + " " + wrap(self.args[1])
+            shifts = {
+                Kind.BVSll: "bv_left_shift",
+                Kind.BVSra: "bv_a_right_shift",
+                Kind.BVSrl: "bv_l_right_shift",
+            }
+            if self.kind in shifts:
+                return shifts[self.kind] + "(" + self.args[0].to_uclid() + ", " + self.args[1].to_uclid() + ")"
             if self.kind == Kind.Ite:
-                return "if (" + self.args[0].to_uclid() + ") then " + self.args[1].to_uclid() + " else " + self.args[2].to_uclid()
+                return "if (" + self.args[0].to_uclid() + ") then " + wrap(self.args[1]) + " else " + wrap(self.args[2])
+            if self.kind == Kind.BVExtract:
+                return wrap(self.args[0]) + "[" + self.args[1].to_uclid() + ":" + self.args[1].to_uclid() + "]"
+            if self.kind == Kind.BVConcat:
+                return " ++ ".join(wrap(a) for a in self.args)
+            if self.kind == Kind.Select:
+                return wrap(self.args[0]) + "[" + self.args[1].to_uclid() + "]"
             raise NotImplementedError(self.kind)
         raise NotImplementedError("cannot convert OpTerm to " + str(tgt))
 
