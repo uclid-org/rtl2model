@@ -92,6 +92,8 @@ class Model:
         # First pass: no variable is declared multiple times
         # TODO don't be stateful if isinstance(v, smt.Variable)!
         for s, count in in_counts.items():
+            if "." in s:
+                report(f"input {s} cannot have . in its name")
             if count > 1:
                 report(f"input {s} was declared multiple times")
             if s in out_counts:
@@ -101,6 +103,8 @@ class Model:
             if s in uf_counts:
                 report(f"input {s} was also declared as an uninterpreted function")
         for s, count in out_counts.items():
+            if "." in s:
+                report(f"output {s} cannot have . in its name")
             if count > 1:
                 report(f"output {s} was declared multiple times")
             if s in state_counts:
@@ -108,6 +112,8 @@ class Model:
             # if s in uf_counts:
             #     report(f"output {s} was also declared as an uninterpreted function")
         for s, count in state_counts.items():
+            if "." in s:
+                report(f"state variable {s} cannot have . in its name")
             if count > 1:
                 report(f"state variable {s} was declared multiple times")
             if s in uf_counts:

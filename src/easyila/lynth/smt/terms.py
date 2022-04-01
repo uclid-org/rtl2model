@@ -1,6 +1,7 @@
 
 from abc import ABC, ABCMeta, abstractmethod
 from enum import Enum, EnumMeta, auto
+from typing import Callable, TypeVar
 
 import pycvc5
 
@@ -131,6 +132,8 @@ _OP_SYGUS_SYMBOLS = {
 
 # === BEGIN SMT TERMS ===
 
+_T = TypeVar("T")
+
 class Term(Translatable, ABC):
     def _op_type_check(self, other):
         """Checks that two operands have the same sort."""
@@ -138,6 +141,21 @@ class Term(Translatable, ABC):
         assert hasattr(self, "sort"), self
         assert hasattr(other, "sort"), other
         assert self.sort == other.sort, f"cannot combine value {self} of sort {self.sort} to {other} of sort {other.sort}"
+
+    def preorder_visit_tree(visit_fn: Callable[["Term"], _T], shortcircuit=True) -> _T:
+        """
+        Calls `visit_fn` on this node, then recursively on all children.
+        Returns whatever `visit_fn(self)` returns.
+
+        If `shortcircuit` is True, then this function will return without visiting
+        its children if  `visit_fn(self)` returns a falsey value.
+        """
+        rv = visit_fn(self)
+        if not shortcircuit or bool(rv):
+            for s in self._children:
+                assert isinstance(s, Term), s
+                self.preorder_visit_tree(visit_fn, shortcircuit)
+        return rv
 
     def typecheck(self) -> bool:
         """

@@ -9,6 +9,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum, auto
 import math
+import re
 import textwrap
 from typing import Dict, List, Optional, Set
 
@@ -60,7 +61,7 @@ class COIConf(Enum):
 def verilog_to_model(
     verilog_file: str,
     top_name: str,
-    clock_name: str="clk",
+    clock_pattern: str="clk",
     important_signals: Optional[List[str]]=None,
     coi_conf=COIConf.NO_COI,
     inline_renames=True,
@@ -99,7 +100,8 @@ def verilog_to_model(
     terms = analyzer.getTerms()
     binddict = analyzer.getBinddict()
     all_signals = [str(t) for t in terms]
-    all_signals = [s for s in all_signals if s.split(".")[-1] != clock_name]
+    clock_regex = re.compile(clock_pattern)
+    all_signals = [s for s in all_signals if not clock_regex.search(unqual_name(s))]
     if preserve_all_signals:
         important_signals = all_signals
     else:
@@ -137,9 +139,11 @@ def verilog_to_model(
     for inst_name, mod_name in sorted(instance_names.items(), key=lambda p: -p[0].count(".")):
         if mod_name not in needed_submodules:
             continue
-        if mod_name in submodules:
-            # TODO generalize for multiple instances of the same submodule
-            print("***WARNING: multiples instances of submodule", mod_name, "(doesn't work yet)***")
+        # If there are multiple instances of the same module in a design, the generated
+        # model will be based on a traversal of the first encountered instance.
+        # This makes no difference in general, but may cause issues when COI configuration is set.
+        # if mod_name in submodules:
+        #     print("***WARNING: multiples instances of submodule", mod_name, "(doesn't work yet)***")
         submodules[mod_name] = _verilog_model_helper(
             mod_name,
             inst_name,
@@ -199,7 +203,7 @@ def _verilog_model_helper(
     `important_signals` must now always be provided, and must be a list of UNQUALIFIED signal
     names.
     """
-    mod_depth = len(instance_name.split("."))
+    mod_depth = instance_name.count(".") + 1
     """
     `mod_depth` represents the number of scopes deep we're in, e.g. if we're generating
     a model for instance `sub` within `top`, we're at depth 2, and the unqualified signal name
@@ -237,8 +241,8 @@ def _verilog_model_helper(
     all_missing.difference_update(important_signals)
     uf_names = set()
     for s in all_missing:
-        in_scope = s.startswith(instance_name + ".")
-        if in_scope and (not inline_renames or not signaltype.isRename(terms[str_to_scope_chain(s)].termtype)):
+        is_curr_scope = ".".join(scope_prefix(s)) == instance_name
+        if is_curr_scope and (not inline_renames or not signaltype.isRename(terms[str_to_scope_chain(s)].termtype)):
             uf_names.add(s)
     if coi_conf == COIConf.NO_COI:
         # Model missing variables (all 1 edge away from important signal in dep graph)
@@ -369,9 +373,9 @@ def _verilog_model_helper(
                             instance_inputs[str(sc[:-1])][v] = expr
     instances = {}
     for qual_i_name, m_name in instance_names.items():
-        if ".".join(qual_i_name.split(".")[:-1]) != instance_name:
+        if scope_prefix(qual_i_name) != instance_name:
             continue
-        unqual_i_name = qual_i_name.split(".")[-1]
+        unqual_i_name = unqual_name(qual_i_name)
         instances[unqual_i_name] = Instance(submodules[m_name], instance_inputs[qual_i_name])
     return Model(
         mod_name,
@@ -704,3 +708,17 @@ def pv_to_smt_expr(node, width: Optional[int], terms, assignee, mod_depth, subst
 
 def str_to_scope_chain(s):
     return ScopeChain([ScopeLabel(l) for l in s.split(".")])
+
+
+def scope_prefix(s):
+    # More efficient than a string split
+    idx = s.rfind(".")
+    if idx == -1:
+        idx = len(s)
+    return s[:idx]
+
+
+def unqual_name(s):
+    # More efficient than a string split
+    # if rfind returns -1, we should start at index 0 anyway
+    return s[s.rfind(".") + 1:]
