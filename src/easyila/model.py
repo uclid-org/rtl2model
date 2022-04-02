@@ -316,10 +316,76 @@ class Model:
         return KeyError(f"cannot case split on {var_name}: no such input or state variable")
 
     def _case_split_input(self, input_var: smt.Variable, possible_values: List[int]):
-        raise NotImplementedError()
+        inputs = self.inputs[:]
+        inputs.remove(input_var)
+        # module/instance suffixes corresponding to possible_values
+        varname = input_var.name
+        if possible_values == (True, False):
+            suffixes = [f"{varname}_TRUE", f"{varname}_FALSE"]
+        else:
+            suffixes = [f"{varname}_{n:b}" for n in possible_values]
+        instances = {}
+        for i, cs_value in enumerate(possible_values):
+            if isinstance(input_var.sort, smt.BoolSort):
+                cs_value_t = smt.BoolConst.T if cs_value else smt.BoolConst.F
+            else:
+                cs_value_t = smt.BVConst(cs_value, input_var.sort.bitwidth)
+            bindings = {i: i for i in inputs}
+            new_model = Model(
+                name=f"{self.name}__{suffixes[i]}",
+                inputs=inputs,
+                outputs=self.outputs,
+                state=self.state,
+                ufs=self.ufs,
+                instances={
+                    name: Instance(
+                        # Rewrite expressions for all input bindings
+                        inst.model,
+                        {
+                            v_name: t.replace_vars(
+                                input_var,
+                                cs_value_t
+                            )
+                            for v_name, t in inst.inputs.items()
+                        }
+                    )
+                    for name, inst in self.instances.items()
+                },
+                # TODO may need to replace LHS of assignments too? in case of indexing and stuff
+                logic={
+                    k: t.replace_vars(input_var, cs_value_t) for k, t in self.logic.items()
+                },
+                default_next=[
+                    {k: t.replace_vars(input_var, cs_value_t) for k, t in l.items()}
+                    for l in self.default_next
+                ],
+                generated_by=GeneratedBy.CASE_SPLIT,
+            )
+            instances[f"{self.name}__{suffixes[i]}_inst"] = Instance(new_model, bindings)
+        # TODO generalize to match
+        new_logic = {
+            o: input_var.ite(
+                smt.Variable(f"{self.name}__{suffixes[0]}.{o.name}", o.sort),
+                smt.Variable(f"{self.name}__{suffixes[1]}.{o.name}", o.sort)
+            ) for o in self.outputs
+        }
+        return Model(
+            name=self.name,
+            inputs=self.inputs,
+            outputs=self.outputs,
+            state=[],
+            ufs=self.ufs,
+            instances=instances,
+            logic=new_logic,
+            default_next=[],
+            generated_by=self.generated_by | GeneratedBy.CASE_SPLIT,
+        )
 
     def _case_split_var(self, state_var: smt.Variable, possible_values: List[int]):
         raise NotImplementedError()
+        # return Model(
+        #     generated_by=self.generated_by | GeneratedBy.CASE_SPLIT,
+        # )
 
 @dataclass
 class Instance:
@@ -339,7 +405,7 @@ class Instance:
     """
 
     def pretty_str(self, indent_level=0):
-        newline = '\n' + ' ' * 12
+        newline = '\n' + ' ' * 16
         c_newline = "," + newline
         if len(self.inputs) > 0:
             input_block = newline + c_newline.join(str(v) + ": " + str(e) for v, e in self.inputs.items())
@@ -347,8 +413,8 @@ class Instance:
             input_block = newline
         # maybe there's a cleaner way to do this f string :)
         return textwrap.indent(textwrap.dedent(f"""\
-            input_bindings={input_block},
-            model:
+            input_bindings={input_block}
+            model=
 {self.model.pretty_str(16)}"""),
             ' ' * indent_level
         )

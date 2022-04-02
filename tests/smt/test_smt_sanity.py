@@ -7,10 +7,24 @@ import pycvc5
 from easyila.lynth import smt
 from easyila.lynth.oracleinterface import *
 
-class TestSygus:
+class TestSMT:
     """
     Sanity checks that SMT and sygus functions work
     """
+
+    def test_rename_pass(self):
+        """
+        Tests renaming variables within an expression tree.
+        """
+        v = smt.Variable
+        s = smt.BVSort(4)
+        a = v("a", s)
+        b = v("b", s)
+        expr = (a + b).op_eq(a | b)
+        renamed = v("test_a", s)
+        expected = (renamed + b).op_eq(renamed | b)
+        actual = expr.replace_vars(a, renamed)
+        assert actual == expected
 
     def test_from_cvc5(self):
         c_slv = pycvc5.Solver()

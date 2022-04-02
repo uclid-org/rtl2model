@@ -184,6 +184,17 @@ class Term(Translatable, ABC):
         assert self.sort == other.sort, f"cannot combine value {self} of sort {self.sort} to {other} of sort {other.sort}"
         return self, other
 
+    def replace_vars(self, var, new_term) -> "Term":
+        """
+        Returns a new term tree with all references to `var` replaced by `new_term`.
+        """
+        if self == var:
+            return new_term
+        t = self
+        for i, child in enumerate(self._children):
+            t = t._replace_child(child.replace_vars(var, new_term), i)
+        return t
+
     def preorder_visit_tree(self, visit_fn: Callable[["Term"], _T], shortcircuit=True) -> _T:
         """
         Calls `visit_fn` on this node, then recursively on all children.
@@ -410,6 +421,13 @@ class Term(Translatable, ABC):
     def _children(self):
         raise NotImplementedError()
 
+    @abstractmethod
+    def _replace_child(self, new_term, index) -> "Term":
+        """
+        Returns a new term with the `index`th child replaced by new_term
+        """
+        raise NotImplementedError()
+
 
 # Needed to be able to make BoolConst sealed
 class _TermMeta(ABCMeta, EnumMeta):
@@ -460,6 +478,9 @@ class Variable(Term):
     @property
     def _children(self):
         return []
+
+    def _replace_child(self, new_term, index):
+        return self
 
     def to_target_format(self, tgt: TargetFormat, **kwargs):
         if tgt == TargetFormat.CVC5:
@@ -546,6 +567,11 @@ class OpTerm(Term):
     @property
     def _children(self):
         return list(self.args)
+
+    def _replace_child(self, new_term, index):
+        new_args = list(self.args)
+        new_args[index] = new_term
+        return OpTerm(self.kind, tuple(new_args))
 
     def __str__(self):
         return self.to_verilog_str()
@@ -757,6 +783,9 @@ class UFTerm(Term):
     def _children(self):
         return []
 
+    def _replace_child(self, new_term, index):
+        return self
+
     def to_target_format(self, tgt: TargetFormat, **kwargs):
         if tgt == TargetFormat.CVC5:
             cvc5_ctx = kwargs["cvc5_ctx"]
@@ -783,6 +812,11 @@ class LambdaTerm(Term):
     @property
     def _children(self):
         return self.body
+
+    def _replace_child(self, new_term, index):
+        if index != 0:
+            raise IndexError()
+        return LambdaTerm(self.params, new_term)
 
     def __str__(self):
         return f"({','.join(self.params)}) -> {self.body}"
@@ -837,6 +871,11 @@ class QuantTerm(Term):
     def _children(self):
         return self.body
 
+    def _replace_child(self, new_term, index):
+        if index != 0:
+            raise IndexError()
+        return QuantTerm(self.kind, self.bound_vars, new_term)
+
     @staticmethod
     def from_cvc5(cvc5_term):
         k = cvc5_term.getKind()
@@ -888,6 +927,9 @@ class ApplyUF(Term):
     def _children(self):
         return list(self.input_values)
 
+    def _replace_child(self, new_term, index):
+        raise NotImplementedError()
+
     @staticmethod
     def from_cvc5(cvc5_term):
         if cvc5_term.getKind() == pycvc5.Kind.ApplyUf:
@@ -915,6 +957,9 @@ class BoolConst(Term, Enum, metaclass=_TermMeta):
     @property
     def _children(self):
         return []
+
+    def _replace_child(self, new_term, index):
+        return self
 
     def __str__(self):
         return "true" if self == self.T else "false"
@@ -945,6 +990,9 @@ class BVConst(Term):
     @property
     def _children(self):
         return []
+
+    def _replace_child(self, new_term, index):
+        return self
 
     def __str__(self):
         return f"{self.val}bv{self.width}"
