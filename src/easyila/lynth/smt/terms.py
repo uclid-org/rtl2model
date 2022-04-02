@@ -125,6 +125,7 @@ _OP_SYGUS_SYMBOLS = {
     Kind.Xor: "xor",
     Kind.Equal: "=",
     Kind.Ite: "ite",
+    Kind.Implies: "=>",
     Kind.Exists: "exists",
     Kind.ForAll: "forall",
 }
@@ -253,6 +254,9 @@ class Term(Translatable, ABC):
             cond = self
         t_term, f_term = t_term._binop_type_check(f_term)
         return OpTerm(Kind.Ite, (cond, t_term, f_term))
+
+    def implies(self, other):
+        return OpTerm(Kind.Implies, self._binop_type_check(other))
 
     def __lt__(self, other):
         return OpTerm(Kind.BVUlt, self._binop_type_check(other))
@@ -398,6 +402,12 @@ class Term(Translatable, ABC):
     def sign_extend(self, extra_bits: "BVConst"):
         """Sign extends this term with an addition `extra_bits` bits."""
         return OpTerm(Kind.BVSignExtend, (self, extra_bits))
+
+    def orr(self):
+        return OpTerm(Kind.BVOrr, (self))
+
+    def xorr(self):
+        return OpTerm(Kind.BVXorr, (self))
 
     # === ABSTRACT AND SHARED STATIC METHODS ===
     @staticmethod
