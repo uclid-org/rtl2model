@@ -796,8 +796,6 @@ class OpTerm(Term):
             return BVConst((~a0.val) & a0_mask, a0_bw)
         # binary ops
         a1 = args[1]
-        a1_bw = a1.sort.bitwidth
-        a1_mask = (1 << a1.sort.bitwidth) - 1
         if self.kind == Kind.BVAdd:
             return BVConst((a0.val + a1.val) & a0_mask, a0_bw)
         if self.kind == Kind.BVSub:
@@ -835,7 +833,7 @@ class OpTerm(Term):
         # Kind.BVSrl: "bv_l_right_shift",
         # if self.kind == Kind.Select:
         if self.kind == Kind.BVZeroPad:
-            return BVConst(a0_val, a1.val + a0_bw)
+            return BVConst(a0.val, a1.val + a0_bw)
         # if self.Kind == Kind.SignExtend:
         # ternary operators and higher
         a2 = args[2]
@@ -846,7 +844,7 @@ class OpTerm(Term):
             low = a2.val
             width = (high - low) + 1
             mask = ((1 << width) - 1) << low
-            return BVConst((a0_val & mask) >> high, width)
+            return BVConst((a0.val & mask) >> high, width)
         # if self.kind == Kind.BVConcat:
         # Ternary operator
         if self.kind == Kind.Ite:

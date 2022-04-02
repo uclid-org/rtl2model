@@ -2,7 +2,7 @@ from collections import defaultdict
 import enum
 from dataclasses import dataclass, field
 import textwrap
-from typing import List, Dict, Optional
+from typing import Collection, List, Dict, Optional
 
 import easyila.lynth.smt as smt
 
@@ -282,7 +282,7 @@ class Model:
         self._get_submodules(submodels, visited_submodel_names)
         return "\n\n".join(s.to_uclid() for s in submodels)
 
-    def case_split(self, var_name: str, possible_values: Optional[List[int]]=None):
+    def case_split(self, var_name: str, possible_values: Optional[Collection[int]]=None):
         """
         Automatically case splits this model on different values of `var_name`.
         `var_name` must be a boolean or bitvector variable, and cannot be an output.
@@ -302,7 +302,7 @@ class Model:
                     else:
                         raise TypeError(f"cannot case split on input {v}: case splits can only be performed on bool/bv variables")
                 return self._case_split_input(v, possible_values)
-        for v in self.state_vars:
+        for v in self.state:
             if isinstance(v, smt.Variable) and v.name == var_name:
                 # TODO validate possible_values if provided
                 if possible_values is None:
@@ -315,7 +315,7 @@ class Model:
                 return self._case_split_input(v, possible_values)
         return KeyError(f"cannot case split on {var_name}: no such input or state variable")
 
-    def _case_split_input(self, input_var: smt.Variable, possible_values: List[int]):
+    def _case_split_input(self, input_var: smt.Variable, possible_values: Collection[int]):
         inputs = self.inputs[:]
         inputs.remove(input_var)
         # module/instance suffixes corresponding to possible_values
