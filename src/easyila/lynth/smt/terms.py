@@ -1,6 +1,6 @@
 
 from abc import ABC, ABCMeta, abstractmethod
-from enum import Enum, EnumMeta, auto
+from enum import Enum, EnumMeta, IntEnum, auto
 from typing import Callable, TypeVar
 
 import pycvc5
@@ -184,6 +184,8 @@ class Term(Translatable, ABC):
         assert self.sort == other.sort, f"cannot combine value {self} of sort {self.sort} to {other} of sort {other.sort}"
         return self, other
 
+    # === OPTIMIZATIONS AND TREE TRAVERSALS ===
+
     def replace_vars(self, var, new_term) -> "Term":
         """
         Returns a new term tree with all references to `var` replaced by `new_term`.
@@ -209,6 +211,15 @@ class Term(Translatable, ABC):
                 assert isinstance(s, Term), s
                 self.preorder_visit_tree(visit_fn, shortcircuit)
         return rv
+
+    def optimize(self) -> "Term":
+        if isinstance(self, OpTerm):
+            # This method must also traverse children!
+            return self.optimize()
+        t = self
+        for i, child in enumerate(self._children):
+            t = t._replace_child(child.optimize(), i)
+        return t
 
     def typecheck(self) -> bool:
         """
@@ -740,7 +751,7 @@ class OpTerm(Term):
             if self.kind == Kind.Ite:
                 return "if (" + self.args[0].to_uclid() + ") then " + wrap(self.args[1]) + " else " + wrap(self.args[2])
             if self.kind == Kind.BVExtract:
-                return wrap(self.args[0]) + "[" + self.args[1].to_uclid() + ":" + self.args[1].to_uclid() + "]"
+                return wrap(self.args[0]) + "[" + self.args[1].to_uclid() + ":" + self.args[2].to_uclid() + "]"
             if self.kind == Kind.BVConcat:
                 return " ++ ".join(wrap(a) for a in self.args)
             if self.kind == Kind.Select:
@@ -751,6 +762,87 @@ class OpTerm(Term):
             raise NotImplementedError(self.kind)
         raise NotImplementedError("cannot convert OpTerm to " + str(tgt))
 
+    def optimize(self) -> Term:
+        # Optimize all children first
+        t = self
+        for i, child in enumerate(self._children):
+            t = t._replace_child(child.optimize(), i)
+        assert isinstance(t, OpTerm), t
+        assert self.kind == t.kind
+        # Constant folding: all arguments must be constants
+        # This technically isn't true for stuff like concats,
+        # but this heuristic works for binops and unops
+        args = t._children
+        for child in args:
+            if not (isinstance(child, BVConst) or isinstance(child, BoolConst)):
+                return t
+        # unary ops
+        a0 = args[0]
+        a0_bw = a0.sort.bitwidth
+        a0_mask = (1 << a0.sort.bitwidth) - 1
+        if self.kind == Kind.Not:
+            return BoolConst.T if a0 == BoolConst.F else BoolConst.T
+        if self.kind == Kind.BVNot:
+            return BVConst((~a0.val) & a0_mask, a0_bw)
+        # binary ops
+        a1 = args[1]
+        a1_bw = a1.sort.bitwidth
+        a1_mask = (1 << a1.sort.bitwidth) - 1
+        if self.kind == Kind.BVAdd:
+            return BVConst((a0.val + a1.val) & a0_mask, a0_bw)
+        if self.kind == Kind.BVSub:
+            # TODO check wrapping behavior
+            return BVConst((a0.val - a1.val) & a0_mask, a0_bw)
+        if self.kind == Kind.BVOr:
+            return BVConst(a0.val | a1.val, a0_bw)
+        if self.kind == Kind.BVAnd:
+            return BVConst(a0.val & a1.val, a0_bw)
+        if self.kind == Kind.BVXor:
+            return BVConst(a0.val ^ a1.val, a0_bw)
+        if self.kind == Kind.BVUlt:
+            return BoolConst(a0.val < a1.val)
+        if self.kind == Kind.BVUle:
+            return BoolConst(a0.val <= a1.val)
+        if self.kind == Kind.BVUgt:
+            return BoolConst(a0.val > a1.val)
+        if self.kind == Kind.BVUge:
+            return BoolConst(a0.val >= a1.val)
+        if self.kind == Kind.Equal:
+            return BoolConst(a0.val == a1.val)
+        if self.kind == Kind.Distinct:
+            return BoolConst(a0.val != a1.val)
+        if self.kind == Kind.Or:
+            return a0 or a1 # IntEnum provides this automatically
+        if self.kind == Kind.And:
+            return a0 and a1
+        if self.kind == Kind.Xor:
+            return BoolConst.T if a0 != a1 else BoolConst.F
+        if self.kind == Kind.Implies:
+            # p ==> q == !p || q
+            return (a0 == BoolConst.F) or a1
+        # Kind.BVSll: "bv_left_shift",
+        # Kind.BVSra: "bv_a_right_shift",
+        # Kind.BVSrl: "bv_l_right_shift",
+        # if self.kind == Kind.Select:
+        if self.kind == Kind.BVZeroPad:
+            return BVConst(a0_val, a1.val + a0_bw)
+        # if self.Kind == Kind.SignExtend:
+        # ternary operators and higher
+        a2 = args[2]
+        if self.kind == Kind.BVExtract:
+            # TODO check semantics for off-by-one in verilog/cvc?
+            # also, what direction does the slice go?
+            high = a1.val
+            low = a2.val
+            width = (high - low) + 1
+            mask = ((1 << width) - 1) << low
+            return BVConst((a0_val & mask) >> high, width)
+        # if self.kind == Kind.BVConcat:
+        # Ternary operator
+        if self.kind == Kind.Ite:
+            print(repr(a0))
+            return a1 if bool(a0) else a2
+        return t
 
 # TODO distinguish between references and declarations
 # variables and UFTerms should be referenced in the same way, but obviously declared
@@ -946,7 +1038,7 @@ class ApplyUF(Term):
         raise NotImplementedError("cannot convert FunctionSort to " + str(tgt))
 
 
-class BoolConst(Term, Enum, metaclass=_TermMeta):
+class BoolConst(Term, IntEnum, metaclass=_TermMeta):
     F = 0
     T = 1
 

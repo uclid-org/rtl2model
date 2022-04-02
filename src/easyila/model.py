@@ -362,13 +362,15 @@ class Model:
                 generated_by=GeneratedBy.CASE_SPLIT,
             )
             instances[f"{self.name}__{suffixes[i]}_inst"] = Instance(new_model, bindings)
-        # TODO generalize to match
+        # TODO generalize to MATCH
         new_logic = {
             o: input_var.ite(
                 smt.Variable(f"{self.name}__{suffixes[0]}.{o.name}", o.sort),
                 smt.Variable(f"{self.name}__{suffixes[1]}.{o.name}", o.sort)
             ) for o in self.outputs
         }
+        # State variables can always be eliminated because their values are taken care of
+        # by the submodules
         return Model(
             name=self.name,
             inputs=self.inputs,
