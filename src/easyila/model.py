@@ -312,24 +312,32 @@ class Model:
                         possible_values = range(0, 2 ** v.sort.bitwidth)
                     else:
                         raise TypeError(f"cannot case split on input {v}: case splits can only be performed on bool/bv variables")
-                return self._case_split_input(v, possible_values)
+                return self._case_split_var(v, possible_values)
         return KeyError(f"cannot case split on {var_name}: no such input or state variable")
 
     def _case_split_input(self, input_var: smt.Variable, possible_values: Collection[int]):
         inputs = self.inputs[:]
         inputs.remove(input_var)
+        return self._do_case_split(input_var, inputs, self.state, possible_values)
+
+    def _case_split_var(self, state_var: smt.Variable, possible_values: List[int]):
+        state = self.state[:]
+        state.remove(state_var)
+        return self._do_case_split(state_var, self.inputs, state, possible_values)
+
+    def _do_case_split(self, split_var, inputs, state, possible_values):
         # module/instance suffixes corresponding to possible_values
-        varname = input_var.name
+        varname = split_var.name
         if possible_values == (True, False):
             suffixes = [f"{varname}_TRUE", f"{varname}_FALSE"]
         else:
             suffixes = [f"{varname}_{n:b}" for n in possible_values]
         instances = {}
         for i, cs_value in enumerate(possible_values):
-            if isinstance(input_var.sort, smt.BoolSort):
+            if isinstance(split_var.sort, smt.BoolSort):
                 cs_value_t = smt.BoolConst.T if cs_value else smt.BoolConst.F
             else:
-                cs_value_t = smt.BVConst(cs_value, input_var.sort.bitwidth)
+                cs_value_t = smt.BVConst(cs_value, split_var.sort.bitwidth)
             bindings = {i: i for i in inputs}
             new_model = Model(
                 name=f"{self.name}__{suffixes[i]}",
@@ -353,22 +361,29 @@ class Model:
                 },
                 # TODO may need to replace LHS of assignments too? in case of indexing and stuff
                 logic={
-                    k: t.replace_vars(input_var, cs_value_t) for k, t in self.logic.items()
+                    k: t.replace_vars(split_var, cs_value_t) for k, t in self.logic.items()
                 },
                 default_next=[
-                    {k: t.replace_vars(input_var, cs_value_t) for k, t in l.items()}
+                    {k: t.replace_vars(split_var, cs_value_t) for k, t in l.items()}
                     for l in self.default_next
                 ],
                 generated_by=GeneratedBy.CASE_SPLIT,
             )
             instances[f"{self.name}__{suffixes[i]}_inst"] = Instance(new_model, bindings)
-        # TODO generalize to MATCH
-        new_logic = {
-            o: input_var.ite(
-                smt.Variable(f"{self.name}__{suffixes[0]}.{o.name}", o.sort),
-                smt.Variable(f"{self.name}__{suffixes[1]}.{o.name}", o.sort)
-            ) for o in self.outputs
-        }
+        if isinstance(split_var.sort, smt.BoolSort):
+            new_logic = {
+                o: split_var.ite(
+                    smt.Variable(f"{self.name}__{suffixes[0]}.{o.name}", o.sort),
+                    smt.Variable(f"{self.name}__{suffixes[1]}.{o.name}", o.sort)
+                ) for o in self.outputs
+            }
+        else:
+            new_logic = {
+                o: split_var.match_const({
+                    i: smt.Variable(f"{self.name}__{suffixes[i]}.{o.name}", o.sort)
+                    for i, v in enumerate(possible_values)
+                }) for o in self.outputs
+            }
         # State variables can always be eliminated because their values are taken care of
         # by the submodules
         return Model(
@@ -383,11 +398,6 @@ class Model:
             generated_by=self.generated_by | GeneratedBy.CASE_SPLIT,
         )
 
-    def _case_split_var(self, state_var: smt.Variable, possible_values: List[int]):
-        raise NotImplementedError()
-        # return Model(
-        #     generated_by=self.generated_by | GeneratedBy.CASE_SPLIT,
-        # )
 
 @dataclass
 class Instance:

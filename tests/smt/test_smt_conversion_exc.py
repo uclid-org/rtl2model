@@ -37,6 +37,7 @@ exprs = {
     "xor": a ^ b,
     "implies": a.implies(b),
     "ite": a.ite(x, y),
+    "match": x.match_const({0: a, 1: a, 2: b, 3: b}),
     "select": arr[x],
 }
 

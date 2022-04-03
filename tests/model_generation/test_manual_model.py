@@ -2,7 +2,7 @@
 import pytest
 
 import easyila.lynth.smt as smt
-from easyila.model import Model
+from easyila.model import Model, Instance
 
 class TestManualModel:
     """
@@ -71,8 +71,7 @@ class TestManualModel:
             inputs=[a_top],
             state=[s_top],
             outputs=[o_top],
-            instances={"sub": submodule},
-            # TODO make different type for references
+            instances={"sub": Instance(submodule, {a_sub: a_top})},
             default_next=[{
                 s_top: smt.Variable("sub.s", bv3)
             }],
@@ -81,3 +80,12 @@ class TestManualModel:
             }
         )
         assert top.validate()
+
+    def test_model_variable_dce(self):
+        """
+        Tests eliminating unused variables from a model.
+        Inputs cannot be eliminated because they change the compositional
+        behavior of models.
+        """
+        ...
+        assert False

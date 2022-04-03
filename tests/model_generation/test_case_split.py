@@ -59,7 +59,7 @@ class TestCaseSplit:
         )
         print("=== ORIGINAL MODEL ===")
         top.print()
-        top.validate()
+        assert top.validate()
         gen = verilog_to_model(rtl, "top")
         assert gen == top
         cs_top_t = Model(
@@ -82,7 +82,6 @@ class TestCaseSplit:
                 big_o: ignore & v_f,
             }
         )
-        # TODO introduce SMT match term
         # In the case split model, state is elided to the case split terms
         # and all that remains is the identical I/O interface
         cs_top = Model(
@@ -91,7 +90,7 @@ class TestCaseSplit:
             outputs=[big_o],
             instances={
                 "_top__either_TRUE_inst": Instance(cs_top_t, {}),
-                "_top__either_TRUE_inst": Instance(cs_top_f, {})
+                "_top__either_FALSE_inst": Instance(cs_top_f, {})
             },
             logic={
                 big_o: either.ite(
@@ -101,9 +100,112 @@ class TestCaseSplit:
             }
         )
         print("=== CASE SPLIT MODEL ===")
-        cs_top.validate()
         assert cs_top.validate()
         alg_split = top.case_split("either")
         alg_split.print()
         alg_split.validate()
+        assert alg_split == cs_top
+
+    def test_case_split_bv_state(self):
+        """
+        Splits a model on a bitvector state variable.
+
+        In this case, the split variable happens to be an instance output.
+        Since said instance no longer has any used outputs, it should be removed
+        in all subinstances.
+        """
+        v = smt.Variable
+        bv2 = smt.BVSort(2)
+        o = v("o", bv2)
+        big_o = v("big_o", bv2)
+        v_t = v("v_t", bv2)
+        v_f = v("v_f", bv2)
+        ignore = v("ignore", bv2)
+        c_true = Model("c_true", outputs=[o], logic={o: smt.BVConst(1, 2)})
+        c_false = Model("c_false", outputs=[o], logic={o: smt.BVConst(0x3, 2)})
+        top = Model(
+            "top",
+            inputs=[ignore],
+            outputs=[big_o],
+            state=[v_t, v_f],
+            instances={"c_t": Instance(c_true, {}), "c_f": Instance(c_false, {})},
+            logic={
+                v_t: v("c_t.o", bv2),
+                v_f: v("c_f.o", bv2),
+                big_o: v_t.op_eq(v_f).ite(ignore & v_t, ignore & v_f),
+            },
+        )
+        print("=== ORIGINAL MODEL ===")
+        top.print()
+        assert top.validate()
+        cs_top_00 = Model(
+            "_top__v_t__00",
+            inputs=[ignore],
+            outputs=[big_o],
+            state=[v_f],
+            instances={"c_f": Instance(c_false, {})},
+            logic={
+                v_f: v("c_f.o", bv2),
+                big_o: smt.BVConst(0, 2).op_eq(v_f).ite(ignore & smt.BVConst(0, 2), ignore & v_f),
+            }
+        )
+        cs_top_01 = Model(
+            "_top__v_t__01",
+            inputs=[ignore],
+            outputs=[big_o],
+            state=[v_f],
+            instances={"c_f": Instance(c_false, {})},
+            logic={
+                v_f: v("c_f.o", bv2),
+                big_o: smt.BVConst(1, 2).op_eq(v_f).ite(ignore & smt.BVConst(1, 2), ignore & v_f),
+            }
+        )
+        cs_top_10 = Model(
+            "_top__v_t__10",
+            inputs=[ignore],
+            outputs=[big_o],
+            state=[v_f],
+            instances={"c_f": Instance(c_false, {})},
+            logic={
+                v_f: v("c_f.o", bv2),
+                big_o: smt.BVConst(2, 2).op_eq(v_f).ite(ignore & smt.BVConst(2, 2), ignore & v_f),
+            }
+        )
+        cs_top_11 = Model(
+            "_top__v_t__11",
+            inputs=[ignore],
+            outputs=[big_o],
+            state=[v_f],
+            instances={"c_f": Instance(c_false, {})},
+            logic={
+                v_f: v("c_f.o", bv2),
+                big_o: smt.BVConst(3, 2).op_eq(v_f).ite(ignore & smt.BVConst(3, 2), ignore & v_f),
+            }
+        )
+        # In the case split model, state is elided to the case split terms
+        # and all that remains is the identical I/O interface
+        cs_top = Model(
+            "top",
+            inputs=[ignore],
+            outputs=[big_o],
+            instances={
+                "_top__v_t__00_inst": Instance(cs_top_00, {ignore: ignore}),
+                "_top__v_t__01_inst": Instance(cs_top_01, {ignore: ignore}),
+                "_top__v_t__10_inst": Instance(cs_top_10, {ignore: ignore}),
+                "_top__v_t__11_inst": Instance(cs_top_11, {ignore: ignore}),
+            },
+            logic={
+                big_o: v_t.match_const({
+                    0: v("_top__v_t__00_inst.big_o", bv2),
+                    1: v("_top__v_t__01_inst.big_o", bv2),
+                    2: v("_top__v_t__10_inst.big_o", bv2),
+                    3: v("_top__v_t__11_inst.big_o", bv2),
+                }),
+            }
+        )
+        print("=== CASE SPLIT MODEL ===")
+        assert cs_top.validate()
+        alg_split = top.case_split("v_t")
+        alg_split.print()
+        assert alg_split.validate()
         assert alg_split == cs_top

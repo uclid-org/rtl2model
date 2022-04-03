@@ -1,7 +1,7 @@
 
 from abc import ABC, ABCMeta, abstractmethod
 from enum import Enum, EnumMeta, IntEnum, auto
-from typing import Callable, TypeVar
+from typing import Callable, Dict, Optional, TypeVar, Union
 
 import pycvc5
 
@@ -35,6 +35,7 @@ class Kind(Enum):
     Xor             = auto()
     Implies         = auto()
     Ite             = auto()
+    Match           = auto()
     Lambda          = auto()
     Equal           = auto()
     Distinct        = auto()
@@ -96,6 +97,7 @@ _OP_KIND_MAPPING = {
     Kind.Xor:           pycvc5.Kind.Xor,
     Kind.Implies:       pycvc5.Kind.Implies,
     Kind.Ite:           pycvc5.Kind.Ite,
+    Kind.Match:         pycvc5.Kind.Match,
 
     Kind.Lambda:        pycvc5.Kind.Lambda,
     Kind.Exists:        pycvc5.Kind.Exists,
@@ -254,6 +256,46 @@ class Term(Translatable, ABC):
             cond = self
         t_term, f_term = t_term._binop_type_check(f_term)
         return OpTerm(Kind.Ite, (cond, t_term, f_term))
+
+    def match_const(
+        self,
+        cases: Dict[Union[int, "BVConst"], "Term"],
+        # default: Optional["Term"]=None TODO implement default
+    ):
+        """
+        A more primitive form of an SMT match expression. SMTLIB match expressions
+        perform destructuring akin to functional programming pattern matching, but
+        we only support matching against constants.
+
+        When this term takes on a certain value, the expression should evaluate to
+        the corresponding value in `cases`. All keys in `cases` must be of the same
+        sort as this term, or are casted if they are int.
+
+        This match must be exhaustive, so if cases do not provide all possible values
+        of this sort, then `default` must be specified. An Exception is raised if the match
+        is not exhaustive.
+        """
+        assert isinstance(self.sort, BVSort)
+        sort_max = (1 << self.sort.bitwidth) - 1
+        covered = 0 # Bit set representing which cases have been covered
+        args = [self] # OpTerm sees this as pairs of (case, term) occurring consecutively
+        for c, term in cases.items():
+            if isinstance(c, int):
+                c = BVConst(c, self.sort.bitwidth)
+            assert c.val <= sort_max
+            if (covered & (1 << c.val)) != 0:
+                # Check if the case was already set
+                raise Exception(f"Match case {c.val} occurred multiple times")
+            covered |= 1 << c.val
+            args.append(c)
+            args.append(term)
+        all_covered = (1 << sort_max) - 1 # 1 bit for each possible value
+        default = None
+        if not default:
+            assert covered != all_covered, "Match default was provided, but cases were already exhaustive"
+        else:
+            assert covered == all_covered, "Match was non-exhaustive"
+        return OpTerm(Kind.Match, tuple(args))
 
     def implies(self, other):
         return OpTerm(Kind.Implies, self._binop_type_check(other))
@@ -577,6 +619,8 @@ class OpTerm(Term):
             return BVSort(sum(a.sort.bitwidth for a in self.args))
         elif self.kind == Kind.Ite:
             return self.args[1].sort
+        elif self.kind == Kind.Match:
+            return self.args[2].sort # Match args are (cond, c1, v1, c2, v2, ...)
         bitops = { Kind.Or, Kind.And, Kind.Xor, Kind.Not, Kind.Equal, Kind.Distinct }
         if self.kind in bitops:
             return BoolSort()
@@ -622,6 +666,24 @@ class OpTerm(Term):
                 assert isinstance(self.args[1], BVConst)
                 op = cvc5_ctx.solver.mkOp(cvc5_kind, self.args[1].val)
                 return cvc5_ctx.solver.mkTerm(op, self.args[0].to_cvc5(cvc5_ctx))
+            elif self.kind == Kind.Match:
+                # Jank workaround until I figure out how to pattern match vs constants
+                a0 = self.args[0]
+                # Last expression is the "else" case, so cond doesn't matter
+                t = self.args[-1]
+                for i in range(len(self.args) - 4, 0, -2):
+                    t = a0.op_eq(self.args[i]).ite(self.args[i + 1], t)
+                return t.to_cvc5(cvc5_ctx)
+                # case_terms = []
+                # for i in range(1, len(self.args), 2):
+                #     case_terms.append(
+                #         cvc5_ctx.solver.mkTerm(
+                #             pycvc5.Kind.MatchCase,
+                #             self.args[i].to_cvc5(cvc5_ctx),
+                #             self.args[i + 1].to_cvc5(cvc5_ctx),
+                #         )
+                #     )
+                # return cvc5_ctx.solver.mkTerm(cvc5_kind, self.args[0].to_cvc5(cvc5_ctx), *case_terms)
             t = cvc5_ctx.solver.mkTerm(cvc5_kind, *[v.to_cvc5(cvc5_ctx) for v in self.args])
             return t
         elif tgt == TargetFormat.SYGUS2:
@@ -675,6 +737,14 @@ class OpTerm(Term):
                 a1_str = wrap(self.args[1])
                 a2_str = wrap(self.args[2])
                 return f"{a0_str} ? {a1_str} : {a2_str}"
+            if v == Kind.Match:
+                # Verilog case statements aren't expressions, so just ITE it up
+                a0 = self.args[0]
+                # Last expression is the "else" case, so cond doesn't matter
+                t = self.args[-1]
+                for i in range(len(self.args) - 4, 0, -2):
+                    t = a0.op_eq(self.args[i]).ite(self.args[i + 1], t)
+                return t.to_verilog_str()
             if v == Kind.BVConcat:
                 return "{" + ",".join(wrap(a) for a in self.args) + "}"
             if v == Kind.BVExtract:
