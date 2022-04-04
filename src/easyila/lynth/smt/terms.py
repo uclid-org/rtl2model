@@ -5,7 +5,6 @@ from typing import Callable, Dict, Optional, TypeVar, Union
 
 import pycvc5
 
-import easyila.verification
 from .sorts import *
 
 class Kind(Enum):
@@ -446,10 +445,10 @@ class Term(Translatable, ABC):
         return OpTerm(Kind.BVSignExtend, (self, extra_bits))
 
     def orr(self):
-        return OpTerm(Kind.BVOrr, (self))
+        return OpTerm(Kind.BVOrr, (self,))
 
     def xorr(self):
-        return OpTerm(Kind.BVXorr, (self))
+        return OpTerm(Kind.BVXorr, (self,))
 
     # === ABSTRACT AND SHARED STATIC METHODS ===
     @staticmethod
@@ -556,15 +555,11 @@ class Variable(Term):
                 return v
         elif tgt in (TargetFormat.SYGUS2, TargetFormat.VERILOG, TargetFormat.UCLID):
             return self.name
-        elif tgt == TargetFormat.VERIF_DSL:
-            # TODO handle booleans
-            assert isinstance(self.sort, BVSort)
-            return easyila.verification.WireOrRegRef(self.name, self.sort.bitwidth)
         raise NotImplementedError("cannot convert Variable to " + str(tgt))
 
 
-BoolVariable = lambda s: Variable(s, BoolSort())
-BVVariable = lambda s, w: Variable(s, BVSort(w))
+BoolVariable = lambda s, **kwargs: Variable(s, BoolSort(), **kwargs)
+BVVariable = lambda s, w, **kwargs: Variable(s, BVSort(w), **kwargs)
 
 
 @dataclass(frozen=True)
@@ -579,6 +574,14 @@ class VarDecl(Translatable):
         return Variable(self.name, self.sort)
 
     def to_target_format(self, tgt: TargetFormat, **kwargs):
+        """
+        Possible kwargs:
+        - cvc5_ctx: a Cvc5Ctx object used to get a reference to a cvc5 solver
+        - is_reg: a boolean used by verilog conversion to determine if this should be declared
+                  as a reg (if false or not specified, the variable will be a wire)
+        - anyconst: a boolean used by verilog conversion; when specified, it will add the
+                  (* anyconst *) yosys attribute
+        """
         if tgt == TargetFormat.CVC5:
             # The CVC5 interface doesn't really distnguish between declarations
             # and references of bound variables
@@ -586,7 +589,18 @@ class VarDecl(Translatable):
         elif tgt == TargetFormat.SYGUS2:
             raise NotImplementedError()
         elif tgt == TargetFormat.VERILOG:
-            raise NotImplementedError()
+            if isinstance(self.sort, ArraySort):
+                raise NotImplementedError("VarDecl verilog array translation not supported yet")
+            is_reg = kwargs.get("is_reg", False)
+            decl = "reg" if is_reg else "wire"
+            if self.sort.bitwidth != 1:
+                decl += " " + self.sort.to_verilog_str()
+            decl += f" {self.name};"
+            anyconst = kwargs.get("anyconst", False)
+            if anyconst:
+                return  "(* anyconst *) " + decl
+            else:
+                return decl
         elif tgt == TargetFormat.UCLID:
             # TODO need to identify inputs/outputs
             return f"var {self.name} : {self.sort.to_uclid()};"
@@ -761,34 +775,6 @@ class OpTerm(Term):
             if v == Kind.BVZeroPad:
                 return wrap(self.args[0])
             raise NotImplementedError(v)
-        elif tgt == TargetFormat.VERIF_DSL:
-            o = easyila.verification.Operators
-            unops = {
-                Kind.Not: o.Not,
-                Kind.BVNot: o.BVNot
-            }
-            if self.kind in unops:
-                return easyila.verification.UnOpExpr(unops[self.kind], self.args[0].to_verif_dsl())
-            binops = {
-                Kind.BVAdd: o.BVAdd,
-                Kind.BVSub: o.BVSub,
-                Kind.BVOr: o.BVOr,
-                Kind.BVAnd: o.BVAnd,
-                Kind.BVXor: o.BVXor,
-                Kind.Or: o.Or,
-                Kind.And: o.And,
-                Kind.Xor: o.Xor,
-                Kind.Equal: o.Equal,
-            }
-            if self.kind in binops:
-                return easyila.verification.BinOpExpr(binops[self.kind], self.args[0].to_verif_dsl(), self.args[1].to_verif_dsl())
-            # if v == kind.Implies:
-            #     a0_str = wrap(self.args[0])
-            #     a1_str = wrap(self.args[1])
-            #     return f"!{a0_str} || {a1_str}"
-            if self.kind == Kind.Ite:
-                return easyila.verification.TernaryExpr(self.args[0].to_verif_dsl(), self.args[1].to_verif_dsl(), self.args[2].to_verif_dsl())
-            raise NotImplementedError(self.kind)
         elif tgt == TargetFormat.UCLID:
             def wrap(term):
                 if term._has_children:
@@ -839,6 +825,14 @@ class OpTerm(Term):
             if self.kind == Kind.BVZeroPad:
                 assert isinstance(self.args[1], BVConst)
                 return f"bv_zero_extend({self.args[1].val}, {self.args[0].to_uclid()})"
+            if self.kind == Kind.Match:
+                # uclid case statements aren't expressions, so just ITE it up
+                a0 = self.args[0]
+                # Last expression is the "else" case, so cond doesn't matter
+                t = self.args[-1]
+                for i in range(len(self.args) - 4, 0, -2):
+                    t = a0.op_eq(self.args[i]).ite(self.args[i + 1], t)
+                return t.to_uclid()
             raise NotImplementedError(self.kind)
         raise NotImplementedError("cannot convert OpTerm to " + str(tgt))
 
@@ -1143,8 +1137,6 @@ class BoolConst(Term, IntEnum, metaclass=_TermMeta):
                 return cvc5_ctx.solver.mkTrue()
         elif tgt in (TargetFormat.VERILOG, TargetFormat.SYGUS2, TargetFormat.UCLID):
             return "true" if self == self.T else "false"
-        elif tgt == TargetFormat.VERIF_DSL:
-            return easyila.verification.BoolConst(self == self.T)
         raise NotImplementedError("cannot convert BoolConst to " + str(tgt))
 
 
@@ -1185,8 +1177,6 @@ class BVConst(Term):
             return "#x{:x}".format(self.val)
         elif tgt == TargetFormat.VERILOG:
             return "{}'h{:x}".format(self.width, self.val)
-        elif tgt == TargetFormat.VERIF_DSL:
-            return easyila.verification.BVConst(self.val, self.width, easyila.verification.Base.HEX)
         elif tgt == TargetFormat.UCLID:
             return "0x{:x}bv{}".format(self.val, self.width)
         raise NotImplementedError("cannot convert BVConst to " + str(tgt))

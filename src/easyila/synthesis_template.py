@@ -6,6 +6,7 @@ import math
 import os
 import random
 from subprocess import Popen, PIPE
+import textwrap
 from typing import List
 
 from easyila.common import *
@@ -13,7 +14,6 @@ from easyila.guidance import Guidance, AnnoType
 from easyila.lynth import smt
 from easyila.sketch import ProgramSketch
 import easyila.lynth.oracleinterface as oi
-import easyila.verification as v
 
 @dataclass
 class ProjectConfig:
@@ -104,9 +104,9 @@ class HwModel(ABC):
             output_vals.append(signal_values[cycle][sigidx])
         return output_vals
 
-    def generate_new_test(self, signal_values, signal_widths, func: smt.LambdaTerm):
+    def generate_test_block_verilog(self, signal_values, signal_widths, func: smt.LambdaTerm):
         """
-        Creates a new correctness check for the function body.
+        Creates a block of verilog code to check correctness for the function body.
 
         func is a concrete SMT function object, representing a guess made by the synthesis loop.
         """
@@ -128,61 +128,74 @@ class HwModel(ABC):
             except ValueError:
                 return qp
 
-        ctr_block = v.counter("counter", width, trigger=v.SignalRef(clock_name))
-        ctr_ref = v.RegRef("counter", width)
-        ctr_values = [v.BVConst(i, width) for i in range(2 ** (width + 1))]
-        ctr_cases = []
+        ctr = smt.BVVariable("counter", width)
+        ctr_values = [smt.BVConst(i, width) for i in range(2 ** (width + 1))]
+        ctr_cases = [] # Each item is a tuple of (iterator condition, assumptions, assertions)
         shadow_decls = []
         numshadow = 0
 
         for stepnum in range(guidance.num_cycles):
-            itercond = ctr_ref == ctr_values[stepnum]
+            itercond = ctr.op_eq(ctr_values[stepnum])
             stmts: List[v.Statement] = []
+            assumes = []
+            asserts = []
             for ind, signal in enumerate(guidance.signals):
                 # Iterate over all indices for vectors
                 for qp in signal.get_all_qp_instances():
+                    qp_var = smt.BVVariable(q2b(qp), get_width(qp))
                     atype = guidance.get_annotation_at(qp, stepnum)
                     if atype == AnnoType.DC:
                         pass
                     elif atype == AnnoType.ASSM:
                         # Add assume statement
-                        constval = v.BVConst(signal_values[stepnum][ind], get_width(qp), base=v.Base.HEX)
-                        stmts.append(
-                            v.Assume(v.SignalRef(q2b(qp)) == constval)
-                        )
+                        constval = smt.BVConst(signal_values[stepnum][ind], get_width(qp))
+                        assumes.append(qp_var.op_eq(constval))
                     elif atype == AnnoType.PARAM:
                         # Add new shadow register
-                        new_shadow = v.RegDecl(f"__shadow_{numshadow}", get_width(qp), anyconst=True)
-                        shadow_decls.append(new_shadow)
-                        stmts.append(
-                            v.Assume(new_shadow.get_ref() == v.SignalRef(q2b(qp)), comment="synthfun parameter")
-                        )
+                        new_shadow = smt.BVVariable(f"__shadow_{numshadow}", get_width(qp))
+                        shadow_decls.append(new_shadow.get_decl())
+                        # TODO add comments to assumes somehow?
+                        assumes.append(new_shadow.op_eq(qp_var))
                         numshadow += 1
                     elif atype == AnnoType.OUTPUT:
                         # Assert output
                         # TODO allow for a more coherent mapping from synth funs to outputs
-                        stmts.append(
-                            v.Assert(func.body.to_verif_dsl() == v.SignalRef(q2b(qp)), comment="synthfun output")
-                        )
+                        asserts.append(func.body.op_eq(qp_var))
                     else:
                         raise NotImplementedError()
-            # TODO fix this lol
-            if len(stmts) > 0:
-                ite = v.IteStatement(itercond, v.StatementSeq(stmts), None)
-            else:
-                ite = v.IteStatement(itercond, v.StatementSeq([]), None)
-            ctr_cases.append(ite)
+            ctr_cases.append((itercond, assumes, asserts))
 
-        return v.StatementSeq(shadow_decls + [
-            ctr_block,
-            v.AlwaysAt(v.Edge.POS, v.SignalRef(clock_name), ctr_cases)
-        ]).to_verilog()
+        shadow_decls = "\n".join(s.to_verilog_str(is_reg=True, anyconst=True) for s in shadow_decls)
+        ctr_cases_l = []
+        for itercond, assumes, asserts in ctr_cases:
+            s = f"if ({itercond.to_verilog_str()}) begin\n"
+            assumes_s = "\n".join(f"\tassume ({a.to_verilog_str()});" for a in assumes)
+            if asserts:
+                asserts_s = "\n" + "\n".join(f"\tassert ({a.to_verilog_str()});" for a in asserts)
+            else:
+                asserts_s = ""
+            ctr_cases_l.append(s + assumes_s + asserts_s + "\nend")
+        return shadow_decls + textwrap.dedent(f"""\
+
+            {ctr.get_decl().to_verilog_str(is_reg=True)}
+            always @(posedge clk) begin
+                {ctr.to_verilog_str()} <= {ctr.to_verilog_str()} + 1;
+            end
+            """) + "always @(posedge clk) begin\n" + \
+            textwrap.indent("\n".join(ctr_cases_l), "    ") + \
+            "\nend"
+
+        return ctr_cases
+        # v.StatementSeq(shadow_decls + [
+        #     ctr_block,
+        #     v.AlwaysAt(v.Edge.POS, v.SignalRef(clock_name), ctr_cases)
+        # ]).to_verilog()
 
     def run_bmc(self, signal_values, signal_widths, hypothesis_func: smt.LambdaTerm):
         """
         Runs BMC (for now, hardcoded to be symbiyosys) and returns true on success.
         """
-        formalblock = self.generate_new_test(
+        formalblock = self.generate_test_block_verilog(
             signal_values,
             signal_widths,
             hypothesis_func,

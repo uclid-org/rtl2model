@@ -387,7 +387,6 @@ def _verilog_model_helper(
         logic=logic,
         default_next=[next_updates],
         instances=instances,
-        instructions={},
         init_values={
             # TODO read init values (may require pyverilog editing)
         },

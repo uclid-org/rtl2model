@@ -12,7 +12,6 @@ from typing import Dict, List, Set, Tuple, Optional
 
 import pycvc5
 
-import easyila.verification as v
 from .sorts import *
 from .terms import *
 

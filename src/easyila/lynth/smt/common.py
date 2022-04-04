@@ -10,7 +10,6 @@ class TargetFormat(Enum):
     SYGUS2 = auto()
     VERILOG = auto()
     UCLID = auto()
-    VERIF_DSL = auto()
 
 class Translatable(ABC):
     """
@@ -27,11 +26,8 @@ class Translatable(ABC):
     def to_sygus2(self):
         return self.to_target_format(TargetFormat.SYGUS2)
 
-    def to_verilog_str(self):
-        return self.to_target_format(TargetFormat.VERILOG)
+    def to_verilog_str(self, *, is_reg=False, anyconst=False):
+        return self.to_target_format(TargetFormat.VERILOG, is_reg=is_reg, anyconst=anyconst)
 
     def to_uclid(self):
         return self.to_target_format(TargetFormat.UCLID)
-
-    def to_verif_dsl(self):
-        return self.to_target_format(TargetFormat.VERIF_DSL)

@@ -50,9 +50,10 @@ class Model:
     having transitions? for now, just have a default "NEXT" instruction
     """
     default_next: Instruction               = field(default_factory=lambda: [{}])
-    instructions: Dict[str, Instruction]    = field(default_factory=dict)
     init_values: Dict[str, smt.BVConst]     = field(default_factory=dict)
-    generated_by: GeneratedBy              = field(default=GeneratedBy.MANUAL, compare=False)
+    assertions: List[smt.Term]              = field(default_factory=list)
+    assumptions: List[smt.Term]             = field(default_factory=list)
+    generated_by: GeneratedBy               = field(default=GeneratedBy.MANUAL, compare=False)
 
     def __post_init__(self):
         assert isinstance(self.inputs, list)
@@ -66,6 +67,10 @@ class Model:
             assert isinstance(i, str), f"instance name {i} is not a str (was {type(i)})"
             assert isinstance(m, Instance), f"value for instance {i} is not a Instance (was {type(m)})"
         assert isinstance(self.init_values, dict)
+        for a in self.assertions:
+            assert isinstance(a.sort, smt.BoolSort)
+        for a in self.assumptions:
+            assert isinstance(a.sort, smt.BoolSort)
 
     def validate(self):
         """
@@ -246,6 +251,7 @@ class Model:
             )
         else:
             child_next_s = ""
+        # TODO serialize assertions and assumptions
         return textwrap.dedent(f"""\
             module {self.name} {{
 {u_vars_s}
