@@ -151,6 +151,8 @@ class Term(Translatable, ABC):
         """
         assert not (zpad and sext), "zpad and sext cannot both be set"
         if cast_int and isinstance(other, int):
+            if isinstance(other, BoolConst):
+                other = other.value
             if isinstance(self.sort, BoolSort):
                 assert other in (0, 1), f"cannot coerce int {other} to {self.sort}"
                 return self, (BoolConst.T if other else BoolConst.F)
