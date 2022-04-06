@@ -16,6 +16,7 @@ a = smt.Variable("a", smt.BoolSort())
 b = smt.Variable("b", smt.BoolSort())
 arr = smt.Variable("arr", smt.ArraySort(bv4, bv4))
 exprs = {
+    "bvvar": x,
     "bvadd": x + y,
     "bvsub": x - y,
     "bvor": x | y,
@@ -32,6 +33,7 @@ exprs = {
     "sll": x.sll(y),
     "srl": x.srl(y),
     "sra": x.sra(y),
+    "boolvar": a,
     "or": a | b,
     "and": a & b,
     "xor": a ^ b,
@@ -42,7 +44,7 @@ exprs = {
 }
 
 tf = smt.TargetFormat
-formats = [tf.CVC5, tf.SYGUS2, tf.VERILOG, tf.UCLID]
+formats = [tf.CVC5, tf.SYGUS2, tf.VERILOG, tf.UCLID] #, tf.JSON]
 
 # skip = []
 # TODO

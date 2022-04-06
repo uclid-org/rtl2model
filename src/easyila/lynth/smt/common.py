@@ -1,6 +1,7 @@
 
 from abc import ABC, abstractmethod
 from enum import Enum, auto
+import json
 
 class TargetFormat(Enum):
     """
@@ -10,11 +11,17 @@ class TargetFormat(Enum):
     SYGUS2 = auto()
     VERILOG = auto()
     UCLID = auto()
+    JSON = auto()
 
 class Translatable(ABC):
     """
     Mixin to define common methods for translating to other representations.
     """
+
+    # @abstractmethod
+    @staticmethod
+    def from_json(fp):
+        raise NotImplementedError()
 
     @abstractmethod
     def to_target_format(self, tgt: TargetFormat, **kwargs):
@@ -31,3 +38,6 @@ class Translatable(ABC):
 
     def to_uclid(self):
         return self.to_target_format(TargetFormat.UCLID)
+
+    def to_json(self):
+        return self.to_target_format(TargetFormat.JSON)

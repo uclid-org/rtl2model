@@ -187,6 +187,7 @@ class TestCaseSplit:
         cs_top = Model(
             "top",
             inputs=[ignore],
+            # TODO what defines v_t here? figure out semantics of case splitting on a state variable
             outputs=[big_o],
             instances={
                 "_top__v_t__00_inst": Instance(cs_top_00, {ignore: ignore}),

@@ -1,6 +1,8 @@
 
 from abc import ABC, ABCMeta, abstractmethod
+from dataclasses import asdict, dataclass
 from enum import Enum, EnumMeta, IntEnum, auto
+import json
 from typing import Callable, Dict, Optional, TypeVar, Union
 
 import pycvc5
@@ -557,6 +559,8 @@ class Variable(Term):
                 return v
         elif tgt in (TargetFormat.SYGUS2, TargetFormat.VERILOG, TargetFormat.UCLID):
             return self.name
+        elif tgt == TargetFormat.JSON:
+            return json.dumps(asdict(self))
         raise NotImplementedError("cannot convert Variable to " + str(tgt))
 
 

@@ -337,7 +337,7 @@ class Model:
         if possible_values == (True, False):
             suffixes = [f"{varname}_TRUE", f"{varname}_FALSE"]
         else:
-            suffixes = [f"{varname}_{n:b}" for n in possible_values]
+            suffixes = [f"{varname}_{n:0{split_var.sort.bitwidth}b}" for n in possible_values]
         instances = {}
         for i, cs_value in enumerate(possible_values):
             if isinstance(split_var.sort, smt.BoolSort):
