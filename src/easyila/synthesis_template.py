@@ -12,7 +12,7 @@ from typing import List
 from easyila.common import *
 from easyila.guidance import Guidance, AnnoType
 from easyila.lynth import smt
-from easyila.sketch import ProgramSketch
+from easyila.sketch import ConcreteProgram
 import easyila.lynth.oracleinterface as oi
 
 @dataclass
@@ -66,15 +66,15 @@ class HwModel(ABC):
         pass
 
     @abstractmethod
-    def generate_program(self, inputs) -> ProgramSketch:
+    def generate_program(self, inputs) -> ConcreteProgram:
         """
-        Produces a ProgramSketch program to be run during simulation.
+        Produces a program to be run during simulation.
         INPUTS is a list of inputs to the model that may be used in constructing the program.
         """
         pass
 
     @abstractmethod
-    def simulate_and_read_signals(self, sketch) -> Tuple[List[int], List[List[int]]]:
+    def simulate_and_read_signals(self, program: ConcreteProgram) -> Tuple[List[int], List[List[int]]]:
         """
         Invokes the simulation binary and reads the resulting signals.
 
@@ -112,7 +112,7 @@ class HwModel(ABC):
         """
         guidance = self.guidance
         clock_name = self.config.clock_name
-        width = int(math.ceil(math.log(guidance.num_cycles, 2)))
+        ctr_width = int(math.ceil(math.log(guidance.num_cycles, 2)))
         signalnames = [qpath for s in self.signals for qpath in s.get_all_qp_instances()]
         basenames = [basename for s in self.signals for basename in s.get_all_bp_instances()]
         base_to_qualified = dict(zip(basenames, signalnames))
@@ -128,8 +128,8 @@ class HwModel(ABC):
             except ValueError:
                 return qp
 
-        ctr = smt.BVVariable("counter", width)
-        ctr_values = [smt.BVConst(i, width) for i in range(2 ** (width + 1))]
+        ctr = smt.BVVariable("__lift_cc", ctr_width)
+        ctr_values = [smt.BVConst(i, ctr_width) for i in range(2 ** (ctr_width + 1))]
         ctr_cases = [] # Each item is a tuple of (iterator condition, assumptions, assertions)
         shadow_decls = []
         numshadow = 0
@@ -142,6 +142,7 @@ class HwModel(ABC):
             for ind, signal in enumerate(guidance.signals):
                 # Iterate over all indices for vectors
                 for qp in signal.get_all_qp_instances():
+                    # TODO convert this into an index expression if necessary
                     qp_var = smt.BVVariable(q2b(qp), get_width(qp))
                     atype = guidance.get_annotation_at(qp, stepnum)
                     if atype == AnnoType.DC:
@@ -177,7 +178,7 @@ class HwModel(ABC):
             ctr_cases_l.append(s + assumes_s + asserts_s + "\nend")
         return shadow_decls + textwrap.dedent(f"""\
 
-            {ctr.get_decl().to_verilog_str(is_reg=True)}
+            {ctr.get_decl(smt.BVConst(0, ctr_width)).to_verilog_str(is_reg=True)}
             always @(posedge clk) begin
                 {ctr.to_verilog_str()} <= {ctr.to_verilog_str()} + 1;
             end

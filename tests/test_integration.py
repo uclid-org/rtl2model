@@ -12,7 +12,6 @@ import pytest
 import easyila
 from easyila.guidance import Guidance, AnnoType
 from easyila.synthesis_template import *
-from easyila.testcase import *
 import easyila.gen_config as gen_config
 import easyila.lynth.smt as smt
 
@@ -46,7 +45,7 @@ class RvMiniModel(HwModel):
                 print(err.decode("utf-8"))
             sys.exit(1)
 
-    def generate_program(self, inputs) -> TestCase:
+    def generate_program(self, inputs) -> ProgramSketch:
         return TestCase(
             xInstrWord(0, 8) * (31 * 4),    # @000 496 bytes of 0s
             xInstrWord('00000013'),         # @496 nop

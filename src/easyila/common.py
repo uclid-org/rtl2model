@@ -33,12 +33,12 @@ class SampledSignal:
     def get_all_bp_instances(self):
         """
         If this signal is an array/vector, returns a list of all base paths,
-        e.g. ['signal', 'signal[0]', 'signal[1]'].
+        e.g. ['signal[0]', 'signal[1]'].
         If the signal is not an array/vector, then it returns a 1-element array
         of the fully qualified path.
         """
         if self.bounds:
-            return [self.get_base_path()] + [self.signal_name + '[{}]'.format(i)
+            return [self.signal_name + '[{}]'.format(i)
                 for i in range(self.bounds[0], self.bounds[1] + 1)]
         else:
             return [self.signal_name]
@@ -46,12 +46,12 @@ class SampledSignal:
     def get_all_qp_instances(self):
         """
         If this signal is an array/vector, returns a list of all qualified paths,
-        e.g. ['top->signal', 'top->signal[0]', 'top->signal[1]'].
+        e.g. ['top->signal[0]', 'top->signal[1]'].
         If the signal is not an array/vector, then it returns a 1-element array
         of the fully qualified path.
         """
         if self.bounds:
-            return [self.get_qualified_path()] + ["->".join(self.hierarchy) + "->" + self.signal_name + '[{}]'.format(i)
+            return ["->".join(self.hierarchy) + "->" + self.signal_name + '[{}]'.format(i)
                 for i in range(self.bounds[0], self.bounds[1] + 1)]
         else:
             return [self.get_qualified_path()]
@@ -63,12 +63,10 @@ S = SampledSignal
 def read_csv(filename, numlines):
     with open(filename, newline="") as csvfile:
         csvreader = csv.reader(csvfile, delimiter=",")
-        # Trim the header
-        signals = next(csvreader, None)[1:]
-        # Trim the signal widths
-        widths = dict(zip(signals, [int(w) for w in next(csvreader, None)[1:]]))
+        signals = next(csvreader, None)
+        widths = dict(zip(signals, [int(w) for w in next(csvreader, None)]))
         values = []
-        # Add first NUMLINES lines trimming the first (empty) column
+        # Add first NUMLINES lines
         for _ in range(numlines):
-            values.append([int(i) for i in next(csvreader)[1:]])
+            values.append([int(i) for i in next(csvreader)])
         return widths, values

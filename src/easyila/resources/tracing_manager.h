@@ -8,7 +8,7 @@
 #define TRACING_MANAGER_H_
 
 
-class tracing_manager
+class TracingManager
 {
 private:
     std::ofstream trace_file;
@@ -29,17 +29,17 @@ private:
     // Generate declarations for the .decl file
     void gen_decls (std::ofstream& file_);
 public:
-    tracing_manager (std::string trace_file_path_, std::string decls_file_path_) : 
+    TracingManager (std::string trace_file_path_, std::string decls_file_path_) :
         trace_file_path(trace_file_path_),
         decls_file_path(decls_file_path_)
     {
-        trace_file.open (trace_file_path_);
+        trace_file.open(trace_file_path_);
         if (decls_file_path_ != "") {
-            decls_file.open (decls_file_path_);
+            decls_file.open(decls_file_path_);
         }
     }
     
-    ~tracing_manager() {
+    ~TracingManager() {
         if (trace_file.is_open()) trace_file.close();
         if (decls_file.is_open()) decls_file.close();
     }
@@ -56,36 +56,37 @@ public:
 
 };
 
+
 // Generate the .dtrace file entries
 template <class T>
-void tracing_manager::gen_state (T * top_, std::ofstream& file_, bool enter_) {
-	char buf[1024];
-	file_ << "\n";
-	if (enter_) {
-		file_ << "Cycle:::ENTER\n";
-	} else {
-		file_ << "Cycle:::EXIT0\n";
-	}
-	ADD_DTRACE_STMTS
+void TracingManager::gen_state (T * top_, std::ofstream& file_, bool enter_) {
+    char buf[1024];
+    file_ << "\n";
+    if (enter_) {
+        file_ << "Cycle:::ENTER\n";
+    } else {
+        file_ << "Cycle:::EXIT0\n";
+    }
+    ADD_DTRACE_STMTS
 }
 
 // Generate the .dtrace file entries
 template <class T>
-void tracing_manager::state_snapshot (T * top_, bool enter_) {
-	gen_state(top_, trace_file, enter_);
+void TracingManager::state_snapshot (T * top_, bool enter_) {
+    gen_state(top_, trace_file, enter_);
 }
 
 // CSV style variable snapshot
 // Required for filename indirection :/
 template <class T>
-void tracing_manager::csv_gen_state (T * top_, std::ofstream& file_) {
-	char buf[1024];
+void TracingManager::csv_gen_state (T * top_, std::ofstream& file_) {
+    char buf[1024];
     CSV_ADD_DTRACE_STMTS
     file_ << "\n";
 }
 
 template <class T>
-void tracing_manager::csv_state_snapshot (T* top_) {
+void TracingManager::csv_state_snapshot (T* top_) {
     csv_gen_state(top_, trace_file);
 }
 

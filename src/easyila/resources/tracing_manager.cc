@@ -1,13 +1,13 @@
 #include "tracing_manager.h"
 #include "portconfig.h"
 
-void tracing_manager::gen_preamble (std::ofstream& file_) {
+void TracingManager::gen_preamble (std::ofstream& file_) {
 	file_ << "input-language Verilog\n";
 	file_ << "decl-version 2.0\n";
 	file_ << "var-comparability implicit\n";
 }
 
-void tracing_manager::csv_gen_decls (std::ofstream& file_) {
+void TracingManager::csv_gen_decls (std::ofstream& file_) {
 	std::stringstream decls_names_;
 	std::stringstream decls_width_;
 	CSV_ADD_DECLS_STMTS
@@ -15,7 +15,7 @@ void tracing_manager::csv_gen_decls (std::ofstream& file_) {
 	file_ << decls_width_.rdbuf() << "\n";
 }
 
-void tracing_manager::gen_decls (std::ofstream& file_) {
+void TracingManager::gen_decls (std::ofstream& file_) {
 	file_ << "input-language Verilog\n";
 	file_ << "decl-version 2.0\n";
 	file_ << "var-comparability implicit\n";
@@ -32,12 +32,11 @@ void tracing_manager::gen_decls (std::ofstream& file_) {
 	file_ << "\n";
 }
 
-void tracing_manager::make_preamble () {
-    gen_preamble (trace_file);
-    gen_decls (decls_file);
+void TracingManager::make_preamble () {
+    gen_preamble(trace_file);
+    gen_decls(decls_file);
 }
 
-void tracing_manager::csv_make_preamble() {
-	csv_gen_decls (trace_file);
+void TracingManager::csv_make_preamble() {
+	csv_gen_decls(trace_file);
 }
-

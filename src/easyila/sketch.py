@@ -5,7 +5,7 @@ Facilities for generating a low-level program sketch.
 """
 
 from dataclasses import dataclass
-from typing import Dict, Tuple, Union
+from typing import Dict, Tuple, Union, Optional
 
 
 @dataclass(frozen=True)
@@ -23,8 +23,13 @@ class SketchValue:
 
 
 def inst_word(value):
-    assert value < 0xFFFFFFFF
+    assert value <= 0xFFFFFFFF
     return Inst(SketchValue(value, 32))
+
+
+def inst_byte(value):
+    assert value <= 0xFF
+    return Inst(SketchValue(value, 8))
 
 
 _InstField = Union[SketchValue, SketchHole]
@@ -44,15 +49,23 @@ class Inst:
             raise TypeError(f"can only multiply Inst by int (got {repr(other)})")
         return Inst(*(self.value * other))
 
-    def to_hex_str(self):
+    def to_bit_str(self):
+        """
+        Returns an array of bits representing this instruction. Any SketchHole bits
+        are replaced with "X".
+        """
         # In order to make sure everything is properly aligned, first generate
         # an array of bits (with Xs for unknown) and
-        bits = []
+        bits = ""
         for field in self.value:
             if isinstance(field, SketchHole):
-                bits.append("X" * field.bitwidth)
+                bits += "X" * field.bitwidth
             else:
-                bits.append(("{:0" + str(field.bitwidth) + "b}").format(field.value))
+                bits += f"{field.value:0{field.bitwidth}b}"
+        return bits
+
+    def to_hex_str(self):
+        bits = self.to_bit_str()
         i = len(bits)
         hex_digits = []
         # Traverse over groups of 4 bits starting from the end of the bit string
@@ -69,15 +82,46 @@ class Inst:
             i -= 4
         return "".join(reversed(hex_digits))
 
+    def to_bytearray(self):
+        bits = self.to_bit_str()
+        ba = bytearray(len(bits) // 8)
+        # Traverse over groups of 8 bits starting from the end
+        i = len(bits)
+        while i > 0:
+            if i - 8 < 0:
+                byte_s = bits[0:i]
+            else:
+                byte_s = bits[i - 8:i]
+            if "X" in byte_s:
+                raise Exception("cannot convert Instruction with holes into bytearray")
+            ba[(i - 8) // 8] = int("".join(byte_s), 2)
+            i -= 8
+        return ba
 
-# TODO make a concrete "program" class as well as ProgramSketch?
+
+class ConcreteProgram:
+    insts: Tuple[Inst]
+
+    def __init__(self, *args):
+        self.insts = tuple(args)
+
+    def to_hex_str_array(self):
+        return [inst.to_hex_str() for inst in self.insts]
+
+    def to_bytearray(self):
+        ba = bytearray()
+        for inst in self.insts:
+            ba.extend(inst.to_bytearray())
+        return ba
+
+
 class ProgramSketch:
     insts: Tuple[Inst]
 
     def __init__(self, *args):
         self.insts = tuple(args)
 
-    def fill(self, mappings: Dict[str, int]):
+    def fill(self, mappings: Optional[Dict[str, int]]=None) -> ConcreteProgram:
         new_insts = []
         for inst in self.insts:
             lst = list(inst.value)
@@ -85,10 +129,4 @@ class ProgramSketch:
                 if isinstance(field, SketchHole):
                     lst[i] = SketchValue(mappings[field.name], field.bitwidth)
             new_insts.append(Inst(*lst))
-        return ProgramSketch(*new_insts)
-
-    def to_hex_str_array(self):
-        return [inst.to_hex_str() for inst in self.insts]
-
-    def to_bytearray(self):
-        raise NotImplementedError()
+        return ConcreteProgram(*new_insts)

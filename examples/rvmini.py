@@ -31,7 +31,7 @@ class RvMiniModel(HwModel):
         )
         self.run_proc(["make", "verilatorM"], cwd=BASEDIR)
 
-    def generate_program(self, inputs) -> ProgramSketch:
+    def generate_program(self, inputs) -> ConcreteProgram:
         return ProgramSketch(
             Inst(SketchValue(0, 8)) * (31 * 4),     # @000 496 bytes of 0s
             inst_word(0x132) * 4,        # @496 through 508: nop

@@ -28,7 +28,7 @@ class Guidance:
         self.base_names = [basename for s in self.signals for basename in s.get_all_bp_instances()]
         self.base_to_qualified = dict(zip(self.base_names, self.signal_names))
         self.num_cycles = num_cycles
-        # Maps signals to maps of cycle -> AnnoType
+        # Maps qualified signal names to maps of cycle -> AnnoType
         self._guide_dict: Dict[str, Dict[int, AnnoType]] = defaultdict(lambda: defaultdict(lambda: AnnoType.DC))
 
     def annotate(self, signal, annotation):

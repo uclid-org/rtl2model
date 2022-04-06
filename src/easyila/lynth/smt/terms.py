@@ -521,9 +521,9 @@ class Variable(Term):
         """Converts this variable to a 0-arity UFTerm."""
         return UFTerm(self.name, self.sort, ())
 
-    def get_decl(self):
+    def get_decl(self, init_value=None):
         """Gets a Translatable declaration of this variable."""
-        return VarDecl(self.name, self.sort)
+        return VarDecl(self.name, self.sort, init_value=init_value)
 
     @staticmethod
     def from_cvc5(cvc5_term):
@@ -572,9 +572,13 @@ BVVariable = lambda s, w, **kwargs: Variable(s, BVSort(w), **kwargs)
 class VarDecl(Translatable):
     name: str
     sort: Sort
+    init_value: "BVConst" = None
 
     def __str__(self):
-        return f"{self.name} : {self.sort}"
+        if self.init_value is not None:
+            return f"{self.name} : {self.sort}"
+        else:
+            return f"{self.name} : {self.sort} = {self.init_value}"
 
     def get_ref(self):
         return Variable(self.name, self.sort)
@@ -601,7 +605,10 @@ class VarDecl(Translatable):
             decl = "reg" if is_reg else "wire"
             if self.sort.bitwidth != 1:
                 decl += " " + self.sort.to_verilog_str()
-            decl += f" {self.name};"
+            decl += f" {self.name}"
+            if self.init_value is not None:
+                decl += " = " + self.init_value.to_verilog_str()
+            decl += ";"
             anyconst = kwargs.get("anyconst", False)
             if anyconst:
                 return  "(* anyconst *) " + decl
@@ -989,7 +996,7 @@ class LambdaTerm(Term):
         return LambdaTerm(self.params, new_term)
 
     def __str__(self):
-        return f"({','.join(self.params)}) -> {self.body}"
+        return f"({','.join(str(s) for s in self.params)}) -> {self.body}"
 
     @staticmethod
     def from_cvc5(cvc5_term):

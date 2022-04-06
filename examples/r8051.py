@@ -3,7 +3,7 @@ import subprocess
 
 from easyila.guidance import Guidance, AnnoType
 from easyila.synthesis_template import *
-from easyila.testcase import *
+from easyila.sketch import *
 import easyila.gen_config as gen_config
 import easyila.lynth.smt as smt
 
@@ -29,32 +29,32 @@ class R8051Model(HwModel):
         )
         self.run_proc(["make", "default"], cwd=BASEDIR)
 
-    def generate_program(self, inputs) -> TestCase:
-        i0 = hex(int(inputs[0]))[2:]
-        i1 = hex(int(inputs[1]))[2:]
+    def generate_program(self, inputs) -> ConcreteProgram:
+        i0 = int(inputs[0])
+        i1 = int(inputs[1])
         # https://www.keil.com/support/man/docs/is51/is51_opcodes.htm
-        return TestCase(
-            xInstrWord('00'),       # nop
-            xInstrWord('78'),       # MOV R0, imm
-            xInstrWord(i0),         # (imm)
-            xInstrWord('74'),       # MOV A, imm
-            xInstrWord(i1),         # (imm)
-            xInstrWord('28'),       # ADD A, R0
-            xInstrWord('00'),       # NOP
-            xInstrWord('00'),
-            xInstrWord('00'),
-            xInstrWord('31'),       # ACALL addr11
-            xInstrWord('31'),
-            xInstrWord('31'),
-            xInstrWord('31'),
-            xInstrWord('31'),
-            xInstrWord('31'),
-            xInstrWord('31')
-        )
+        return ProgramSketch(
+            inst_byte(0x00),       # nop
+            inst_byte(0x78),       # MOV R0, imm
+            Inst(SketchHole("i0", 8)),         # (imm)
+            inst_byte(0x74),       # MOV A, imm
+            Inst(SketchHole("i1", 8)),         # (imm)
+            inst_byte(0x28),       # ADD A, R0
+            inst_byte(0x00),       # NOP
+            inst_byte(0x00),
+            inst_byte(0x00),
+            inst_byte(0x31),       # ACALL addr11
+            inst_byte(0x31),
+            inst_byte(0x31),
+            inst_byte(0x31),
+            inst_byte(0x31),
+            inst_byte(0x31),
+            inst_byte(0x31)
+        ).fill({"i0": i0, "i1": i1})
 
-    def simulate_and_read_signals(self, testcase):
+    def simulate_and_read_signals(self, program):
         with open(os.path.join(BASEDIR, "myhello"), "wb") as f:
-            f.write(testcase._inject(BinaryRepr.BYTE))
+            f.write(program.to_bytearray())
         self.run_proc(["./obj_dir/Vtop"], cwd=BASEDIR)
         return read_csv(os.path.join(BASEDIR, "traces/tr.csv"), self.cycle_count)
 
@@ -89,15 +89,15 @@ def main():
     start = smt.Variable("Start", bv8)
     substart = smt.Variable("BV8", bv8)
     boolterm = smt.Variable("B", smt.BoolSort())
-    addbv = smt.OpTerm(smt.Kind.BVAdd, (start, start))
-    subbv = smt.OpTerm(smt.Kind.BVSub, (start, start))
-    orbv = smt.OpTerm(smt.Kind.BVOr, (start, start))
-    andbool = smt.OpTerm(smt.Kind.And, (boolterm, boolterm))
-    orbool = smt.OpTerm(smt.Kind.Or, (boolterm, boolterm))
-    xorbool = smt.OpTerm(smt.Kind.Xor, (boolterm, boolterm))
-    notbool = smt.OpTerm(smt.Kind.Not, (boolterm,))
-    impliesbool = smt.OpTerm(smt.Kind.Implies, (boolterm, boolterm))
-    itebv = smt.OpTerm(smt.Kind.Ite, (boolterm, substart, substart))
+    addbv = start + start
+    subbv = start - start
+    orbv = start | start
+    andbool = boolterm & boolterm
+    orbool = boolterm | boolterm
+    xorbool = boolterm ^ boolterm
+    notbool = ~boolterm
+    impliesbool = boolterm.implies(boolterm)
+    itebv = boolterm.ite(substart, substart)
     # Synth function and grammar
     solver = smt.SynthFun(
         "alu_add",
