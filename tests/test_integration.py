@@ -45,7 +45,7 @@ class RvMiniModel(HwModel):
                 print(err.decode("utf-8"))
             sys.exit(1)
 
-    def generate_program(self, inputs) -> ProgramSketch:
+    def generate_program(self, inputs) -> ConcreteProgram:
         return TestCase(
             xInstrWord(0, 8) * (31 * 4),    # @000 496 bytes of 0s
             xInstrWord('00000013'),         # @496 nop

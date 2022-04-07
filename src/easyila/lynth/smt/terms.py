@@ -1148,7 +1148,9 @@ class BoolConst(Term, IntEnum, metaclass=_TermMeta):
                 return cvc5_ctx.solver.mkFalse()
             else:
                 return cvc5_ctx.solver.mkTrue()
-        elif tgt in (TargetFormat.VERILOG, TargetFormat.SYGUS2, TargetFormat.UCLID):
+        elif tgt == TargetFormat.VERILOG:
+            return "1" if self == self.T else "0"
+        elif tgt in (TargetFormat.SYGUS2, TargetFormat.UCLID):
             return "true" if self == self.T else "false"
         raise NotImplementedError("cannot convert BoolConst to " + str(tgt))
 

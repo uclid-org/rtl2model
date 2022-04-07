@@ -145,9 +145,9 @@ class HwModel(ABC):
                     # TODO convert this into an index expression if necessary
                     qp_var = smt.BVVariable(q2b(qp), get_width(qp))
                     atype = guidance.get_annotation_at(qp, stepnum)
-                    if atype == AnnoType.DC:
+                    if atype is None or atype == AnnoType.DONT_CARE:
                         pass
-                    elif atype == AnnoType.ASSM:
+                    elif atype == AnnoType.ASSUME:
                         # Add assume statement
                         constval = smt.BVConst(signal_values[stepnum][ind], get_width(qp))
                         assumes.append(qp_var.op_eq(constval))
@@ -166,16 +166,49 @@ class HwModel(ABC):
                         raise NotImplementedError()
             ctr_cases.append((itercond, assumes, asserts))
 
+        pred_cases_l = []
+        for signal in guidance.signals:
+            for qp in signal.get_all_qp_instances():
+                first = True
+                for cond, anno in guidance.get_predicated_annotations(qp).items():
+                    if anno == AnnoType.DONT_CARE:
+                        continue
+                    if first:
+                        s = f"if ({cond.to_verilog_str()}) begin\n"
+                        first = False
+                    else:
+                        s = f"else if ({cond.to_verilog_str()}) begin\n"
+                    if anno == AnnoType.ASSUME:
+                        # Add assume statement
+                        constval = smt.BVConst(signal_values[stepnum][ind], get_width(qp))
+                        s += f"    assume ({qp_var.op_eq(constval).to_verilog_str()});"
+                    elif anno == AnnoType.PARAM:
+                        # Add new shadow register
+                        new_shadow = smt.BVVariable(f"__shadow_{numshadow}", get_width(qp))
+                        shadow_decls.append(new_shadow.get_decl())
+                        # TODO add comments to assumes somehow?
+                        s += f"    assume ({new_shadow.op_eq(qp_var).to_verilog_str()});"
+                        numshadow += 1
+                    elif anno == AnnoType.OUTPUT:
+                        # Assert output
+                        # TODO allow for a more coherent mapping from synth funs to outputs
+                        s += f"    assert ({func.body.op_eq(qp_var).to_verilog_str()});"
+                    else:
+                        raise NotImplementedError()
+                    s += "\nend\n"
+                    pred_cases_l.append(s)
+
         shadow_decls = "\n".join(s.to_verilog_str(is_reg=True, anyconst=True) for s in shadow_decls)
         ctr_cases_l = []
         for itercond, assumes, asserts in ctr_cases:
             s = f"if ({itercond.to_verilog_str()}) begin\n"
-            assumes_s = "\n".join(f"\tassume ({a.to_verilog_str()});" for a in assumes)
+            assumes_s = "\n".join(f"    assume ({a.to_verilog_str()});" for a in assumes)
             if asserts:
-                asserts_s = "\n" + "\n".join(f"\tassert ({a.to_verilog_str()});" for a in asserts)
+                asserts_s = "\n" + "\n".join(f"    assert ({a.to_verilog_str()});" for a in asserts)
             else:
                 asserts_s = ""
             ctr_cases_l.append(s + assumes_s + asserts_s + "\nend")
+
         return shadow_decls + textwrap.dedent(f"""\
 
             {ctr.get_decl(smt.BVConst(0, ctr_width)).to_verilog_str(is_reg=True)}
@@ -184,6 +217,7 @@ class HwModel(ABC):
             end
             """) + "always @(posedge clk) begin\n" + \
             textwrap.indent("\n".join(ctr_cases_l), "    ") + \
+            "\n" + textwrap.indent("\n".join(pred_cases_l), "    ") + \
             "\nend"
 
         return ctr_cases

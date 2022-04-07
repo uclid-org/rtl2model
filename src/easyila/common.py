@@ -7,6 +7,7 @@ from dataclasses import dataclass
 # import getpass
 from typing import *
 
+import easyila.lynth.smt as smt
 
 @dataclass
 class SampledSignal:
@@ -18,11 +19,19 @@ class SampledSignal:
 
     def __post_init__(self):
         if self.hierarchy is None:
-            self.hierarchy = (self.module_name,)
+            self.hierarchy = tuple(self.module_name.split("."))
 
     # TODO this is weird
     def __hash__(self):
         return hash((self.module_name, self.signal_name, self.width, self.hierarchy, self.bounds))
+
+    def to_variable(self):
+        """
+        Converts this to an SMT variable, ignoring hierarchy.
+        """
+        # TODO deal with arrays/bounds
+        # and also booleans
+        return smt.BVVariable(self.signal_name, self.width)
 
     def get_qualified_path(self):
         return "->".join(self.hierarchy) + "->" + self.signal_name

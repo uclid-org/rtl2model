@@ -74,12 +74,12 @@ def main():
     ]
     guidance = Guidance(SIGNALS, cycle_count)
     for sig in ("rst", "lft_pc", "lft_cmd2"):
-        guidance.annotate(sig, AnnoType.ASSM)
-    guidance.annotate("lft_cmd0", {ts: AnnoType.ASSM for ts in [0, 1, 2, 3, 5, 7, 8, 9]})
-    guidance.annotate("lft_cmd1", {ts: AnnoType.ASSM for ts in [0, 1, 2, 3, 4, 6, 8, 9]})
-    guidance.annotate("lft_pc", {ts: AnnoType.ASSM for ts in [0, 1, 2, 3, 4, 6, 8, 9]})
+        guidance.annotate(sig, AnnoType.ASSUME)
+    guidance.annotate("lft_cmd0", {ts: AnnoType.ASSUME for ts in [0, 1, 2, 3, 5, 7, 8, 9]})
+    guidance.annotate("lft_cmd1", {ts: AnnoType.ASSUME for ts in [0, 1, 2, 3, 4, 6, 8, 9]})
+    guidance.annotate("lft_pc", {ts: AnnoType.ASSUME for ts in [0, 1, 2, 3, 4, 6, 8, 9]})
     guidance.annotate("data[0]",  {7: AnnoType.PARAM})
-    guidance.annotate("lft_acc",  [AnnoType.ASSM]*7 + [AnnoType.PARAM, AnnoType.ASSM, AnnoType.OUTPUT])
+    guidance.annotate("lft_acc",  [AnnoType.ASSUME]*7 + [AnnoType.PARAM, AnnoType.ASSUME, AnnoType.OUTPUT])
 
     bv8 = smt.BVSort(8)
     # TODO create refinement mappings for smt variables to verilog names

@@ -84,7 +84,7 @@ def main():
     ]
     guidance = Guidance(SIGNALS, cycle_count)
     for sig in ["reset", "lft_tile_pc", "lft_tile_fe_pc", "lft_tile_ew_pc", "lft_tile_fe_inst",]:
-        guidance.annotate(sig, AnnoType.ASSM)
+        guidance.annotate(sig, AnnoType.ASSUME)
     # a1 (shadow var)
     guidance.annotate("lft_tile_regs_11", {12: AnnoType.PARAM})
     # a2 (shadow var)
