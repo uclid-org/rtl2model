@@ -192,15 +192,15 @@ class Term(Translatable, ABC):
 
     # === OPTIMIZATIONS AND TREE TRAVERSALS ===
 
-    def replace_vars(self, var, new_term) -> "Term":
+    def replace_vars(self, m: Dict["Variable", "Term"]) -> "Term":
         """
         Returns a new term tree with all references to `var` replaced by `new_term`.
         """
-        if self == var:
-            return new_term
+        if isinstance(self, Variable) and self in m:
+            return m[self]
         t = self
         for i, child in enumerate(self._children):
-            t = t._replace_child(child.replace_vars(var, new_term), i)
+            t = t._replace_child(child.replace_vars(m), i)
         return t
 
     def preorder_visit_tree(self, visit_fn: Callable[["Term"], _T], shortcircuit=True) -> _T:
@@ -482,8 +482,9 @@ class Term(Translatable, ABC):
         raise NotImplementedError()
 
     @property
-    def _has_children(self):
-        return len(self._children) > 0
+    def _should_paren(self):
+        return len(self._children) > 0 and not isinstance(self, ApplyUF) \
+            and not (isinstance(self, OpTerm) and self.kind == Kind.BVExtract)
 
     @property
     @abstractmethod
@@ -570,8 +571,13 @@ class Variable(Term):
                 v = cvc5_ctx.solver.mkVar(self.sort.to_cvc5(cvc5_ctx), self.name)
                 cvc5_ctx.terms[self] = v
                 return v
-        elif tgt in (TargetFormat.SYGUS2, TargetFormat.VERILOG, TargetFormat.UCLID):
+        elif tgt in (TargetFormat.SYGUS2, TargetFormat.VERILOG):
             return self.name
+        elif tgt == TargetFormat.UCLID:
+            if kwargs.get("prime_vars", False):
+                return self.name + "'"
+            else:
+                return self.name
         elif tgt == TargetFormat.JSON:
             return json.dumps(asdict(self))
         raise NotImplementedError("cannot convert Variable to " + str(tgt))
@@ -588,7 +594,7 @@ class VarDecl(Translatable):
     init_value: "BVConst" = None
 
     def __str__(self):
-        if self.init_value is not None:
+        if self.init_value is None:
             return f"{self.name} : {self.sort}"
         else:
             return f"{self.name} : {self.sort} = {self.init_value}"
@@ -731,7 +737,7 @@ class OpTerm(Term):
         elif tgt == TargetFormat.VERILOG:
             v = self.kind
             def wrap(term):
-                if term._has_children:
+                if term._should_paren:
                     return "(" + term.to_verilog_str() + ")"
                 else:
                     return term.to_verilog_str()
@@ -803,10 +809,10 @@ class OpTerm(Term):
             raise NotImplementedError(v)
         elif tgt == TargetFormat.UCLID:
             def wrap(term):
-                if term._has_children:
-                    return "(" + term.to_uclid() + ")"
+                if term._should_paren:
+                    return "(" + term.to_uclid(**kwargs) + ")"
                 else:
-                    return term.to_uclid()
+                    return term.to_uclid(**kwargs)
             # TODO use uclid library
             unops = {
                 Kind.Not: "!",
@@ -839,18 +845,24 @@ class OpTerm(Term):
                 Kind.BVSrl: "bv_l_right_shift",
             }
             if self.kind in shifts:
-                return shifts[self.kind] + "(" + self.args[0].to_uclid() + ", " + self.args[1].to_uclid() + ")"
+                return shifts[self.kind] + "(" + self.args[0].to_uclid(**kwargs) + ", " + self.args[1].to_uclid(**kwargs) + ")"
             if self.kind == Kind.Ite:
-                return "if (" + self.args[0].to_uclid() + ") then " + wrap(self.args[1]) + " else " + wrap(self.args[2])
+                return "if (" + self.args[0].to_uclid(**kwargs) + ") then " + wrap(self.args[1]) + " else " + wrap(self.args[2])
             if self.kind == Kind.BVExtract:
-                return wrap(self.args[0]) + "[" + self.args[1].to_uclid() + ":" + self.args[2].to_uclid() + "]"
+                if not isinstance(self.args[1], BVConst):
+                    raise Exception(f"non-constant BVExtract not supported ({self.args[1]})")
+                if not isinstance(self.args[2], BVConst):
+                    raise Exception(f"non-constant BVExtract not supported ({self.args[2]})")
+                a1_str = str(self.args[1].val)
+                a2_str = str(self.args[2].val)
+                return wrap(self.args[0]) + "[" + a1_str + ":" + a2_str + "]"
             if self.kind == Kind.BVConcat:
                 return " ++ ".join(wrap(a) for a in self.args)
             if self.kind == Kind.Select:
-                return wrap(self.args[0]) + "[" + self.args[1].to_uclid() + "]"
+                return wrap(self.args[0]) + "[" + self.args[1].to_uclid(**kwargs) + "]"
             if self.kind == Kind.BVZeroPad:
                 assert isinstance(self.args[1], BVConst)
-                return f"bv_zero_extend({self.args[1].val}, {self.args[0].to_uclid()})"
+                return f"bv_zero_extend({self.args[1].val}, {self.args[0].to_uclid(**kwargs)})"
             if self.kind == Kind.Match:
                 # uclid case statements aren't expressions, so just ITE it up
                 a0 = self.args[0]
@@ -858,7 +870,7 @@ class OpTerm(Term):
                 t = self.args[-1]
                 for i in range(len(self.args) - 4, 0, -2):
                     t = a0.op_eq(self.args[i]).ite(self.args[i + 1], t)
-                return t.to_uclid()
+                return t.to_uclid(**kwargs)
             raise NotImplementedError(self.kind)
         raise NotImplementedError("cannot convert OpTerm to " + str(tgt))
 
@@ -1114,8 +1126,11 @@ class ApplyUF(Term):
     """
     Term representing application of an uninterpreted function on the specified inputs.
     """
-    fun: "SynthFun"
-    input_values: Tuple["BVConst", ...]
+    fun: UFTerm
+    input_values: Tuple[Term, ...]
+
+    def __post_init__(self):
+        assert self.fun.arity == len(self.input_values)
 
     @property
     def sort(self):
@@ -1126,7 +1141,7 @@ class ApplyUF(Term):
         return list(self.input_values)
 
     def _replace_child(self, new_term, index):
-        raise NotImplementedError()
+        return ApplyUF(self.fun, tuple(t._replace_child for t in self.input_values))
 
     @staticmethod
     def from_cvc5(cvc5_term):
@@ -1141,6 +1156,9 @@ class ApplyUF(Term):
             cvc5_kind = pycvc5.Kind.ApplyUf
             t = cvc5_ctx.solver.mkTerm(cvc5_kind, self.fun.to_cvc5(cvc5_ctx), *[v.to_cvc5(cvc5_ctx) for v in self.input_values])
             return t
+        elif tgt == TargetFormat.UCLID:
+            args = ", ".join(i.to_uclid(**kwargs) for i in self.input_values)
+            return self.fun.name + "(" + args + ")"
         raise NotImplementedError("cannot convert FunctionSort to " + str(tgt))
 
 

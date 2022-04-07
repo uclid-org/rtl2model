@@ -45,7 +45,7 @@ class TestModelToUclid:
             state=[s_a, s_b],
             # TODO move s_b into the grammar of uf_b instead
             ufs=[smt.UFTerm("uf_a", bv3, ()), smt.UFTerm("uf_b", bv3, (s_b,))],
-            logic={o_a: var("uf_a", bv3) + s_a, o_b: s_a + s_b, s_a: i_a | i_b},
+            logic={o_a: var("uf_a", bv3) + s_a, o_b: var("uf_b", bv3) + s_b, s_a: i_a | i_b},
             default_next=[{s_b: i_a[0].ite(i_a, s_b)}]
         )
         model.print()
@@ -60,24 +60,26 @@ class TestModelToUclid:
                 output o_b : bv3;
                 var s_a : bv3;
                 var s_b : bv3;
-                var __next_s_b : bv3;
+                var s_b__next : bv3;
                 synthesis function uf_a() : bv3;
                 synthesis function uf_b(s_b : bv3) : bv3;
 
                 init {
                     o_a = uf_a() + s_a;
-                    o_b = s_a + s_b;
+                    o_b = uf_b(s_b) + s_b;
                     s_a = i_a | i_b;
+                    s_b__next = if (i_a[0:0] == 0x1bv1) then i_a else s_b;
+                    s_b = s_b__next;
                 }
 
                 next {
-                    // Instance transitions
+                    // Combinatorial logic
                     o_a' = uf_a() + s_a';
-                    o_b' = s_a' + s_b';
+                    o_b' = uf_b(s_b') + s_b';
                     s_a' = i_a' | i_b';
-                    __next_s_b = if (i_a'[0:0] == 1bv1) then i_a' else s_b';
                     // Transition logic
-                    s_b' = __next_s_b;
+                    s_b__next' = if (i_a'[0:0] == 0x1bv1) then i_a' else s_b';
+                    s_b' = s_b__next';
                     // Instance transitions
 
                 }

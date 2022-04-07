@@ -36,8 +36,8 @@ class Translatable(ABC):
     def to_verilog_str(self, *, is_reg=False, anyconst=False):
         return self.to_target_format(TargetFormat.VERILOG, is_reg=is_reg, anyconst=anyconst)
 
-    def to_uclid(self):
-        return self.to_target_format(TargetFormat.UCLID)
+    def to_uclid(self, prime_vars=False):
+        return self.to_target_format(TargetFormat.UCLID, prime_vars=prime_vars)
 
     def to_json(self):
         return self.to_target_format(TargetFormat.JSON)

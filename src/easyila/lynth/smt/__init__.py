@@ -20,11 +20,11 @@ from .terms import *
 class Grammar:
     bound_vars: Tuple[Variable, ...]
     input_vars: Tuple[Variable, ...]
+    terms: Dict[Term, Tuple[Term, ...]]
     """
     Maps a non-terminal Term to a list of reduction rules, each of which could either be another
     nonterminal or a variable.
     """
-    terms: Dict[Term, Tuple[Term, ...]]
 
     @property
     def _all_terms(self) -> List[Term]:

@@ -23,7 +23,7 @@ class TestSMT:
         expr = (a + b).op_eq(a | b)
         renamed = v("test_a", s)
         expected = (renamed + b).op_eq(renamed | b)
-        actual = expr.replace_vars(a, renamed)
+        actual = expr.replace_vars({a: renamed})
         assert actual == expected
 
     def test_from_cvc5(self):

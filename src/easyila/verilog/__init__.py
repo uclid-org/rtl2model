@@ -242,7 +242,6 @@ def _verilog_model_helper(
     uf_names = set()
     for s in all_missing:
         is_curr_scope = scope_prefix(s) == instance_name
-        print(s, is_curr_scope)
         if is_curr_scope and (not inline_renames or not signaltype.isRename(terms[str_to_scope_chain(s)].termtype)):
             uf_names.add(s)
     if coi_conf == COIConf.NO_COI:

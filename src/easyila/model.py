@@ -228,21 +228,52 @@ class Model:
         u_append(self.inputs, "input")
         u_append(self.outputs, "output")
         u_append(self.state, "var")
+        # Generate "__next" temp vars
+        next_vars = {}
+        for transitions in self.default_next:
+            for v in transitions:
+                assert isinstance(v, smt.Variable), "uclid translation only works for variable (not array) assignments"
+                next_vars[v] = smt.Variable(v.name + "__next", v.sort)
+        u_append(next_vars.values(), "var")
         if len(self.ufs) > 0:
             u_vars.extend(s.to_uclid() for s in self.ufs)
         newline = ' ' * 16
         u_vars_s = textwrap.indent("\n".join(u_vars), newline)
         instances_s = textwrap.indent("\n".join(i.to_uclid(n) for n, i in self.instances.items()), newline)
+        def add_uf_calls(expr, prime_vars=False):
+            return expr.replace_vars({
+                # trick: since we named uf params the same as module variables,
+                # we can just call on variable terms with those same names
+                smt.Variable(uf.name, uf.sort): smt.ApplyUF(uf, uf.params)
+                for uf in self.ufs
+            }).to_uclid(prime_vars=prime_vars)
+        init_logic_s = textwrap.indent(
+            "\n".join(f"{lhs.to_uclid()} = {add_uf_calls(rhs)};" for lhs, rhs in self.logic.items()),
+            newline + "    "
+        )
         logic_s = textwrap.indent(
-            "\n".join(f"{lhs.to_uclid()} = {rhs.to_uclid()};" for lhs, rhs in self.logic.items()),
+            "\n".join(f"{lhs.to_uclid(prime_vars=True)} = {add_uf_calls(rhs, prime_vars=True)};" for lhs, rhs in self.logic.items()),
             newline + "    "
         )
         if len(self.default_next) > 0:
+            init_next_s = textwrap.indent(
+                "\n".join(
+                    f"{next_vars[lhs].to_uclid()} = {add_uf_calls(rhs)};\n"
+                    f"{lhs.to_uclid()} = {next_vars[lhs].to_uclid()};"
+                    for lhs, rhs in self.default_next[0].items()
+                ),
+                newline + "    "
+            )
             next_s = textwrap.indent(
-                "\n".join(f"{lhs.to_uclid()}' = {rhs.to_uclid()};" for lhs, rhs in self.default_next[0].items()),
+                "\n".join(
+                    f"{next_vars[lhs].to_uclid(prime_vars=True)} = {add_uf_calls(rhs, prime_vars=True)};\n"
+                    f"{lhs.to_uclid(prime_vars=True)} = {next_vars[lhs].to_uclid(prime_vars=True)};"
+                    for lhs, rhs in self.default_next[0].items()
+                ),
                 newline + "    "
             )
         else:
+            init_next_s = ""
             next_s = ""
         if len(self.instances) > 0:
             child_next_s = textwrap.indent(
@@ -257,7 +288,8 @@ class Model:
 {u_vars_s}
 {instances_s}
                 init {{
-
+{init_logic_s}
+{init_next_s}
                 }}
 
                 next {{
@@ -356,10 +388,7 @@ class Model:
                         # Rewrite expressions for all input bindings
                         inst.model,
                         {
-                            v_name: t.replace_vars(
-                                input_var,
-                                cs_value_t
-                            )
+                            v_name: t.replace_vars({input_var: cs_value_t})
                             for v_name, t in inst.inputs.items()
                         }
                     )
@@ -367,10 +396,10 @@ class Model:
                 },
                 # TODO may need to replace LHS of assignments too? in case of indexing and stuff
                 logic={
-                    k: t.replace_vars(split_var, cs_value_t) for k, t in self.logic.items()
+                    k: t.replace_vars({split_var: cs_value_t}) for k, t in self.logic.items()
                 },
                 default_next=[
-                    {k: t.replace_vars(split_var, cs_value_t) for k, t in l.items()}
+                    {k: t.replace_vars({split_var: cs_value_t}) for k, t in l.items()}
                     for l in self.default_next
                 ],
                 generated_by=GeneratedBy.CASE_SPLIT,
