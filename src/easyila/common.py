@@ -71,11 +71,10 @@ S = SampledSignal
 
 def read_csv(filename, numlines):
     with open(filename, newline="") as csvfile:
-        csvreader = csv.reader(csvfile, delimiter=",")
-        signals = next(csvreader, None)
-        widths = dict(zip(signals, [int(w) for w in next(csvreader, None)]))
+        csvreader = csv.DictReader(csvfile)
+        widths = {sig: int(w) for sig, w in next(csvreader).items()}
         values = []
         # Add first NUMLINES lines
         for _ in range(numlines):
-            values.append([int(i) for i in next(csvreader)])
+            values.append({sig: int(v) for sig, v in next(csvreader).items()})
         return widths, values

@@ -243,6 +243,9 @@ class Term(Translatable, ABC):
                 return False
         return True
 
+    def eval(self, values: Dict[str, int]) -> Union["BVConst", "BoolConst"]:
+        raise NotImplementedError()
+
     # === OPERATOR OVERRIDES ===
     def ite(self, t_term, f_term):
         """
@@ -547,6 +550,16 @@ class Variable(Term):
 
     def _replace_child(self, new_term, index):
         return self
+
+    def eval(self, values):
+        assert self.name in values
+        assert self.sort
+        if isinstance(self.sort, BVSort):
+            return BVConst(values[self.name], self.sort.bitwidth)
+        elif isinstance(self.sort, BoolSort):
+            return BoolConst(values[self.name])
+        else:
+            raise NotImplementedError()
 
     def to_target_format(self, tgt: TargetFormat, **kwargs):
         if tgt == TargetFormat.CVC5:
@@ -863,6 +876,14 @@ class OpTerm(Term):
         for child in args:
             if not (isinstance(child, BVConst) or isinstance(child, BoolConst)):
                 return t
+        return self._do_const_eval(args)
+
+    def eval(self, values):
+        # Optimize all children first
+        children = [child.eval(values) for child in self._children]
+        return self._do_const_eval(children)
+
+    def _do_const_eval(self, args):
         # unary ops
         a0 = args[0]
         a0_bw = a0.sort.bitwidth
@@ -925,9 +946,9 @@ class OpTerm(Term):
         # if self.kind == Kind.BVConcat:
         # Ternary operator
         if self.kind == Kind.Ite:
-            print(repr(a0))
             return a1 if bool(a0) else a2
         return t
+
 
 # TODO distinguish between references and declarations
 # variables and UFTerms should be referenced in the same way, but obviously declared
@@ -1141,6 +1162,9 @@ class BoolConst(Term, IntEnum, metaclass=_TermMeta):
     def __str__(self):
         return "true" if self == self.T else "false"
 
+    def eval(self, values):
+        return self
+
     def to_target_format(self, tgt: TargetFormat, **kwargs):
         if tgt == TargetFormat.CVC5:
             cvc5_ctx = kwargs["cvc5_ctx"]
@@ -1180,6 +1204,9 @@ class BVConst(Term):
         if kind != pycvc5.Kind.ConstBV:
             raise TypeError("BVConst must be translated from pycvc5.Kind.ConstBV, instead got " + str(kind))
         return BVConst(int(cvc5_term.getBitVectorValue(base=10)), cvc5_term.getSort().getBitVectorSize())
+
+    def eval(self, values):
+        return self
 
     def to_target_format(self, tgt: TargetFormat, **kwargs):
         if tgt == TargetFormat.CVC5:

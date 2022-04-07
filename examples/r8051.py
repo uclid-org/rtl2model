@@ -60,10 +60,11 @@ class R8051Model(HwModel):
 
 def main():
     cycle_count = 10
+    pc_sig = S("tb", "lft_pc", 16)
     SIGNALS = [
         S("tb", "clk", 1),
         S("tb", "rst", 1),
-        S("tb", "lft_pc", 16),
+        pc_sig,
         S("tb", "lft_acc", 8),
         S("tb", "lft_psw_c", 1),
         S("tb", "lft_cmd0", 8),
@@ -73,13 +74,17 @@ def main():
         S("tb", "data", 8, bounds=(0, 7)),
     ]
     guidance = Guidance(SIGNALS, cycle_count)
-    for sig in ("rst", "lft_pc", "lft_cmd2"):
+    for sig in ("rst", "lft_pc"):
         guidance.annotate(sig, AnnoType.ASSUME)
-    guidance.annotate("lft_cmd0", {ts: AnnoType.ASSUME for ts in [0, 1, 2, 3, 5, 7, 8, 9]})
-    guidance.annotate("lft_cmd1", {ts: AnnoType.ASSUME for ts in [0, 1, 2, 3, 4, 6, 8, 9]})
-    guidance.annotate("lft_pc", {ts: AnnoType.ASSUME for ts in [0, 1, 2, 3, 4, 6, 8, 9]})
-    guidance.annotate("data[0]",  {7: AnnoType.PARAM})
-    guidance.annotate("lft_acc",  [AnnoType.ASSUME]*7 + [AnnoType.PARAM, AnnoType.ASSUME, AnnoType.OUTPUT])
+    guidance.annotate("lft_cmd0", {
+        pc_sig.to_variable().op_eq(3): AnnoType.PARAM,
+        pc_sig.to_variable().op_eq(5): AnnoType.PARAM,
+        smt.BoolConst.T: AnnoType.ASSUME,
+    })
+    guidance.annotate("lft_acc", {
+        pc_sig.to_variable().op_eq(8): AnnoType.OUTPUT,
+        smt.BoolConst.T: AnnoType.ASSUME,
+    })
 
     bv8 = smt.BVSort(8)
     # TODO create refinement mappings for smt variables to verilog names

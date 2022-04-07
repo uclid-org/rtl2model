@@ -74,13 +74,13 @@ class HwModel(ABC):
         pass
 
     @abstractmethod
-    def simulate_and_read_signals(self, program: ConcreteProgram) -> Tuple[List[int], List[List[int]]]:
+    def simulate_and_read_signals(self, program: ConcreteProgram) -> Tuple[Dict[str, int], List[Dict[str, int]]]:
         """
         Invokes the simulation binary and reads the resulting signals.
 
-        The first returned value is a list of all signal widths.
-        The second is a 2D array of all signal values.
-        TODO name these signals intead of just leaving them in a list
+        The first returned value is a map of signal qualified name to all signal widths.
+        The second is a list indexed on cycles, where values are a map of signal qualified names to
+        signal values.
         """
         pass
 
@@ -98,10 +98,25 @@ class HwModel(ABC):
         self.signal_values = signal_values
         output_sigs = self.guidance.get_outputs()
         output_vals = []
-        for signame, cycle in output_sigs:
+        def q2b(qp):
+            """Converts qualified signal path ("top->reset") to a base path ("reset")"""
+            try:
+                i = qp.rindex("->")
+                return qp[i+2:] # i is location of -, need to cut off after >
+            except ValueError:
+                return qp
+        for signame, cond_or_cycle in output_sigs:
             # TODO less hacky way to do this
-            sigidx = [i for i, s in enumerate(self.guidance.signals) if s.get_qualified_path() == signame][0]
-            output_vals.append(signal_values[cycle][sigidx])
+            if isinstance(cond_or_cycle, smt.Term):
+                # TODO sample each signal exactly once,
+                # and error if a signal is never sampled
+                for cc, values in enumerate(signal_values):
+                    should_sample = cond_or_cycle.eval({q2b(sig): v for sig, v in values.items()})
+                    if bool(should_sample):
+                        output_vals.append(signal_values[cc][signame])
+            else:
+                cycle = cond_or_cycle
+                output_vals.append(signal_values[cycle][signame])
         return output_vals
 
     def generate_test_block_verilog(self, signal_values, signal_widths, func: smt.LambdaTerm):
@@ -129,7 +144,7 @@ class HwModel(ABC):
                 return qp
 
         ctr = smt.BVVariable("__lift_cc", ctr_width)
-        ctr_values = [smt.BVConst(i, ctr_width) for i in range(2 ** (ctr_width + 1))]
+        ctr_values = [smt.BVConst(i, ctr_width) for i in range(guidance.num_cycles)]
         ctr_cases = [] # Each item is a tuple of (iterator condition, assumptions, assertions)
         shadow_decls = []
         numshadow = 0
@@ -139,7 +154,7 @@ class HwModel(ABC):
             stmts: List[v.Statement] = []
             assumes = []
             asserts = []
-            for ind, signal in enumerate(guidance.signals):
+            for signal in guidance.signals:
                 # Iterate over all indices for vectors
                 for qp in signal.get_all_qp_instances():
                     # TODO convert this into an index expression if necessary
@@ -149,7 +164,7 @@ class HwModel(ABC):
                         pass
                     elif atype == AnnoType.ASSUME:
                         # Add assume statement
-                        constval = smt.BVConst(signal_values[stepnum][ind], get_width(qp))
+                        constval = smt.BVConst(signal_values[stepnum][qp], get_width(qp))
                         assumes.append(qp_var.op_eq(constval))
                     elif atype == AnnoType.PARAM:
                         # Add new shadow register
@@ -170,6 +185,8 @@ class HwModel(ABC):
         for signal in guidance.signals:
             for qp in signal.get_all_qp_instances():
                 first = True
+                # TODO convert this into an index expression if necessary
+                qp_var = smt.BVVariable(q2b(qp), get_width(qp))
                 for cond, anno in guidance.get_predicated_annotations(qp).items():
                     if anno == AnnoType.DONT_CARE:
                         continue
@@ -179,23 +196,26 @@ class HwModel(ABC):
                     else:
                         s = f"else if ({cond.to_verilog_str()}) begin\n"
                     if anno == AnnoType.ASSUME:
-                        # Add assume statement
-                        constval = smt.BVConst(signal_values[stepnum][ind], get_width(qp))
-                        s += f"    assume ({qp_var.op_eq(constval).to_verilog_str()});"
+                        s += f"    case ({ctr.to_verilog_str()})\n"
+                        # Add assume statements
+                        for cc in ctr_values:
+                            constval = smt.BVConst(signal_values[cc.val][qp], get_width(qp))
+                            s += f"        {cc.to_verilog_str()}: assume ({qp_var.op_eq(constval).to_verilog_str()});\n"
+                        s += f"    endcase\n"
                     elif anno == AnnoType.PARAM:
                         # Add new shadow register
                         new_shadow = smt.BVVariable(f"__shadow_{numshadow}", get_width(qp))
                         shadow_decls.append(new_shadow.get_decl())
                         # TODO add comments to assumes somehow?
-                        s += f"    assume ({new_shadow.op_eq(qp_var).to_verilog_str()});"
+                        s += f"    assume ({new_shadow.op_eq(qp_var).to_verilog_str()});\n"
                         numshadow += 1
                     elif anno == AnnoType.OUTPUT:
                         # Assert output
                         # TODO allow for a more coherent mapping from synth funs to outputs
-                        s += f"    assert ({func.body.op_eq(qp_var).to_verilog_str()});"
+                        s += f"    assert ({func.body.op_eq(qp_var).to_verilog_str()});\n"
                     else:
                         raise NotImplementedError()
-                    s += "\nend\n"
+                    s += "end"
                     pred_cases_l.append(s)
 
         shadow_decls = "\n".join(s.to_verilog_str(is_reg=True, anyconst=True) for s in shadow_decls)
@@ -217,14 +237,10 @@ class HwModel(ABC):
             end
             """) + "always @(posedge clk) begin\n" + \
             textwrap.indent("\n".join(ctr_cases_l), "    ") + \
-            "\n" + textwrap.indent("\n".join(pred_cases_l), "    ") + \
+            "\n\n" + textwrap.indent("\n".join(pred_cases_l), "    ") + \
             "\nend"
 
         return ctr_cases
-        # v.StatementSeq(shadow_decls + [
-        #     ctr_block,
-        #     v.AlwaysAt(v.Edge.POS, v.SignalRef(clock_name), ctr_cases)
-        # ]).to_verilog()
 
     def run_bmc(self, signal_values, signal_widths, hypothesis_func: smt.LambdaTerm):
         """
