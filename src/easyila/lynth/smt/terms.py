@@ -1126,11 +1126,15 @@ class ApplyUF(Term):
     """
     Term representing application of an uninterpreted function on the specified inputs.
     """
-    fun: UFTerm
+    fun: "SynthFun" # TODO properly make this UF instead of SynthFun
+    # without making cvc5 unhappy
     input_values: Tuple[Term, ...]
 
-    def __post_init__(self):
-        assert self.fun.arity == len(self.input_values)
+    # def __post_init__(self):
+    #     assert self.fun.arity == len(self.input_values)
+
+    def __str__(self):
+        return self.to_uclid()
 
     @property
     def sort(self):

@@ -47,7 +47,7 @@ class Inst:
     def __mul__(self, other):
         if not isinstance(other, int):
             raise TypeError(f"can only multiply Inst by int (got {repr(other)})")
-        return Inst(*(self.value * other))
+        return [Inst(*self.value) for _ in range(other)]
 
     def to_bit_str(self):
         """
@@ -77,7 +77,7 @@ class Inst:
             if "X" in nibble_s:
                 nibble = "X"
             else:
-                nibble = "{:1X}".format(int("".join(nibble_s), 2))
+                nibble = "{:1x}".format(int("".join(nibble_s), 2))
             hex_digits.append(nibble)
             i -= 4
         return "".join(reversed(hex_digits))
@@ -119,7 +119,13 @@ class ProgramSketch:
     insts: Tuple[Inst]
 
     def __init__(self, *args):
-        self.insts = tuple(args)
+        insts = []
+        for a in args:
+            if isinstance(a, list) or isinstance(a, tuple):
+                insts.extend(a)
+            else:
+                insts.append(a)
+        self.insts = tuple(insts)
 
     def fill(self, mappings: Optional[Dict[str, int]]=None) -> ConcreteProgram:
         new_insts = []

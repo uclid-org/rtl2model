@@ -56,6 +56,9 @@ class SynthFun:
         # sorts, variables get automatically read
         return Solver(terms=self.grammar._all_terms, synthfuns=[self])
 
+    def to_uf(self) -> UFTerm:
+        return UFTerm(self.name, self.return_sort, self.bound_vars)
+
     def to_cvc5(self, cvc5_ctx) -> Term:
         return cvc5_ctx.synthfuns[self.name]
 

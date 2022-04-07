@@ -24,7 +24,7 @@ class ProjectConfig:
     def __post_init__(self):
         os.makedirs(self.sby_dir, exist_ok=True)
 
-class HwModel(ABC):
+class ModelBuilder(ABC):
     config: ProjectConfig
     # TODO come up with more explicit mappings for input name > width
     # rather than just ordinal position
@@ -86,7 +86,7 @@ class HwModel(ABC):
 
     def sample(self, inputs) -> List[int]:
         """
-        Runs a simulatiion with the provided inputs, and returns sampled output values.
+        Runs a simulation with the provided inputs, and returns sampled output values.
 
         TODO name outputs instead of just ordering them
         """

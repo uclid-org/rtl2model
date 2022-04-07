@@ -19,7 +19,7 @@ subprocess.run(
 
 BASEDIR = os.path.join(REPO_BASE_DIR, "processors/R8051/")
 
-class R8051Model(HwModel):
+class R8051Model(ModelBuilder):
     def build_binary(self):
         gen_config.generate_config(
             signals=self.signals,

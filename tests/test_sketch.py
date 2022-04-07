@@ -9,7 +9,7 @@ class TestSketch:
             inst_byte(0x12),
             inst_word(0xEE33),
         ).fill()
-        assert p.to_hex_str_array() == ["AB", "0000FFFC", "12", "0000EE33"]
+        assert p.to_hex_str_array() == ["ab", "0000fffc", "12", "0000ee33"]
 
     def test_concrete_program_to_bytearray(self):
         p = ProgramSketch(
