@@ -8,6 +8,8 @@ from easyila.synthesis_template import *
 from easyila.sketch import *
 import easyila.gen_config as gen_config
 import easyila.lynth.smt as smt
+from easyila.model import *
+from easyila.verilog import *
 
 REPO_BASE_DIR = "/home/jhshi/research/hwlifting/"
 """
@@ -127,7 +129,30 @@ def main():
         guidance
     )
     model.build_binary()
-    model.main_sygus_loop()
+    fn = model.main_sygus_loop()
+
+    v = smt.Variable
+    a = v("io_A", bv32)
+    b = v("io_B", bv32)
+    io_out = v("io_out", bv32)
+    alu = Model(
+        "ALUArea",
+        # TODO think about the variance of inputs/outputs for a module
+        # inputs (like io_alu_op here) can be omitted if their value is unused internally,
+        # though anything that instantiates this instance would have to somehow be aware of that
+        # (maybe via dependency graph traversal)
+        # outputs cannot be omitted, unless their parent doesn't use them
+        inputs=[a, b, v("io_alu_op", smt.BVSort(4))],
+        outputs=[io_out, v("io_sum", bv32)],
+        ufs=[smt.UFTerm("io_sum", bv32, ())],
+        logic={io_out: fn.apply(a, b)},
+    )
+    verilog_to_model(
+        "../hwlifting/processors/riscv-mini/full.v",
+        "Core",
+        clock_pattern=".*clock",
+        defined_modules=[alu],
+    ).print()
 
 if __name__ == '__main__':
     main()

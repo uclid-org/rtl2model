@@ -1015,6 +1015,11 @@ class LambdaTerm(Term):
     params: Tuple[Variable, ...]
     body: Term
 
+    def apply(self, *args):
+        assert len(args) == len(self.params)
+        # jank hack for inlining lambdas
+        return self.body.replace_vars({self.params[i]: args[i] for i in range(len(args))})
+
     @property
     def sort(self):
         return FunctionSort(tuple([p.sort for p in self.params]), self.body.sort)

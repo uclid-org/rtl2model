@@ -365,9 +365,8 @@ class ModelBuilder(ABC):
                     print("All oracles passed. Found a solution: ")
                     print(solution.to_sygus2())
                     self.o_ctx.oracles["io"].save_call_logs()
-                    break
-
+                    return solution
             else:
                 print("Sorry, no solution found!")
-                break
+                return None
 
