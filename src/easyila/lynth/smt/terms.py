@@ -139,6 +139,12 @@ _OP_SYGUS_SYMBOLS = {
 _T = TypeVar("_T")
 
 class Term(Translatable, ABC):
+    """
+    Representation for an SMT term. Operator overrides perform type checking and in some cases,
+    implicit type conversions between arguments; construct an `OpTerm` manually if this behavior
+    is undesired.
+    """
+
     def _binop_type_check(self, other, sext=False, zpad=True, cast_int=True) -> Tuple["Term", "Term"]:
         """
         Checks that two operands have the same sort.
@@ -244,6 +250,9 @@ class Term(Translatable, ABC):
         return True
 
     def eval(self, values: Dict[str, int]) -> Union["BVConst", "BoolConst"]:
+        """
+        Evaluates this expression with variables replaced by the values specified in `values`.
+        """
         raise NotImplementedError()
 
     # === OPERATOR OVERRIDES ===
@@ -314,8 +323,8 @@ class Term(Translatable, ABC):
 
     def op_eq(self, other):
         """
-        We can't override __eq__ without breaking a decent amount of stuff, so
-        op_eq is syntactic sugar for an equality expression instead.
+        We can't override `__eq__` without breaking a decent amount of stuff, so
+        `op_eq` is syntactic sugar for an equality expression instead.
         """
         return OpTerm(Kind.Equal, self._binop_type_check(other))
 
@@ -522,11 +531,11 @@ class Variable(Term):
         return f"{self.name}"
 
     def to_uf(self):
-        """Converts this variable to a 0-arity UFTerm."""
+        """Converts this variable to a 0-arity `UFTerm`."""
         return UFTerm(self.name, self.sort, ())
 
     def get_decl(self, init_value=None):
-        """Gets a Translatable declaration of this variable."""
+        """Gets a `Translatable` declaration of this variable."""
         return VarDecl(self.name, self.sort, init_value=init_value)
 
     @staticmethod
@@ -584,7 +593,10 @@ class Variable(Term):
 
 
 BoolVariable = lambda s, **kwargs: Variable(s, BoolSort(), **kwargs)
+"""Constructs a variable of boolean sort with the given name."""
+
 BVVariable = lambda s, w, **kwargs: Variable(s, BVSort(w), **kwargs)
+"""Constructs a variable of a bitvector sort with the given name and width."""
 
 
 @dataclass(frozen=True)
@@ -605,11 +617,11 @@ class VarDecl(Translatable):
     def to_target_format(self, tgt: TargetFormat, **kwargs):
         """
         Possible kwargs:
-        - cvc5_ctx: a Cvc5Ctx object used to get a reference to a cvc5 solver
-        - is_reg: a boolean used by verilog conversion to determine if this should be declared
-                  as a reg (if false or not specified, the variable will be a wire)
-        - anyconst: a boolean used by verilog conversion; when specified, it will add the
-                  (* anyconst *) yosys attribute
+        - `cvc5_ctx`: a `easyila.lynth.Cvc5Ctx` object used to get a reference to a cvc5 solver
+        - `is_reg`: a boolean used by verilog conversion to determine if this should be declared
+                    as a reg (if false or not specified, the variable will be a wire)
+        - `anyconst`: a boolean used by verilog conversion; when specified, it will add the
+                    `(* anyconst *)` yosys attribute
         """
         if tgt == TargetFormat.CVC5:
             # The CVC5 interface doesn't really distnguish between declarations
@@ -690,7 +702,7 @@ class OpTerm(Term):
     @staticmethod
     def from_cvc5(cvc5_term):
         """
-        Translates the provided cvc5 Term object into an OpTerm.
+        Translates the provided cvc5 Term object into an `OpTerm`.
         """
         cvc5_kind = cvc5_term.getKind()
         if cvc5_kind not in _OP_KIND_REV_MAPPING:
@@ -1172,6 +1184,7 @@ class ApplyUF(Term):
 
 
 class BoolConst(Term, IntEnum, metaclass=_TermMeta):
+    """SMT boolean constants for true and false. Can be coerced to/from an `int`."""
     F = 0
     T = 1
 

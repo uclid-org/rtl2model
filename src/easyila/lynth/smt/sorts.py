@@ -8,6 +8,8 @@ from .common import Translatable, TargetFormat
 # === BEGIN SMT Sorts ===
 
 class Sort(Translatable, ABC):
+    """A representation of an SMT sort."""
+
     @staticmethod
     def from_cvc5(cvc5_sort):
         if cvc5_sort.isBitVector():

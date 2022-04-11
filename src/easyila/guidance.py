@@ -20,8 +20,8 @@ class AnnoType(Enum):
 class Guidance:
     """
     Allows the user to provide guidance for whether or not a value at a particular clock cycle
-    is DONT_CARE ("Don't Care"), ASSUME ("Assumed" to be the value read during simulation), PARAM
-    ("Parameter" of the synthesis function), or OUTPUT ("Output" of the synthesis function).
+    is `DONT_CARE` ("Don't Care"), `ASSUME` ("Assumed" to be the value read during simulation),
+    `PARAM` ("Parameter" of the synthesis function), or `OUTPUT` ("Output" of the synthesis function).
     """
 
     def __init__(self, signals, num_cycles: int):
@@ -52,11 +52,11 @@ class Guidance:
 
         If the argument is a dict of ints, then just copy it.
 
-        If the argument is a dict mapping smt.Term to AnnoType, it is copied as well.
-        These predicates will be turned into an if/elseif tree, so if two conditions
+        If the argument is a dict mapping `easyila.lynth.smt.Term` to `AnnoType`, it is copied as well.
+        These predicates will be turned into an "if/elseif" tree, so if two conditions
         are true, only the first will matter.
 
-        If the argument is an AnnoType, then apply that AnnoType for every cycle,
+        If the argument is an `AnnoType`, then apply that `AnnoType` for every cycle,
         overwriting any existing annotations.
         """
         signal = self._validate_signame(signal)
@@ -84,7 +84,7 @@ class Guidance:
     def get_annotation_at(self, signal, cycle) -> Optional[AnnoType]:
         """
         Gets the appropriate annotation for `signal` on the corresponding `cycle`.
-        If the signal's annotations are instead specified by predicates, then None is returned.
+        If the signal's annotations are instead specified by predicates, then `None` is returned.
         """
         signal = self._validate_signame(signal)
         if cycle >= self.num_cycles:

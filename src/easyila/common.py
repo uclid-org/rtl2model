@@ -67,9 +67,13 @@ class SampledSignal:
 
 
 S = SampledSignal
+"""An alias for SampledSignal."""
 
-
-def read_csv(filename, numlines):
+def read_csv(filename, numlines) -> Tuple[Dict[str, int], List[Dict[str, int]]]:
+    """
+    Reads a simulation trace from a CSV, and returns a dict of signal widths and
+    list of signal values for each cycle.
+    """
     with open(filename, newline="") as csvfile:
         csvreader = csv.DictReader(csvfile)
         widths = {sig: int(w) for sig, w in next(csvreader).items()}

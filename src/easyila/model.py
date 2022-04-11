@@ -6,13 +6,13 @@ from typing import Collection, List, Dict, Optional
 
 import easyila.lynth.smt as smt
 
+Instruction = List[Dict[smt.Term, smt.Term]]
 """
-An Instruction represents a sequence of state transitions. A transition is a mapping
+An `Instruction` represents a sequence of state transitions. A transition is a mapping
 of state variables to expressions computing their next values.
 
 A single instruction is considered to be atomic.
 """
-Instruction = List[Dict[smt.Term, smt.Term]]
 
 class GeneratedBy(enum.IntFlag):
     """Indicates different mechanisms for how the model was generated."""
@@ -37,7 +37,7 @@ class Model:
     # how do we incorporate child-ILA transitions? how do we connect modules?
     instances: Dict[str, "Instance"]        = field(default_factory=dict)
     """
-    Maps instance names to coresponding Model objects. I/O connections should be declared through
+    Maps instance names to coresponding `Model` objects. I/O connections should be declared through
     the `logic` field.
     """
     logic: Dict[smt.Term, smt.Term]         = field(default_factory=dict)
@@ -75,7 +75,7 @@ class Model:
     def validate(self):
         """
         Checks that all expressions are well-typed, variables are declared, etc.
-        Returns True on success, False on failure.
+        Returns `True` on success, `False` on failure.
 
         TODO more robust error handling
         """
@@ -310,7 +310,7 @@ class Model:
         submodel_list.append(self)
         visited_submodel_names.add(self.name)
 
-    def to_uclid_with_children(self):
+    def to_uclid_with_children(self) -> str:
         """
         Generates a uclid model, as well as a uclid model for every child instance.
         """
@@ -320,7 +320,7 @@ class Model:
         self._get_submodules(submodels, visited_submodel_names)
         return "\n\n".join(s.to_uclid() for s in submodels)
 
-    def case_split(self, var_name: str, possible_values: Optional[Collection[int]]=None):
+    def case_split(self, var_name: str, possible_values: Optional[Collection[int]]=None) -> "Model":
         """
         Automatically case splits this model on different values of `var_name`.
         `var_name` must be a boolean or bitvector variable, and cannot be an output.
@@ -351,7 +351,7 @@ class Model:
                     else:
                         raise TypeError(f"cannot case split on input {v}: case splits can only be performed on bool/bv variables")
                 return self._case_split_var(v, possible_values)
-        return KeyError(f"cannot case split on {var_name}: no such input or state variable")
+        raise KeyError(f"cannot case split on {var_name}: no such input or state variable")
 
     def _case_split_input(self, input_var: smt.Variable, possible_values: Collection[int]):
         inputs = self.inputs[:]

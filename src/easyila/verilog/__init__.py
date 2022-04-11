@@ -1,8 +1,9 @@
 
 """
-Functions for producing a Model from a Verilog file.
+Functions for producing a `easyila.model.Model` from a Verilog file.
 
-This code uses the pyverilog library for parsing and dataflow analysis.
+This code uses a fork of the [`pyverilog`](https://github.com/noloerino/Pyverilog) library
+for parsing and dataflow analysis.
 """
 
 from collections import defaultdict
