@@ -5,7 +5,7 @@ import pytest
 
 import easyila.lynth.smt as smt
 from easyila.verilog import verilog_to_model, COIConf
-from easyila.model import Model, Instance
+from easyila.model import Model, Instance, UFPlaceholder
 
 class TestVerilogParse:
     """
@@ -14,7 +14,7 @@ class TestVerilogParse:
     On the current version of pyverilog, initial register values are not treated properly, hence
     the need for a reset input.
 
-    pyverilog if branches that are missing an else block also will produce a dummy "dest" variable
+    pyverilog "if" branches that are missing an "else" block also will produce a dummy "dest" variable
     when `tocode` is called, though this does not affect the actual dataflow graph.
     """
 
@@ -97,7 +97,8 @@ class TestVerilogParse:
     def test_verilog_single_imp_no_coi(self):
         """
         Tests generation of a model from a single RTL module with specified important signals.
-        `coi_conf` is NO_COI, meaning non-important signals are 0-arity UFs.
+        `coi_conf` is `NO_COI`, meaning non-important signals are 1-arity UFs with a single argument
+        for degrees of freedom.
         """
         rtl = textwrap.dedent("""\
             module top(input clk, input should_inc, output [2:0] result);
@@ -135,8 +136,8 @@ class TestVerilogParse:
                 outputs=[result],
                 state=[b, b_p1],
                 # `a` appears in the expression for `result`, but is not declared important
-                # therefore, it is modeled as a 0-arity uninterpreted function
-                ufs=[smt.UFTerm("a", bv3, ())],
+                # therefore, it is modeled as a 1-arity uninterpreted function
+                ufs=[UFPlaceholder("a", bv3, (), True)],
                 logic={
                     b_p1: b + 1,
                     result: (~a) | (~b)
@@ -152,8 +153,8 @@ class TestVerilogParse:
                 outputs=[result],
                 state=[a, a_p1],
                 # `b` appears in the expression for `result`, but is not declared important
-                # therefore, it is modeled as a 0-arity uninterpreted function
-                ufs=[smt.UFTerm("b", bv3, ())],
+                # therefore, it is modeled as a 1-arity uninterpreted function
+                ufs=[UFPlaceholder("b", bv3, (), True)],
                 logic={
                     a_p1: a + 1,
                     result: (~a) | (~b)
@@ -161,12 +162,11 @@ class TestVerilogParse:
                 default_next=[{a: should_inc.ite(a_p1, a)}],
             )
 
-
-    def test_verilog_single_imp_uf_coi(self):
+    def test_verilog_single_imp_uf_coi_logic(self):
         """
         Tests generation of a model from a single RTL module with specified important signals.
-        `coi_conf` is UF_ARGS_COI, meaning that non-important signals are replaced with uninterpreted
-        functions. Unlike NO_COI, these UF terms have important arguments in their COI as arguments.
+        `coi_conf` is `UF_ARGS_COI`, meaning that non-important signals are replaced with uninterpreted
+        functions. Unlike `NO_COI`, these UF terms have important arguments in their COI as arguments.
         """
         rtl = textwrap.dedent("""\
             module top(input clk, input should_inc, output [2:0] result);
@@ -187,7 +187,6 @@ class TestVerilogParse:
             """)
         bv3 = smt.BVSort(3)
         var = smt.Variable
-        # TODO to allow for composition of child modules, and specifying important_signals for those
         model_no_a = verilog_to_model(
             rtl,
             "top",
@@ -210,8 +209,7 @@ class TestVerilogParse:
                 state=[b, b_p1],
                 # `a` appears in the expression for `result`, but is not declared important
                 # therefore, it is modeled as an uninterpreted function
-                # TODO namespace collision for should_inc parameter?
-                ufs=[smt.UFTerm("a", bv3, (should_inc,))],
+                ufs=[UFPlaceholder("a", bv3, (should_inc,), True)],
                 logic={
                     b_p1: b + 1,
                     result: (~a) | (~b)
@@ -234,7 +232,7 @@ class TestVerilogParse:
                 # `b` appears in the expression for `result`, but is not declared important
                 # therefore, it is modeled as an uninterpreted function
                 # TODO namespace collision for should_inc parameter?
-                ufs=[smt.UFTerm("b", bv3, (should_inc,))],
+                ufs=[UFPlaceholder("b", bv3, (should_inc,), True)],
                 logic={
                     a_p1: a + 1,
                     result: (~a) | (~b)
@@ -242,6 +240,55 @@ class TestVerilogParse:
                 default_next=[{a: should_inc.ite(a_p1, a)}],
             )
 
+    def test_verilog_single_imp_uf_coi_temporal_state(self):
+        """
+        Tests generation of a model from a single RTL module with specified important signals.
+
+        In this example, the dependency between the output and one of the parent unimportant signals
+        occurs across multiple cycles. Therefore, passing the important input variable as argument
+        is insufficient; we instead must make the transition function for each elided state variable
+        an uninterpreted function.
+
+        Furthermore, every state variable but `b` happens to depend on an important variable, or one
+        that is modeled as a UF. Accordingly, only `b` needs an extra degree of freedom argument.
+        """
+        rtl = textwrap.dedent("""\
+            module top(input clk, input [1:0] in, input [1:0] ignore, output [1:0] out);
+                reg [1:0] a;
+                reg [1:0] b;
+                reg [1:0] c;
+                always @(posedge clk) begin
+                    a <= in + 1;
+                    b <= a & ignore;
+                    c <= b;
+                end
+                assign out = c;
+            endmodule
+            """)
+        actual_model = verilog_to_model(
+            rtl,
+            "top",
+            important_signals=["out", "in"],
+            coi_conf=COIConf.UF_ARGS_COI
+        )
+        actual_model.print()
+        assert actual_model.validate()
+        bv2 = smt.BVSort(2)
+        in_ = smt.Variable("in", bv2)
+        out = smt.Variable("out", bv2)
+        exp_model = Model(
+            "top",
+            inputs=[in_],
+            outputs=[out],
+            next_ufs=[
+                UFPlaceholder("c", bv2, (smt.Variable("b", bv2),), False),
+                UFPlaceholder("b", bv2, (smt.Variable("a", bv2),), True),
+                UFPlaceholder("a", bv2, (in_,), False),
+            ],
+            logic={out: smt.Variable("c", bv2)}
+        )
+        assert exp_model.validate()
+        assert actual_model == exp_model
 
     def test_verilog_single_imp_keep_coi(self):
         """
@@ -297,6 +344,7 @@ class TestVerilogParse:
             default_next=[{a: should_inc.ite(a_p1, a)}],
         )
 
+    @pytest.mark.skip()
     def test_verilog_output_unimp(self):
         # TODO what do we do when an output is a dependency of an important signal,
         # but the output itself is non-important
@@ -345,9 +393,12 @@ class TestVerilogParse:
             logic={o_inner: i_state[0]}
         )
 
+    @pytest.mark.skip()
     def test_verilog_bv_var_index(self):
         """
         Tests indexing a bitvector with a variable.
+
+        TODO this should effectively just be a bitvector mask
         """
         ...
         assert False
@@ -616,6 +667,7 @@ class TestVerilogParse:
         assert inner1 == exp_inner1
         assert top == exp_top
 
+    @pytest.mark.skip()
     def test_verilog_nested_child_coi(self):
         """
         Tests behavior when COI options are enabled and child submodules are traversed.
@@ -623,6 +675,7 @@ class TestVerilogParse:
         ...
         assert False
 
+    @pytest.mark.skip()
     def test_verilog_reused_child(self):
         """
         Tests when a module has multiple instances within a design.

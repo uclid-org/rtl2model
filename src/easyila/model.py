@@ -2,7 +2,7 @@ from collections import defaultdict
 import enum
 from dataclasses import dataclass, field
 import textwrap
-from typing import Collection, List, Dict, Optional
+from typing import Collection, List, Dict, Optional, Tuple
 
 import easyila.lynth.smt as smt
 
@@ -21,18 +21,49 @@ class GeneratedBy(enum.IntFlag):
     SYGUS2          = enum.auto()
     CASE_SPLIT      = enum.auto()
 
-# models should look something like this?
-# TODO instead of having separate uf/logic/next logic, should they all be values of
-# a dict keyed by variables? probably not, because of the splitting behavior of the
-# `instructions` array
+
+@dataclass(frozen=True)
+class UFPlaceholder:
+    name: str
+    sort: smt.Sort
+    params: Tuple[smt.Variable, ...]
+    free_arg: bool
+
+    def maybe_free_arg_var(self) -> Optional[smt.Variable]:
+        if not self.free_arg:
+            return None
+        # TODO determine width of free variable
+        # for example, if a bv3 was elided but this expression is a boolean,
+        # that bv3 may have been used in an 8-way case stmt or something
+        return smt.Variable(f"__free_{self.name}", self.sort)
+
+    def to_ufterm(self) -> smt.UFTerm:
+        free_var = self.maybe_free_arg_var()
+        if free_var is not None:
+            params = self.params + (free_var,)
+        else:
+            params = self.params
+        return smt.UFTerm(self.name, self.sort, params)
+
+
 @dataclass
 class Model:
     name: str
     inputs: List[smt.Variable]              = field(default_factory=list)
     outputs: List[smt.Variable]             = field(default_factory=list)
     state: List[smt.Variable]               = field(default_factory=list)
-    # TODO variables are just UFs of 0 arity -- should we treat them all the same?
-    ufs: List[smt.UFTerm]                   = field(default_factory=list)
+    ufs: List[UFPlaceholder]                = field(default_factory=list)
+    """Combinatorial relations modeled as uninterpreted functions."""
+    next_ufs: List[UFPlaceholder]           = field(default_factory=list)
+    """
+    Transition relations modeled as uninterpreted functions.
+    For example, if a UF f(a, b) is in this list, then it would correspond to some
+    transition f' <= f(a, b) in RTL. References to a UF in this list read from
+    the current value of the wire rather than the primed (next).
+
+    When emitted to RTL or uclid, each UF effectively induces a new state variable.
+    """
+
     # memories: List[]
     # how do we incorporate child-ILA transitions? how do we connect modules?
     instances: Dict[str, "Instance"]        = field(default_factory=dict)
@@ -60,6 +91,8 @@ class Model:
         assert isinstance(self.outputs, list)
         assert isinstance(self.state, list)
         assert isinstance(self.ufs, list)
+        for uf in self.ufs:
+            assert isinstance(uf, UFPlaceholder)
         assert isinstance(self.logic, dict)
         assert isinstance(self.default_next, list)
         assert isinstance(self.instances, dict)
@@ -189,7 +222,7 @@ class Model:
         else:
             state_block = ""
         if len(self.ufs) > 0:
-            uf_block = newline + c_newline.join([str(a) for a in self.ufs])
+            uf_block = newline + c_newline.join([str(a.to_ufterm()) for a in self.ufs])
         else:
             uf_block = ""
         if len(self.instances) > 0:
@@ -228,6 +261,7 @@ class Model:
         u_append(self.inputs, "input")
         u_append(self.outputs, "output")
         u_append(self.state, "var")
+        raise Exception("need to add UF placeholder vars")
         # Generate "__next" temp vars
         next_vars = {}
         for transitions in self.default_next:
@@ -236,7 +270,7 @@ class Model:
                 next_vars[v] = smt.Variable(v.name + "__next", v.sort)
         u_append(next_vars.values(), "var")
         if len(self.ufs) > 0:
-            u_vars.extend(s.to_uclid() for s in self.ufs)
+            u_vars.extend(s.to_ufterm().to_uclid() for s in self.ufs)
         newline = ' ' * 16
         u_vars_s = textwrap.indent("\n".join(u_vars), newline)
         instances_s = textwrap.indent("\n".join(i.to_uclid(n) for n, i in self.instances.items()), newline)
@@ -244,7 +278,7 @@ class Model:
             return expr.replace_vars({
                 # trick: since we named uf params the same as module variables,
                 # we can just call on variable terms with those same names
-                smt.Variable(uf.name, uf.sort): smt.ApplyUF(uf, uf.params)
+                smt.Variable(uf.name, uf.sort): smt.ApplyUF(uf.to_ufterm(), uf.params)
                 for uf in self.ufs
             }).to_uclid(prime_vars=prime_vars)
         init_logic_s = textwrap.indent(

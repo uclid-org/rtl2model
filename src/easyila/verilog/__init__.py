@@ -30,7 +30,7 @@ from pyverilog.dataflow.dataflow import (
 from pyverilog.utils.scope import ScopeChain, ScopeLabel
 from pyverilog.utils import signaltype
 
-from easyila.model import Model, Instance, GeneratedBy
+from easyila.model import Model, Instance, GeneratedBy, UFPlaceholder
 import easyila.lynth.smt as smt
 
 class COIConf(Enum):
@@ -224,7 +224,7 @@ def _verilog_model_helper(
     deps = DependencyGraph(important_signals, terms, binddict)
     ufs = []
     """
-    `ufs` is a list of non-important variables that are modeled as a `UFTerm` with arguments based
+    `ufs` is a list of non-important variables that are modeled as a an uninterpreted fn with arguments based
     on the variable's COI. This behavior changes based on the `coi_conf` option:
     - NO_COI: All functions are 0-arity, and can be determined directly from edges of the dependency
               graph generated in pass #1.
@@ -233,6 +233,11 @@ def _verilog_model_helper(
     - UF_ARGS_COI: Any symbol found to be an immediate parent of an important signal is modeled as
                    a UF, but unlike NO_COI, this UF takes as arguments the important signals that
                    are in its COI.
+    """
+    next_ufs = []
+    """
+    `next_ufs` is the same as above, except it is a list of non-important _state_ variables whose
+    transition relations must be left uninterpereted. COI behavior is the same as for UFs.
     """
 
     all_missing = set()
@@ -249,7 +254,9 @@ def _verilog_model_helper(
         # Model missing variables (all 1 edge away from important signal in dep graph)
         # as 0-arity uninterpreted functions.
         for s in uf_names:
-            ufs.append(term_to_smt_var(s, terms, mod_depth).to_uf())
+            tmp = term_to_smt_var(s, terms, mod_depth)
+            # TODO set free args properly
+            ufs.append(UFPlaceholder(tmp.name, tmp.sort, (), True))
         important_signal_set = set(important_signals)
     elif coi_conf == COIConf.KEEP_COI:
         if preserve_all_signals:
@@ -274,7 +281,8 @@ def _verilog_model_helper(
             params = tuple(
                 term_to_smt_var(p, terms, mod_depth) for p in coi[s] if p in important_signal_set
             )
-            ufs.append(smt.UFTerm(unqual_s, smt.BVSort(width), params))
+            # TODO figure out how to determine whether a degree of freedom is needed
+            ufs.append(UFPlaceholder(unqual_s, smt.BVSort(width), params, True))
     else:
         raise NotImplementedError("unimplemented COIConf " + str(coi_conf))
     # 1.5th pass: traverse AST to get expressions for _rn variables.
@@ -384,6 +392,7 @@ def _verilog_model_helper(
         outputs=m_outputs,
         state=m_state,
         ufs=ufs,
+        next_ufs=next_ufs,
         logic=logic,
         default_next=[next_updates],
         instances=instances,
