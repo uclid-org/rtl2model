@@ -15,6 +15,8 @@ class TestCaseSplit:
         Splits a model on a boolean input.
 
         Unused values + instances in each split should be pruned automatically.
+
+        Because no state variable has a clocked transition update, logic can be split cleanly.
         """
         rtl = textwrap.dedent("""\
             module c_true(output [3:0] o);
@@ -82,7 +84,7 @@ class TestCaseSplit:
                 big_o: ignore & v_f,
             }
         )
-        # In the case split model, state is elided to the case split terms
+        # In the case split model, combinational logic is elided to the case split terms
         # and all that remains is the identical I/O interface
         cs_top = Model(
             "top",
@@ -182,20 +184,22 @@ class TestCaseSplit:
                 big_o: smt.BVConst(3, 2).op_eq(v_f).ite(ignore & smt.BVConst(3, 2), ignore & v_f),
             }
         )
-        # In the case split model, state is elided to the case split terms
-        # and all that remains is the identical I/O interface
+        # In the case split model, state that doesn't determine v_t is elided and pushed
+        # into the submodule instances
         cs_top = Model(
             "top",
             inputs=[ignore],
-            # TODO what defines v_t here? figure out semantics of case splitting on a state variable
             outputs=[big_o],
+            state=[v_t],
             instances={
+                "c_t": Instance(c_true, {}),
                 "_top__v_t__00_inst": Instance(cs_top_00, {ignore: ignore}),
                 "_top__v_t__01_inst": Instance(cs_top_01, {ignore: ignore}),
                 "_top__v_t__10_inst": Instance(cs_top_10, {ignore: ignore}),
                 "_top__v_t__11_inst": Instance(cs_top_11, {ignore: ignore}),
             },
             logic={
+                v_t: v("c_t.o", bv2),
                 big_o: v_t.match_const({
                     0: v("_top__v_t__00_inst.big_o", bv2),
                     1: v("_top__v_t__01_inst.big_o", bv2),
@@ -209,4 +213,77 @@ class TestCaseSplit:
         alg_split = top.case_split("v_t")
         alg_split.print()
         assert alg_split.validate()
+        assert alg_split == cs_top
+
+    def test_case_split_bv_clocked_state(self):
+        """
+        Tests case splitting on a variable that affects a clocked update in the
+        model.
+        In this case, we cannot simply remove state variables from the top-level design
+        because then each submodule would have diverging state; instead, we make the "next"
+        value of the variable an output and the current value an input for each submodule.
+        """
+        v = smt.Variable
+        bv2 = smt.BVSort(2)
+        in_ = v("in", bv2)
+        s_a = v("s_a", bv2)
+        s_b = v("s_b", bv2)
+        next_s_b = v("__next_s_b", bv2)
+        out = v("out", bv2)
+        top = Model(
+            "top",
+            inputs=[in_],
+            outputs=[out],
+            state=[s_a, s_b],
+            logic={out: s_b & s_a},
+            default_next=[{
+                s_a: in_.op_eq(smt.BVConst(0b10, 2)).ite(s_a, s_a + 1),
+                s_b: s_a.op_eq(in_).ite(s_b, smt.BVConst(0, 2)),
+            }]
+        )
+        assert top.validate()
+        cases = [
+            Model(
+                f"_top__s_a__{i:02b}",
+                inputs=[in_, s_b],
+                outputs=[out, next_s_b],
+                logic={
+                    out: s_b & smt.BVConst(i, 2),
+                    next_s_b: smt.BVConst(i, 2).op_eq(in_).ite(s_b, smt.BVConst(0, 2)),
+                },
+            )
+            for i in range(4)
+        ]
+        cs_top = Model(
+            "top",
+            inputs=[in_],
+            outputs=[out],
+            state=[s_a, s_b],
+            instances={
+                "_top__s_a__00_inst": Instance(cases[0], {in_: in_, s_b: s_b}),
+                "_top__s_a__01_inst": Instance(cases[1], {in_: in_, s_b: s_b}),
+                "_top__s_a__10_inst": Instance(cases[2], {in_: in_, s_b: s_b}),
+                "_top__s_a__11_inst": Instance(cases[3], {in_: in_, s_b: s_b}),
+            },
+            logic={
+                out: s_a.match_const({
+                    0: v("_top__s_a__00_inst.out", bv2),
+                    1: v("_top__s_a__01_inst.out", bv2),
+                    2: v("_top__s_a__10_inst.out", bv2),
+                    3: v("_top__s_a__11_inst.out", bv2),
+                }),
+            },
+            default_next=[{
+                s_a: in_.op_eq(smt.BVConst(0b10, 2)).ite(s_a, s_a + 1),
+                s_b: s_a.match_const({
+                    0: v("_top__s_a__00_inst.__next_s_b", bv2),
+                    1: v("_top__s_a__01_inst.__next_s_b", bv2),
+                    2: v("_top__s_a__10_inst.__next_s_b", bv2),
+                    3: v("_top__s_a__11_inst.__next_s_b", bv2),
+                }),
+            }]
+        )
+        assert cs_top.validate()
+        alg_split = top.case_split("s_a")
+        alg_split.print()
         assert alg_split == cs_top
