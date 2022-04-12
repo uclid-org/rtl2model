@@ -274,25 +274,34 @@ class Model:
         newline = ' ' * 16
         u_vars_s = textwrap.indent("\n".join(u_vars), newline)
         instances_s = textwrap.indent("\n".join(i.to_uclid(n) for n, i in self.instances.items()), newline)
-        def add_uf_calls(expr, prime_vars=False):
-            return expr.replace_vars({
-                # trick: since we named uf params the same as module variables,
-                # we can just call on variable terms with those same names
+        def fix_var_refs(expr, prime_vars=False):
+            """
+            Replaces variable references to calls to uninterpreted functions when appropriate.
+            """
+            # trick: since we named uf params the same as module variables,
+            # we can just call on variable terms with those same names
+            ufs = {
                 smt.Variable(uf.name, uf.sort): smt.ApplyUF(uf.to_ufterm(), uf.params)
                 for uf in self.ufs
-            }).to_uclid(prime_vars=prime_vars)
+            }
+            # TODO what if a UF takes in another UF as argument?
+            ufs.update({
+                smt.Variable(uf.name, uf.sort): smt.ApplyUF(uf.to_ufterm(), uf.params)
+                for uf in self.next_ufs
+            })
+            return expr.replace_vars(ufs).to_uclid(prime_vars=prime_vars)
         init_logic_s = textwrap.indent(
-            "\n".join(f"{lhs.to_uclid()} = {add_uf_calls(rhs)};" for lhs, rhs in self.logic.items()),
+            "\n".join(f"{lhs.to_uclid()} = {fix_var_refs(rhs)};" for lhs, rhs in self.logic.items()),
             newline + "    "
         )
         logic_s = textwrap.indent(
-            "\n".join(f"{lhs.to_uclid(prime_vars=True)} = {add_uf_calls(rhs, prime_vars=True)};" for lhs, rhs in self.logic.items()),
+            "\n".join(f"{lhs.to_uclid(prime_vars=True)} = {fix_var_refs(rhs, prime_vars=True)};" for lhs, rhs in self.logic.items()),
             newline + "    "
         )
         if len(self.default_next) > 0:
             init_next_s = textwrap.indent(
                 "\n".join(
-                    f"{next_vars[lhs].to_uclid()} = {add_uf_calls(rhs)};\n"
+                    f"{next_vars[lhs].to_uclid()} = {fix_var_refs(rhs)};\n"
                     f"{lhs.to_uclid()} = {next_vars[lhs].to_uclid()};"
                     for lhs, rhs in self.default_next[0].items()
                 ),
@@ -300,7 +309,7 @@ class Model:
             )
             next_s = textwrap.indent(
                 "\n".join(
-                    f"{next_vars[lhs].to_uclid(prime_vars=True)} = {add_uf_calls(rhs, prime_vars=True)};\n"
+                    f"{next_vars[lhs].to_uclid(prime_vars=True)} = {fix_var_refs(rhs, prime_vars=True)};\n"
                     f"{lhs.to_uclid(prime_vars=True)} = {next_vars[lhs].to_uclid(prime_vars=True)};"
                     for lhs, rhs in self.default_next[0].items()
                 ),
