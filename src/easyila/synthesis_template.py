@@ -309,6 +309,26 @@ class ModelBuilder(ABC):
             )
         self.o_ctx.add_oracle(io)
 
+    def _add_distinguishing_oracle(self, io_replay_path=None, io_log_path=None):
+        if io_replay_path is not None:
+            d = oi.DistinguishingOracle.from_call_logs(
+                "distinguishing",
+                self.input_widths,
+                self.output_width,
+                lambda *args: self.sample(*args)[0],
+                io_replay_path,
+                new_log_path=io_log_path
+            )
+        else:
+            d = oi.DistinguishingOracle(
+                "distinguishing",
+                self.input_widths,
+                self.output_width,
+                lambda *args: self.sample(*args)[0],
+                log_path=io_log_path
+            )
+        self.o_ctx.add_oracle(d)
+
     def _add_correctness_oracle(self):
         corr = oi.CorrectnessOracle("corr", self.verify)
         self.o_ctx.add_oracle(corr)
@@ -330,16 +350,18 @@ class ModelBuilder(ABC):
             help="Log file to which I/O inputs and outputs from this run are saved."
         )
         args = parser.parse_args()
-        self._add_io_oracle(io_replay_path=args.io_replay_path, io_log_path=args.io_log_path)
+        # self._add_io_oracle(io_replay_path=args.io_replay_path, io_log_path=args.io_log_path)
+        self._add_distinguishing_oracle(io_replay_path=args.io_replay_path, io_log_path=args.io_log_path)
         self._add_correctness_oracle()
         solver = self.solver
         sf = solver.synthfuns[0]
         while True:
             print("Correctness oracle returned false, please provide more constraints: ")
             # TODO key on names instead of just by order
-            io_o = self.o_ctx.oracles["io"]
-            replayed_inputs = io_o.next_replay_input()
+            # io_o = self.o_ctx.oracles["io"]
+            # replayed_inputs = io_o.next_replay_input()
             # TODO prompt for input before anything else
+            replayed_inputs = None
             if replayed_inputs is not None:
                 inputs = replayed_inputs
                 print("REPLAYING INPUTS:")
@@ -350,10 +372,12 @@ class ModelBuilder(ABC):
                 for i, v in enumerate(sf.bound_vars):
                     inputs.append(input(f"{v.name} (input {i + 1}): "))
             solver.reinit_cvc5()
-            self.o_ctx.call_oracle("io", inputs)
-            self.o_ctx.oracles["io"].save_call_logs()
+            # self.o_ctx.call_oracle("io", inputs)
+            # self.o_ctx.oracles["io"].save_call_logs()
 
-            self.o_ctx.apply_all_constraints(solver, {"io": sf})
+            self.o_ctx.call_oracle("distinguishing", inputs)
+            self.o_ctx.oracles["distinguishing"].save_call_logs()
+            self.o_ctx.apply_all_constraints(solver, {"distinguishing": sf})
             sr = solver.check_synth()
             if sr.is_unsat:
                 solution = sr.solution

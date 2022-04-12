@@ -4,15 +4,15 @@ import logging
 import os
 from subprocess import Popen, PIPE
 import sys
-from typing import Dict, Callable, Iterator, List, Union, Optional, Tuple
+from typing import Dict, Callable, Iterator, List, Union, Optional, Tuple, Any
 
 import easyila.lynth.smt as smt
 
 
 @dataclass
 class CallResult:
-    inputs: List
-    output: int
+    inputs: List[int]
+    output: Any
 
     def to_tuple(self):
         return (*self.inputs, self.output)
@@ -71,7 +71,7 @@ class OracleInterface(ABC):
         else:
             return None
 
-    def invoke(self, args):
+    def apply(self, args):
         if self.is_external_binary:
             process = Popen([self.binpath] + args, stdout=PIPE)
             (output, _) = process.communicate()
@@ -147,61 +147,66 @@ class CorrectnessOracle(OracleInterface):
         pass
 
 
-# class DistinguishingOracle(OracleInterface):
-#     """
-#     Distinguishing oracle. Given a history of I/O inputs and a candidate
-#     function, produce an input on which the candidate function defers from
-#     some other function.
-#     """
+class DistinguishingOracle(OracleInterface):
+    """
+    Distinguishing oracle. Given a history of I/O inputs and a candidate
+    function, produce an input on which the candidate function differs from
+    some other function.
+    """
 
-#     def __init__(
-#         self,
-#         name: str,
-#         in_widths: List[int],
-#         out_width: int,
-#         io_oracle_name: str,
-#         *,
-#         replay_inputs: Optional[List[Tuple[int, ...]]]=None,
-#         log_path: Optional[str]=None
-#     ):
-#         def oracle_fun(args):
+    def __init__(
+        self,
+        name: str,
+        in_widths: List[int],
+        out_width: int,
+        io_oracle_fun: Union[Callable, str],
+        *,
+        replay_inputs: Optional[List[Tuple[int, ...]]]=None,
+        log_path: Optional[str]=None
+    ):
+        super().__init__(name, io_oracle_fun, replay_inputs, log_path)
+        self.in_widths = in_widths
+        self.out_width = out_width
 
-#         super().__init__(name, oracle)
+    @staticmethod
+    def from_call_logs(name, in_widths, out_width, oracle, replay_log_path, *, new_log_path=None):
+        inputs = []
+        with open(replay_log_path) as f:
+            for l in f.readlines():
+                inputs.append([int(s) for s in l.split()[:-1]])
+        return DistinguishingOracle(name, in_widths, out_width, oracle, replay_inputs=inputs, log_path=new_log_path)
 
-#     def invoke(self, args):
-#         return super()._invoke(args)
-
-#     def apply_constraints(self, slv, fun):
-#         """
-#         Pseudocode for the distinguishing constraint is:
-#         exists (f', O, O') . (Behave(f') and f(I) == O and f'(I) == O' and O != O'
-#         That is, there exists some other function f' that matches candidate function f
-#         on all existing inputs but differs on some input set I.
-#         """
-#         in_sorts = tuple([smt.BVSort(i) for i in self.in_widths])
-#         out_sort = smt.BVSort(self.out_width)
-#         synth_inputs = tuple([smt.Variable(f"__dist_in_{i}", s) for i, s in enumerate(in_sort)])
-#         other_fn = smt.Variable("__other_fn", smt.FunctionSort(in_sorts, out_sort))
-#         cand_out = smt.Variable("__cand_out", out_sort)
-#         other_out = smt.Variable("__other_out", out_sort)
-#         eq_terms = []
-#         for call in self.calls:
-#             in_consts = [smt.BVConst(int(i_value), i_width) for i_width, i_value in zip(self.in_widths, call.inputs)]
-#             out_const = smt.BVConst(call.output, self.out_width)
-#             fn_apply = smt.ApplyUF(other_fn, tuple(in_consts))
-#             # TODO allow python operators
-#             eq_terms.append(smt.OpTerm(smt.Kind.Equal, (fn_apply, out_const)))
-#         behave_constraint = smt.OpTerm(smt.Kind.And, tuple(eq_terms))
-#         out_neq = smt.OpTerm(smt.Kind.Not, smt.OpTerm(smt.Kind.Equal, (cand_out, other_out)))
-#         cand_call = smt.OpTerm(smt.Kind.Equal, (smt.ApplyUf(fun, synth_inputs), cand_out))
-#         other_call = smt.OpTerm(smt.Kind.Equal, (smt.ApplyUf(other_fn, synth_inputs), other_out))
-#         exists = smt.QuantTerm(
-#             smt.Kind.Exists,
-#             (other_fn, cand_out, other_out),
-#             smt.OpTerm(smt.Kind.And, (behave_constraint, cand_call, other_call, out_neq))
-#         )
-
-#         slv.add_sygus_constraint()
+    def apply_constraints(self, slv, fun):
+        """
+        Pseudocode for the distinguishing constraint is:
+        exists (f', O, O') . (Behave(f') and f(I) == O and f'(I) == O' and O != O'
+        That is, there exists some other function f' that matches candidate function f
+        on all existing inputs but differs on some input set I.
+        """
+        in_sorts = tuple([smt.BVSort(i) for i in self.in_widths])
+        out_sort = smt.BVSort(self.out_width)
+        synth_inputs = tuple([smt.Variable(f"__dist_in_{i}", s) for i, s in enumerate(in_sorts)])
+        other_fn = smt.Variable("__other_fn", smt.FunctionSort(in_sorts, out_sort))
+        cand_out = smt.Variable("__cand_out", out_sort)
+        other_out = smt.Variable("__other_out", out_sort)
+        eq_terms = []
+        for call in self.calls:
+            in_consts = [smt.BVConst(int(i_value), i_width) for i_width, i_value in zip(self.in_widths, call.inputs)]
+            out_const = smt.BVConst(call.output, self.out_width)
+            fn_apply = smt.ApplyUF(other_fn, tuple(in_consts))
+            eq_terms.append(fn_apply.op_eq(out_const))
+        # Behavioral constraint: function output matches all previous calls
+        behave = smt.OpTerm(smt.Kind.And, tuple(eq_terms))
+        # Distinguishing contraint constraint: candidate function and existing function disagree
+        distinct = cand_out.op_ne(other_out)
+        cand_call = smt.ApplyUF(fun, synth_inputs).op_eq(cand_out)
+        other_call = smt.ApplyUF(other_fn, synth_inputs).op_eq(other_out)
+        exists = smt.QuantTerm(
+            smt.Kind.Exists,
+            (other_fn, cand_out, other_out),
+            smt.OpTerm(smt.Kind.And, (behave, cand_call, other_call, distinct))
+        )
+        slv.add_sygus_constraint(exists)
 
 class OracleCtx:
     """
@@ -218,9 +223,8 @@ class OracleCtx:
         self.oracles[oracle.name] = oracle
 
     def call_oracle(self, oraclename: str, args):
-        result = self.oracles[oraclename].invoke(args)
-        if oraclename == "io":
-            print(f"{oraclename} oracle result:", result)
+        result = self.oracles[oraclename].apply(args)
+        print(f"{oraclename} oracle result:", result)
         # self.call_logs.append(log_entry)
         return result
 

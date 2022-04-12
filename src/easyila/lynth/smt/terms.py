@@ -1155,7 +1155,13 @@ class ApplyUF(Term):
 
     @property
     def sort(self):
-        raise NotImplementedError()
+        if isinstance(self.fun, Variable):
+            return self.fun.sort.codomain
+        elif isinstance(self.fun, UFTerm):
+            return self.fun.sort
+        else:
+            return self.fun.return_sort
+        raise NotImplementedError(repr(self))
 
     @property
     def _children(self):
