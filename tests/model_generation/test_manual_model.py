@@ -43,7 +43,7 @@ class TestManualModel:
                 a_p1: a + 1,
                 var("result", bv3): ~a,
             },
-            default_next=[{a: should_inc.ite(a_p1, a)}],
+            default_next={a: should_inc.ite(a_p1, a)},
         )
         assert model.validate()
 
@@ -72,9 +72,9 @@ class TestManualModel:
             state=[s_top],
             outputs=[o_top],
             instances={"sub": Instance(submodule, {a_sub: a_top})},
-            default_next=[{
+            default_next={
                 s_top: smt.Variable("sub.s", bv3)
-            }],
+            },
             logic={
                 o_top: s_top + smt.Variable("sub.o", bv3)
             }

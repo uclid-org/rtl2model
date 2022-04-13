@@ -6,9 +6,9 @@ from typing import Collection, List, Dict, Optional, Tuple
 
 import easyila.lynth.smt as smt
 
-Instruction = List[Dict[smt.Term, smt.Term]]
+Instruction = Dict[smt.Term, smt.Term]
 """
-An `Instruction` represents a sequence of state transitions. A transition is a mapping
+An `Instruction` represents state transitions. A transition is a mapping
 of state variables to expressions computing their next values.
 
 A single instruction is considered to be atomic.
@@ -80,7 +80,7 @@ class Model:
     how do we distinguish between having ILA instructions to execute vs.
     having transitions? for now, just have a default "NEXT" instruction
     """
-    default_next: Instruction               = field(default_factory=lambda: [{}])
+    default_next: Instruction               = field(default_factory=dict)
     init_values: Dict[str, smt.BVConst]     = field(default_factory=dict)
     assertions: List[smt.Term]              = field(default_factory=list)
     assumptions: List[smt.Term]             = field(default_factory=list)
@@ -94,7 +94,7 @@ class Model:
         for uf in self.ufs:
             assert isinstance(uf, UFPlaceholder)
         assert isinstance(self.logic, dict)
-        assert isinstance(self.default_next, list)
+        assert isinstance(self.default_next, dict)
         assert isinstance(self.instances, dict)
         for i, m in self.instances.items():
             assert isinstance(i, str), f"instance name {i} is not a str (was {type(i)})"
@@ -104,6 +104,10 @@ class Model:
             assert isinstance(a.sort, smt.BoolSort)
         for a in self.assumptions:
             assert isinstance(a.sort, smt.BoolSort)
+
+    @property
+    def is_stateful(self):
+        return len(self.next_ufs) == 0 and len(self.default_next) == 0
 
     def validate(self):
         """
@@ -173,10 +177,9 @@ class Model:
         # TODO for now, outputs can also be UFs
         logic_and_next = {v.name for v in self.logic if isinstance(v, smt.Variable)}
         next_keys = set()
-        for l in self.default_next:
-            names = {v.name for v in l if isinstance(v, smt.Variable)}
-            next_keys.update(names)
-            logic_and_next.update(names)
+        names = {v.name for v in self.default_next if isinstance(v, smt.Variable)}
+        next_keys.update(names)
+        logic_and_next.update(names)
         for v in self.inputs:
             if v.name in self.logic:
                 report(f"input variable {v.name} has illegal declared logic")
@@ -199,10 +202,9 @@ class Model:
         for v, e in self.logic.items():
             if not e.typecheck():
                 report(f"type error in logic for {v} (see above output)")
-        for l in self.default_next:
-            for v, e in l.items():
-                if not e.typecheck():
-                    report(f"type error in transition logic for {v} (see above output)")
+        for v, e in self.default_next.items():
+            if not e.typecheck():
+                report(f"type error in transition logic for {v} (see above output)")
         return len(errs) == 0
 
     def pretty_str(self, indent_level=0):
@@ -234,7 +236,7 @@ class Model:
         else:
             logic_block = ""
         if len(self.default_next) > 0:
-            next_block = newline + c_newline.join(str(m) + ': ' + str(e) for m, e in self.default_next[0].items())
+            next_block = newline + c_newline.join(str(m) + ': ' + str(e) for m, e in self.default_next.items())
         else:
             next_block = ""
         return textwrap.indent(textwrap.dedent(f"""\
@@ -303,7 +305,7 @@ class Model:
                 "\n".join(
                     f"{next_vars[lhs].to_uclid()} = {fix_var_refs(rhs)};\n"
                     f"{lhs.to_uclid()} = {next_vars[lhs].to_uclid()};"
-                    for lhs, rhs in self.default_next[0].items()
+                    for lhs, rhs in self.default_next.items()
                 ),
                 newline + "    "
             )
@@ -311,7 +313,7 @@ class Model:
                 "\n".join(
                     f"{next_vars[lhs].to_uclid(prime_vars=True)} = {fix_var_refs(rhs, prime_vars=True)};\n"
                     f"{lhs.to_uclid(prime_vars=True)} = {next_vars[lhs].to_uclid(prime_vars=True)};"
-                    for lhs, rhs in self.default_next[0].items()
+                    for lhs, rhs in self.default_next.items()
                 ),
                 newline + "    "
             )
@@ -441,10 +443,9 @@ class Model:
                 logic={
                     k: t.replace_vars({split_var: cs_value_t}) for k, t in self.logic.items()
                 },
-                default_next=[
-                    {k: t.replace_vars({split_var: cs_value_t}) for k, t in l.items()}
-                    for l in self.default_next
-                ],
+                default_next={
+                    k: t.replace_vars({split_var: cs_value_t}) for k, t in self.default_next.items()
+                },
                 generated_by=GeneratedBy.CASE_SPLIT,
             )
             instances[f"{self.name}__{suffixes[i]}_inst"] = Instance(new_model, bindings)
@@ -472,7 +473,7 @@ class Model:
             ufs=self.ufs,
             instances=instances,
             logic=new_logic,
-            default_next=[],
+            default_next={},
             generated_by=self.generated_by | GeneratedBy.CASE_SPLIT,
         )
 

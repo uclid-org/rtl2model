@@ -59,7 +59,7 @@ class TestVerilogParse:
                     rn_a: a_p1,
                     var("result", bv3): ~a,
                 },
-                default_next=[{a: should_inc.ite(rn_a, a)}],
+                default_next={a: should_inc.ite(rn_a, a)},
             )
 
     def test_verilog_always_star(self):
@@ -91,7 +91,7 @@ class TestVerilogParse:
                 inputs=[in_],
                 state=[r0, r1],
                 logic={r1: r1 | in_},
-                default_next=[{r0: r0 | in_}]
+                default_next={r0: r0 | in_}
             )
 
     def test_verilog_single_imp_no_coi(self):
@@ -142,7 +142,7 @@ class TestVerilogParse:
                     b_p1: b + 1,
                     result: (~a) | (~b)
                 },
-                default_next=[{b: should_inc.ite(b_p1, b)}],
+                default_next={b: should_inc.ite(b_p1, b)},
             )
         model_no_b = verilog_to_model(rtl, "top", important_signals=["should_inc", "a", "a_p1", "result"])
         assert model_no_b.validate()
@@ -159,7 +159,7 @@ class TestVerilogParse:
                     a_p1: a + 1,
                     result: (~a) | (~b)
                 },
-                default_next=[{a: should_inc.ite(a_p1, a)}],
+                default_next={a: should_inc.ite(a_p1, a)},
             )
 
     def test_verilog_single_imp_uf_coi_logic(self):
@@ -214,7 +214,7 @@ class TestVerilogParse:
                     b_p1: b + 1,
                     result: (~a) | (~b)
                 },
-                default_next=[{b: should_inc.ite(b_p1, b)}],
+                default_next={b: should_inc.ite(b_p1, b)},
             )
         model_no_b = verilog_to_model(
             rtl,
@@ -237,7 +237,7 @@ class TestVerilogParse:
                     a_p1: a + 1,
                     result: (~a) | (~b)
                 },
-                default_next=[{a: should_inc.ite(a_p1, a)}],
+                default_next={a: should_inc.ite(a_p1, a)},
             )
 
     def test_verilog_single_imp_uf_coi_temporal_state(self):
@@ -331,7 +331,7 @@ class TestVerilogParse:
             # Even though `b_p1` isn't specified as important, it's still in the COI
             state=[b, b_p1],
             logic={b_p1: b + 1},
-            default_next=[{b: should_inc.ite(b_p1, b)}],
+            default_next={b: should_inc.ite(b_p1, b)},
         )
         assert model_no_b.validate()
         assert model_no_b == Model(
@@ -341,7 +341,7 @@ class TestVerilogParse:
             # Even though `a_p1` isn't specified as important, it's still in the COI
             state=[a, a_p1],
             logic={a_p1: a + 1},
-            default_next=[{a: should_inc.ite(a_p1, a)}],
+            default_next={a: should_inc.ite(a_p1, a)},
         )
 
     @pytest.mark.skip()
@@ -383,13 +383,13 @@ class TestVerilogParse:
             inputs=[rst, i_inner],
             outputs=[boolvar("o_inner")],
             state=[i_state],
-            default_next=[{
+            default_next={
                 i_state: rst.ite(
                     smt.BVConst(0, 3),
                     # The expression i_inner | i_state should implicitly upcast
                     i_inner.ite(smt.BVConst(1, 3), smt.BVConst(0, 3)) | i_state
                 )
-            }],
+            },
             logic={o_inner: i_state[0]}
         )
 
@@ -449,9 +449,9 @@ class TestVerilogParse:
             inputs=[rst, i_inner],
             outputs=[o_inner],
             state=[i_state],
-            default_next=[{
+            default_next={
                 i_state: rst.ite(smt.BoolConst.F, i_inner | i_state)
-            }],
+            },
             logic={o_inner: i_state}
         )
         assert exp_submodel.validate()
@@ -463,7 +463,7 @@ class TestVerilogParse:
             logic={
                 i_out_next: var("sub.o_inner", boolsort),
             },
-            default_next=[{i_top_last: i_top, o_top: i_out_next}],
+            default_next={i_top_last: i_top, o_top: i_out_next},
             instances={"sub": Instance(exp_submodel, {rst: rst, i_inner: i_top_last})},
         )
         assert exp_top.validate()
@@ -530,7 +530,7 @@ class TestVerilogParse:
             logic={
                 i_out_next: var("sub.o_inner", boolsort),
             },
-            default_next=[{i_top_last: i_top, o_top: i_out_next}],
+            default_next={i_top_last: i_top, o_top: i_out_next},
             instances={"sub": Instance(inner_def, {rst: rst, i_inner: i_top_last})},
         )
         assert exp_top.validate()
@@ -576,7 +576,7 @@ class TestVerilogParse:
             outputs=[rdata],
             state=[arr],
             logic={rdata: arr[reg]},
-            default_next=[{arr[reg]: wen.ite(wdata, arr[reg])}],
+            default_next={arr[reg]: wen.ite(wdata, arr[reg])},
         )
 
     def test_verilog_nested_child_no_coi(self):
@@ -631,7 +631,7 @@ class TestVerilogParse:
             outputs=[o],
             state=[state],
             logic={o: state ^ smt.BVConst(0b1111, 4)},
-            default_next=[{state: value + 1}],
+            default_next={state: value + 1},
         )
         exp_inner1 = Model(
             "inner1",
@@ -640,7 +640,7 @@ class TestVerilogParse:
             state=[state, inner_s],
             instances={"inst": Instance(exp_inner2, {value: value})},
             logic={inner_s: bvar("inst.o", 4), o: state | smt.BVConst(0b0110, 4)},
-            default_next=[{state: inner_s ^ value}],
+            default_next={state: inner_s ^ value},
         )
         exp_top = Model(
             "top",
@@ -649,7 +649,7 @@ class TestVerilogParse:
             state=[state, inner_s],
             instances={"inst": Instance(exp_inner1, {value: state})},
             logic={inner_s: bvar("inst.o", 4), o: inner_s},
-            default_next=[{state: inner_s & value}]
+            default_next={state: inner_s & value}
         )
         assert exp_inner2.validate()
         assert exp_inner1.validate()

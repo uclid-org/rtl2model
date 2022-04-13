@@ -46,7 +46,7 @@ class TestModelToUclid:
             # TODO move s_b into the grammar of uf_b instead
             ufs=[smt.UFTerm("uf_a", bv3, ()), smt.UFTerm("uf_b", bv3, (s_b,))],
             logic={o_a: var("uf_a", bv3) + s_a, o_b: var("uf_b", bv3) + s_b, s_a: i_a | i_b},
-            default_next=[{s_b: i_a[0].ite(i_a, s_b)}]
+            default_next={s_b: i_a[0].ite(i_a, s_b)}
         )
         model.print()
         actual_ucl = model.to_uclid().strip()

@@ -236,10 +236,10 @@ class TestCaseSplit:
             outputs=[out],
             state=[s_a, s_b],
             logic={out: s_b & s_a},
-            default_next=[{
+            default_next={
                 s_a: in_.op_eq(smt.BVConst(0b10, 2)).ite(s_a, s_a + 1),
                 s_b: s_a.op_eq(in_).ite(s_b, smt.BVConst(0, 2)),
-            }]
+            }
         )
         assert top.validate()
         cases = [
@@ -273,7 +273,7 @@ class TestCaseSplit:
                     3: v("_top__s_a__11_inst.out", bv2),
                 }),
             },
-            default_next=[{
+            default_next={
                 s_a: in_.op_eq(smt.BVConst(0b10, 2)).ite(s_a, s_a + 1),
                 s_b: s_a.match_const({
                     0: v("_top__s_a__00_inst.__next_s_b", bv2),
@@ -281,7 +281,7 @@ class TestCaseSplit:
                     2: v("_top__s_a__10_inst.__next_s_b", bv2),
                     3: v("_top__s_a__11_inst.__next_s_b", bv2),
                 }),
-            }]
+            }
         )
         assert cs_top.validate()
         alg_split = top.case_split("s_a")
