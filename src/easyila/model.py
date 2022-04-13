@@ -37,6 +37,9 @@ class UFPlaceholder:
         # that bv3 may have been used in an 8-way case stmt or something
         return smt.Variable(f"__free_{self.name}", self.sort)
 
+    def get_ref(self) -> smt.Variable:
+        return smt.Variable(self.name, self.sort)
+
     def to_ufterm(self) -> smt.UFTerm:
         free_var = self.maybe_free_arg_var()
         if free_var is not None:
@@ -107,7 +110,7 @@ class Model:
 
     @property
     def is_stateful(self):
-        return len(self.next_ufs) == 0 and len(self.default_next) == 0
+        return len(self.next_ufs) != 0 or len(self.default_next) != 0
 
     def validate(self):
         """
@@ -206,6 +209,8 @@ class Model:
             if not e.typecheck():
                 report(f"type error in transition logic for {v} (see above output)")
         return len(errs) == 0
+
+    # === STRING/FORMAT CONVERSIONS ===
 
     def pretty_str(self, indent_level=0):
         # Weird things happen with escaped chars in f-strings
@@ -364,6 +369,51 @@ class Model:
         # Submodules are added in DFS postorder traversal
         self._get_submodules(submodels, visited_submodel_names)
         return "\n\n".join(s.to_uclid() for s in submodels)
+
+    # === TRANSFORMATIONS ===
+
+    def flatten_state(self):
+        """
+        Pushes all intermediate logic and state transitions into a submodule.
+        # TODO deal with submodules
+        """
+        # The only state that should remain in the top module is state with clocked udpates
+        new_state = list(self.default_next.keys())
+        new_inst_name = f"__logic_{self.name}_inst"
+        sub_logic = dict(self.logic)
+        sub_logic.update({
+            v.add_prefix("__next_"): r for v, r in self.default_next.items()
+        })
+        submodel = Model(
+            f"__logic_{self.name}",
+            # Current value of state variables is treated as inputs to new submodule...
+            inputs=self.inputs + new_state + [u.get_ref() for u in self.next_ufs],
+            # ... and new value of state variables is the output
+            outputs=self.outputs + [s.add_prefix("__next_") for s in new_state],
+            logic=sub_logic,
+            ufs=self.ufs,
+        )
+        inst_bindings = {i: i for i in self.inputs}
+        inst_bindings.update({s: s for s in new_state})
+        inst_bindings.update({s.get_ref(): s.get_ref() for s in self.next_ufs})
+        return Model(
+            self.name,
+            inputs=self.inputs,
+            outputs=self.outputs,
+            state=new_state,
+            instances={
+                new_inst_name: Instance(submodel, inst_bindings)
+            },
+            default_next={
+                s: s.add_prefix(new_inst_name + ".__next_")
+                for s in new_state
+            },
+            logic={
+                o: o.add_prefix(new_inst_name + ".")
+                for o in self.outputs
+            },
+            next_ufs=self.next_ufs,
+        )
 
     def case_split(self, var_name: str, possible_values: Optional[Collection[int]]=None) -> "Model":
         """

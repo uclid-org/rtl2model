@@ -530,16 +530,19 @@ class Variable(Term):
     def __str__(self):
         return f"{self.name}"
 
-    def to_uf(self):
+    def to_uf(self) -> "UFTerm":
         """Converts this variable to a 0-arity `UFTerm`."""
         return UFTerm(self.name, self.sort, ())
 
-    def get_decl(self, init_value=None):
+    def get_decl(self, init_value=None) -> "VarDecl":
         """Gets a `Translatable` declaration of this variable."""
         return VarDecl(self.name, self.sort, init_value=init_value)
 
+    def add_prefix(self, prefix) -> "Variable":
+        return Variable(prefix + self.name, self.sort)
+
     @staticmethod
-    def from_cvc5(cvc5_term):
+    def from_cvc5(cvc5_term) -> "Variable":
         if cvc5_term.getKind() != pycvc5.Kind.Variable:
             raise TypeError("Variable must be translated from pycvc5.Kind.Variable, instead got " + str(cvc5_term.getKind()))
         # it seems like cvc5 will wrap the variable name in |var| if there are square brackets inside

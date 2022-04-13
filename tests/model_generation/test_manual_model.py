@@ -2,7 +2,7 @@
 import pytest
 
 import easyila.lynth.smt as smt
-from easyila.model import Model, Instance
+from easyila.model import *
 
 class TestManualModel:
     """
@@ -80,6 +80,68 @@ class TestManualModel:
             }
         )
         assert top.validate()
+
+    def test_model_flatten_state(self):
+        """
+        Tests pushing the transition relations of a module into submodules.
+        """
+        bv3 = smt.BVSort(3)
+        a = smt.Variable("a", bv3)
+        state = smt.Variable("state", bv3)
+        next_state = smt.Variable("__next_state", bv3)
+        state_uf_var = smt.Variable("state_uf", bv3)
+        logic = smt.Variable("logic", bv3)
+        out = smt.Variable("out", bv3)
+        top = Model(
+            "top",
+            inputs=[a],
+            outputs=[out],
+            state=[state, logic],
+            default_next={state: logic & smt.Variable("uf", bv3)},
+            logic={logic: a + state_uf_var, out: state + 1},
+            ufs=[UFPlaceholder("uf", bv3, (), True)],
+            next_ufs=[UFPlaceholder("state_uf", bv3, (), True)],
+        )
+        assert top.validate()
+        assert top.is_stateful
+        actual_flattened = top.flatten_state()
+        exp_flattened = Model(
+            "top",
+            inputs=[a],
+            outputs=[out],
+            state=[state],
+            instances={
+                "__logic_top_inst": Instance(
+                    Model(
+                        "__logic_top",
+                        inputs=[a, state, state_uf_var],
+                        outputs=[out, next_state],
+                        logic={
+                            logic: a + state_uf_var,
+                            next_state: logic & smt.Variable("uf", bv3),
+                            out: state + 1,
+                        },
+                        ufs=[UFPlaceholder("uf", bv3, (), True)]
+                    ),
+                    {
+                        a: a,
+                        state: state,
+                        state_uf_var: state_uf_var
+                    },
+                )
+            },
+            default_next={
+                state: smt.Variable("__logic_top_inst.__next_state", bv3),
+            },
+            logic={
+                out: smt.Variable("__logic_top_inst.out", bv3),
+            },
+            next_ufs=[UFPlaceholder("state_uf", bv3, (), True)],
+        )
+        assert exp_flattened.validate()
+        assert actual_flattened.validate()
+        assert actual_flattened == exp_flattened
+        assert not actual_flattened.instances["__logic_top_inst"].model.is_stateful
 
     def test_model_variable_dce(self):
         """
