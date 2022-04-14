@@ -911,14 +911,34 @@ class OpTerm(Term):
             t = t._replace_child(child.optimize(), i)
         assert isinstance(t, OpTerm), t
         assert self.kind == t.kind
+        def is_const(term):
+            return isinstance(term, BVConst) or isinstance(term, BoolConst)
+        # Special case for constant folding: ITEs/match where the cond is constant
+        if t.kind == Kind.Match:
+            cond = t.args[0]
+            if is_const(cond):
+                # Return value for correct case
+                # Recall that every other arg is cond, then value
+                for i in range(1, len(t.args) - 1):
+                    case = t.args[i]
+                    if case == cond:
+                        return t.args[i + 1]
+            else:
+                return t
+        if t.kind == Kind.Ite:
+            cond = t.args[0]
+            if is_const(cond):
+                return t.args[1] if bool(cond) else t.args[2]
+            else:
+                return t
         # Constant folding: all arguments must be constants
         # This technically isn't true for stuff like concats,
         # but this heuristic works for binops and unops
         args = t._children
         for child in args:
-            if not (isinstance(child, BVConst) or isinstance(child, BoolConst)):
+            if not is_const(child):
                 return t
-        return self._do_const_eval(args)
+        return t._do_const_eval(args)
 
     def eval(self, values):
         # Optimize all children first

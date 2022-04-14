@@ -16,7 +16,8 @@ class TestCaseSplit:
 
         Unused values + instances in each split should be pruned automatically.
 
-        Because no state variable has a clocked transition update, logic can be split cleanly.
+        Because no state variable has a clocked transition update, logic can be split cleanly,
+        and this model does not first need to be flattened.
         """
         rtl = textwrap.dedent("""\
             module c_true(output [3:0] o);
@@ -66,6 +67,7 @@ class TestCaseSplit:
         assert gen == top
         cs_top_t = Model(
             "_top__either__TRUE",
+            inputs=[ignore],
             outputs=[big_o],
             state=[v_t],
             instances={"c_t": Instance(c_true, {})},
@@ -76,6 +78,7 @@ class TestCaseSplit:
         )
         cs_top_f = Model(
             "_top__either__FALSE",
+            inputs=[ignore],
             outputs=[big_o],
             state=[v_f],
             instances={"c_f": Instance(c_false, {})},
@@ -84,20 +87,21 @@ class TestCaseSplit:
                 big_o: ignore & v_f,
             }
         )
-        # In the case split model, combinational logic is elided to the case split terms
+        # The case split transformation first flattens all state
+        # Then, in the submodel, combinational logic is elided to the case split terms
         # and all that remains is the identical I/O interface
         cs_top = Model(
             "top",
-            inputs=[either],
+            inputs=[either, ignore],
             outputs=[big_o],
             instances={
-                "_top__either_TRUE_inst": Instance(cs_top_t, {}),
-                "_top__either_FALSE_inst": Instance(cs_top_f, {})
+                "_top__either__TRUE_inst": Instance(cs_top_t, {ignore: ignore}),
+                "_top__either__FALSE_inst": Instance(cs_top_f, {ignore: ignore})
             },
             logic={
                 big_o: either.ite(
-                    v("_top__either_TRUE_inst.o", bv4),
-                    v("_top__either_FALSE_inst.o", bv4),
+                    v("_top__either__TRUE_inst.o", bv4),
+                    v("_top__either__FALSE_inst.o", bv4),
                 ),
             }
         )

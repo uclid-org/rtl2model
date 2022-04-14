@@ -398,6 +398,9 @@ class Model:
             if v in visited or v in non_state_set:
                 continue
             visited.add(v)
+            if "." in v.name:
+                # TODO Signal is an instance field
+                continue
             if v in self.logic:
                 term = self.logic[v]
                 parents = term.get_vars()
@@ -409,7 +412,7 @@ class Model:
                 dependencies[v].update(set(parents))
                 to_visit.extend(parents)
             else:
-                raise Exception(f"signal {v} was had no transition relation")
+                raise Exception(f"signal {v} has no transition relation or logic")
         # Compute cone of influence from dependency graph
         coi = {}
         visited = set()
@@ -515,6 +518,28 @@ class Model:
         If not specified, then all values encompassed by `var_name`'s sort will be
         used instead (e.g. a bv3 would have values 0-8).
         """
+        if self.is_stateful:
+            # If this model is stateful, then we must case split on logic only
+            top = self.flatten_state()
+            new_instances = {}
+            for n, i in top.instances.items():
+                if n == f"__logic__{top.name}_inst":
+                    new_instances[n] = Instance(
+                        i.model.case_split(var_name, possible_values),
+                        i.inputs,
+                    )
+                else:
+                    new_instances[n] = i
+            return Model(
+                top.name,
+                inputs=top.inputs,
+                outputs=top.outputs,
+                state=top.state,
+                instances=new_instances,
+                default_next=top.default_next,
+                logic=top.logic,
+                next_ufs=top.next_ufs,
+            )
         for v in self.inputs:
             if v.name == var_name:
                 # TODO validate possible_values if provided
@@ -553,10 +578,11 @@ class Model:
         # module/instance suffixes corresponding to possible_values
         varname = split_var.name
         if possible_values == (True, False):
-            suffixes = [f"{varname}_TRUE", f"{varname}_FALSE"]
+            suffixes = [f"{varname}__TRUE", f"{varname}__FALSE"]
         else:
-            suffixes = [f"{varname}_{n:0{split_var.sort.bitwidth}b}" for n in possible_values]
+            suffixes = [f"{varname}__{n:0{split_var.sort.bitwidth}b}" for n in possible_values]
         instances = {}
+        inst_names = [f"_{self.name}__{suffix}_inst" for suffix in suffixes]
         for i, cs_value in enumerate(possible_values):
             if isinstance(split_var.sort, smt.BoolSort):
                 cs_value_t = smt.BoolConst.T if cs_value else smt.BoolConst.F
@@ -564,7 +590,7 @@ class Model:
                 cs_value_t = smt.BVConst(cs_value, split_var.sort.bitwidth)
             bindings = {i: i for i in inputs}
             new_model = Model(
-                name=f"{self.name}__{suffixes[i]}",
+                name=f"_{self.name}__{suffixes[i]}",
                 inputs=inputs,
                 outputs=self.outputs,
                 state=self.state,
@@ -582,25 +608,27 @@ class Model:
                 },
                 # TODO may need to replace LHS of assignments too? in case of indexing and stuff
                 logic={
-                    k: t.replace_vars({split_var: cs_value_t}) for k, t in self.logic.items()
+                    k: t.replace_vars({split_var: cs_value_t}).optimize() for k, t in self.logic.items()
                 },
                 default_next={
-                    k: t.replace_vars({split_var: cs_value_t}) for k, t in self.default_next.items()
+                    k: t.replace_vars({split_var: cs_value_t}).optimize() for k, t in self.default_next.items()
                 },
                 generated_by=GeneratedBy.CASE_SPLIT,
             )
-            instances[f"{self.name}__{suffixes[i]}_inst"] = Instance(new_model, bindings)
+            # TODO do a DCE pass
+            # new_model = new_model.eliminate_dead_code()
+            instances[inst_names[i]] = Instance(new_model, bindings)
         if isinstance(split_var.sort, smt.BoolSort):
             new_logic = {
                 o: split_var.ite(
-                    smt.Variable(f"{self.name}__{suffixes[0]}.{o.name}", o.sort),
-                    smt.Variable(f"{self.name}__{suffixes[1]}.{o.name}", o.sort)
+                    smt.Variable(inst_names[0] + "." + o.name, o.sort),
+                    smt.Variable(inst_names[1] + "." + o.name, o.sort)
                 ) for o in self.outputs
             }
         else:
             new_logic = {
                 o: split_var.match_const({
-                    i: smt.Variable(f"{self.name}__{suffixes[i]}.{o.name}", o.sort)
+                    i: smt.Variable(inst_names[i] + o.name, o.sort)
                     for i, v in enumerate(possible_values)
                 }) for o in self.outputs
             }
