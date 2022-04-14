@@ -236,9 +236,13 @@ class Model:
         else:
             state_block = ""
         if len(self.ufs) > 0:
-            uf_block = newline + c_newline.join([str(a.to_ufterm()) for a in self.ufs])
+            uf_block = newline + c_newline.join([str(a) for a in self.ufs])
         else:
             uf_block = ""
+        if len(self.next_ufs) > 0:
+            next_uf_block = newline + c_newline.join([str(a) for a in self.next_ufs])
+        else:
+            next_uf_block = ""
         if len(self.instances) > 0:
             inst_block = newline + (newline + c_newline).join(str(m) + ':\n' + i.pretty_str(24) for m, i in self.instances.items())
         else:
@@ -257,6 +261,7 @@ class Model:
                 outputs={output_block}
                 state={state_block}
                 ufs={uf_block}
+                next_ufs={next_uf_block}
                 instances={inst_block}
                 logic={logic_block}
                 default_next={next_block}

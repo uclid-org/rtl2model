@@ -88,7 +88,7 @@ class TestManualModel:
         bv3 = smt.BVSort(3)
         a = smt.Variable("a", bv3)
         state = smt.Variable("state", bv3)
-        next_state = smt.Variable("__next_state", bv3)
+        next_state = smt.Variable("__next__state", bv3)
         state_uf_var = smt.Variable("state_uf", bv3)
         logic = smt.Variable("logic", bv3)
         out = smt.Variable("out", bv3)
@@ -140,6 +140,7 @@ class TestManualModel:
         )
         assert exp_flattened.validate()
         assert actual_flattened.validate()
+        actual_flattened.print()
         assert actual_flattened == exp_flattened
         assert not actual_flattened.instances["__logic__top_inst"].model.is_stateful
 

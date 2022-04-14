@@ -232,7 +232,7 @@ class TestCaseSplit:
         in_ = v("in", bv2)
         s_a = v("s_a", bv2)
         s_b = v("s_b", bv2)
-        next_s_b = v("__next_s_b", bv2)
+        next_s_b = v("__next__s_b", bv2)
         out = v("out", bv2)
         top = Model(
             "top",
@@ -280,10 +280,10 @@ class TestCaseSplit:
             default_next={
                 s_a: in_.op_eq(smt.BVConst(0b10, 2)).ite(s_a, s_a + 1),
                 s_b: s_a.match_const({
-                    0: v("_top__s_a__00_inst.__next_s_b", bv2),
-                    1: v("_top__s_a__01_inst.__next_s_b", bv2),
-                    2: v("_top__s_a__10_inst.__next_s_b", bv2),
-                    3: v("_top__s_a__11_inst.__next_s_b", bv2),
+                    0: v("_top__s_a__00_inst.__next__s_b", bv2),
+                    1: v("_top__s_a__01_inst.__next__s_b", bv2),
+                    2: v("_top__s_a__10_inst.__next__s_b", bv2),
+                    3: v("_top__s_a__11_inst.__next__s_b", bv2),
                 }),
             }
         )
