@@ -3,7 +3,7 @@ from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import asdict, dataclass
 from enum import Enum, EnumMeta, IntEnum, auto
 import json
-from typing import Callable, Dict, Optional, TypeVar, Union
+from typing import Callable, Dict, Optional, TypeVar, Union, List
 
 import pycvc5
 
@@ -221,8 +221,23 @@ class Term(Translatable, ABC):
         if not shortcircuit or bool(rv):
             for s in self._children:
                 assert isinstance(s, Term), s
-                self.preorder_visit_tree(visit_fn, shortcircuit)
+                s.preorder_visit_tree(visit_fn, shortcircuit)
         return rv
+
+    def get_vars(self) -> List["Variable"]:
+        """
+        Returns the list of variables referenced in this expression tree.
+        """
+        visited = set()
+        child_vars = []
+        def visitor(term):
+            if term in visited:
+                return
+            if isinstance(term, Variable):
+                visited.add(term)
+                child_vars.append(term)
+        self.preorder_visit_tree(visitor, False)
+        return child_vars
 
     def optimize(self) -> "Term":
         if isinstance(self, OpTerm):

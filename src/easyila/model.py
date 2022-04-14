@@ -89,6 +89,8 @@ class Model:
     assumptions: List[smt.Term]             = field(default_factory=list)
     generated_by: GeneratedBy               = field(default=GeneratedBy.MANUAL, compare=False)
 
+    # === VALIDATION AND PROPERTIES ===
+
     def __post_init__(self):
         assert isinstance(self.inputs, list)
         assert isinstance(self.outputs, list)
@@ -372,24 +374,105 @@ class Model:
 
     # === TRANSFORMATIONS ===
 
+    def eliminate_dead_code(self):
+        """
+        Removes state variables, instances, and UFs that don't influence the output. Inputs and
+        outputs are always preserved.
+
+        This is run recursively on instances, but does not take into account inter-module
+        connections when examining liveness of a signal.
+        """
+        # Maps SMT var to set of SMT var parents
+        dependencies = defaultdict(set)
+        # UFs already have dependencies encoded
+        for u in self.ufs:
+            dependencies[u.get_ref()].update(set(u.params))
+        for u in self.next_ufs:
+            dependencies[u.get_ref()].update(set(u.params))
+        to_visit = self.outputs[:]
+        visited = set()
+        non_state_set = set(self.inputs)
+        non_state_set.update(set(u.get_ref() for u in self.next_ufs))
+        non_state_set.update(set(u.get_ref() for u in self.ufs))
+        for v in to_visit:
+            if v in visited or v in non_state_set:
+                continue
+            visited.add(v)
+            if v in self.logic:
+                term = self.logic[v]
+                parents = term.get_vars()
+                dependencies[v].update(set(parents))
+                to_visit.extend(parents)
+            elif v in self.default_next:
+                term = self.default_next[v]
+                parents = term.get_vars()
+                dependencies[v].update(set(parents))
+                to_visit.extend(parents)
+            else:
+                raise Exception(f"signal {v} was had no transition relation")
+        # Compute cone of influence from dependency graph
+        coi = {}
+        visited = set()
+        def visit(v):
+            if v in visited:
+                return {}
+            parents = dependencies[v]
+            if v not in coi:
+                coi[v.name] = {v.name: ()}
+            for p in parents:
+                if p not in visited:
+                    if p not in coi:
+                        coi[p.name] = {p.name: ()}
+                    coi[p.name] |= visit(p)
+                coi[v.name] |= coi[p.name]
+            return coi[v.name]
+        for v in self.outputs:
+            visit(v)
+        coi = {k: list(v.keys()) for k, v in coi.items()}
+        all_parent_names = set()
+        needed_instance_names = set()
+        for v in self.outputs:
+            all_parent_names.update(coi[v.name])
+            for sig_name in coi[v.name]:
+                if "." in sig_name:
+                    needed_instance_names.add(sig_name.split(".")[0])
+        new_state = [s for s in self.state if s.name in all_parent_names]
+        new_ufs = [u for u in self.ufs if u.name in all_parent_names]
+        new_next_ufs = [u for u in self.next_ufs if u.name in all_parent_names]
+        new_instances = {n: i for n, i in self.instances.items() if n in needed_instance_names}
+        new_transitions = {v: term for v, term in self.default_next.items() if v.name in all_parent_names}
+        new_logic = {v: term for v, term in self.logic.items() if v.name in all_parent_names}
+        return Model(
+            self.name,
+            inputs=self.inputs,
+            outputs=self.outputs,
+            state=new_state,
+            instances=new_instances,
+            default_next=new_transitions,
+            logic=new_logic,
+            ufs=new_ufs,
+            next_ufs=new_next_ufs,
+        )
+
     def flatten_state(self):
         """
         Pushes all intermediate logic and state transitions into a submodule.
         # TODO deal with submodules
         """
         # The only state that should remain in the top module is state with clocked udpates
+        NEXT_PREFIX = "__next__"
         new_state = list(self.default_next.keys())
-        new_inst_name = f"__logic_{self.name}_inst"
+        new_inst_name = f"__logic__{self.name}_inst"
         sub_logic = dict(self.logic)
         sub_logic.update({
-            v.add_prefix("__next_"): r for v, r in self.default_next.items()
+            v.add_prefix(NEXT_PREFIX): r for v, r in self.default_next.items()
         })
         submodel = Model(
-            f"__logic_{self.name}",
+            f"__logic__{self.name}",
             # Current value of state variables is treated as inputs to new submodule...
             inputs=self.inputs + new_state + [u.get_ref() for u in self.next_ufs],
             # ... and new value of state variables is the output
-            outputs=self.outputs + [s.add_prefix("__next_") for s in new_state],
+            outputs=self.outputs + [s.add_prefix(NEXT_PREFIX) for s in new_state],
             logic=sub_logic,
             ufs=self.ufs,
         )
@@ -405,7 +488,7 @@ class Model:
                 new_inst_name: Instance(submodel, inst_bindings)
             },
             default_next={
-                s: s.add_prefix(new_inst_name + ".__next_")
+                s: s.add_prefix(new_inst_name + "." + NEXT_PREFIX)
                 for s in new_state
             },
             logic={

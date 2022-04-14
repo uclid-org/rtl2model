@@ -111,9 +111,9 @@ class TestManualModel:
             outputs=[out],
             state=[state],
             instances={
-                "__logic_top_inst": Instance(
+                "__logic__top_inst": Instance(
                     Model(
-                        "__logic_top",
+                        "__logic__top",
                         inputs=[a, state, state_uf_var],
                         outputs=[out, next_state],
                         logic={
@@ -131,17 +131,17 @@ class TestManualModel:
                 )
             },
             default_next={
-                state: smt.Variable("__logic_top_inst.__next_state", bv3),
+                state: smt.Variable("__logic__top_inst.__next__state", bv3),
             },
             logic={
-                out: smt.Variable("__logic_top_inst.out", bv3),
+                out: smt.Variable("__logic__top_inst.out", bv3),
             },
             next_ufs=[UFPlaceholder("state_uf", bv3, (), True)],
         )
         assert exp_flattened.validate()
         assert actual_flattened.validate()
         assert actual_flattened == exp_flattened
-        assert not actual_flattened.instances["__logic_top_inst"].model.is_stateful
+        assert not actual_flattened.instances["__logic__top_inst"].model.is_stateful
 
     def test_model_variable_dce(self):
         """
@@ -149,5 +149,65 @@ class TestManualModel:
         Inputs cannot be eliminated because they change the compositional
         behavior of models.
         """
-        ...
-        assert False
+        v = smt.Variable
+        bv2 = smt.BVSort(2)
+        a = v("a", bv2)
+        b = v("b", bv2)
+        s0 = v("s0", bv2)
+        s1 = v("s1", bv2)
+        s2 = v("s2", bv2)
+        s3 = v("s3", bv2)
+        s4 = v("s4", bv2)
+        o = v("o", bv2)
+        top = Model(
+            "top",
+            inputs=[a, b], # b is unused
+            outputs=[o],
+            # s0 is used through s2, s1 is unused, s2 is used directly, s3/s4 are used through a used UF
+            state=[s0, s1, s2, s3, s4],
+            # uf0 is used, uf1 is not used
+            ufs=[
+                UFPlaceholder("uf0", bv2, (s3,), False),
+                UFPlaceholder("uf1", bv2, (s1,), False),
+            ],
+            # nuf0 is used, nuf1 is not used
+            next_ufs=[
+                UFPlaceholder("nuf0", bv2, (s4,), False),
+                UFPlaceholder("nuf1", bv2, (s1,), False),
+            ],
+            logic={
+                o: s2 + v("uf0", bv2) + v("nuf0", bv2),
+                s2: s0 + 2,
+                s1: s0 & b & v("uf1", bv2) & v("nuf1", bv2),
+            },
+            default_next={
+                s0: a + 1,
+                s3: a + 1,
+                s4: a + 1,
+            },
+        )
+        assert top.validate()
+        actual = top.eliminate_dead_code()
+        expected = Model(
+            "top",
+            inputs=[a, b], # b is unused
+            outputs=[o],
+            state=[s0, s2, s3, s4],
+            ufs=[
+                UFPlaceholder("uf0", bv2, (s3,), False),
+            ],
+            next_ufs=[
+                UFPlaceholder("nuf0", bv2, (s4,), False),
+            ],
+            logic={
+                o: s2 + v("uf0", bv2) + v("nuf0", bv2),
+                s2: s0 + 2,
+            },
+            default_next={
+                s0: a + 1,
+                s3: a + 1,
+                s4: a + 1,
+            },
+        )
+        assert actual.validate()
+        assert actual == expected

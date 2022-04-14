@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 import logging
 import os
+import random
 from subprocess import Popen, PIPE
 import sys
 from typing import Dict, Callable, Iterator, List, Union, Optional, Tuple
@@ -57,13 +58,18 @@ class OracleInterface(ABC):
         else:
             raise Exception("oracle function must be callable or path to external binary, instead was " + str(type(oracle)))
         self.name = name
-        self.calls: List[CallResult] = []
         self.replay_inputs = replay_inputs
         self._replay_iter: Optional[Iterator[Tuple[int, ...]]]
         if replay_inputs:
             self._replay_iter = iter(replay_inputs)
         else:
             self._replay_iter = None
+        self.i_history = []
+        self.o_history = []
+
+    @property
+    def calls(self) -> List[CallResult]:
+        return [CallResult(i, o) for i, o in zip(self.i_history, self.o_history)]
 
     def next_replay_input(self):
         if self._replay_iter is not None:
@@ -78,9 +84,9 @@ class OracleInterface(ABC):
         else:
             output = self.lfun(args)
         output = int(output)
-        result = CallResult(args, output)
-        self.calls.append(result)
-        return result
+        self.i_history.append(args)
+        self.o_history.append(output)
+        return CallResult(args, output)
 
     @abstractmethod
     def apply_constraints(self, slv, fun):
@@ -112,11 +118,13 @@ class IOOracle(OracleInterface):
         oracle: Union[Callable, str],
         *,
         replay_inputs: Optional[List[Tuple[int, ...]]]=None,
-        log_path: Optional[str]=None
+        log_path: Optional[str]=None,
+        seed: Optional[int]=None,
     ):
         super().__init__(name, oracle, replay_inputs, log_path)
         self.in_widths = in_widths
         self.out_width = out_width
+        self.rng = random.Random(seed)
 
     @staticmethod
     def from_call_logs(name, in_widths, out_width, oracle, replay_log_path, *, new_log_path=None):
@@ -125,6 +133,16 @@ class IOOracle(OracleInterface):
             for l in f.readlines():
                 inputs.append([int(s) for s in l.split()[:-1]])
         return IOOracle(name, in_widths, out_width, oracle, replay_inputs=inputs, log_path=new_log_path)
+
+    def new_random(self):
+        """
+        Returns a set of uniformly sampled, new random inputs.
+        """
+        repeated = True
+        while repeated:
+            new_inputs = [self.rng.randint(2 ** w - 1) for w in self.in_widths]
+            repeated = new_inputs in self.i_history
+        return new_inputs
 
     # Generate the term that enforce input output pair matches with uninterpreted function
     def apply_constraints(self, slv, fun):
