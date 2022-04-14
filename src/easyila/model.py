@@ -439,7 +439,15 @@ class Model:
         new_state = [s for s in self.state if s.name in all_parent_names]
         new_ufs = [u for u in self.ufs if u.name in all_parent_names]
         new_next_ufs = [u for u in self.next_ufs if u.name in all_parent_names]
-        new_instances = {n: i for n, i in self.instances.items() if n in needed_instance_names}
+        new_instances = {}
+        for n, i in self.instances.items():
+            if n not in needed_instance_names:
+                continue
+            new_instances[n] = i
+            # TODO figure out how to recursively call for subinstances
+            # and deal with liveliness for input ports
+            # perhaps treat instance as a single variable, with input bindings as parents
+
         new_transitions = {v: term for v, term in self.default_next.items() if v.name in all_parent_names}
         new_logic = {v: term for v, term in self.logic.items() if v.name in all_parent_names}
         return Model(

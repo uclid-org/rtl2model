@@ -346,9 +346,11 @@ class ModelBuilder(ABC):
                 for i, v in enumerate(sf.bound_vars):
                     print(f"- {v.name} (input {i + 1}):", inputs[i])
             else:
-                inputs = []
-                for i, v in enumerate(sf.bound_vars):
-                    inputs.append(input(f"{v.name} (input {i + 1}): "))
+                inputs = io_o.new_random_inputs()
+                # inputs = []
+                # for i, v in enumerate(sf.bound_vars):
+                #     inputs.append(input(f"{v.name} (input {i + 1}): "))
+                # inputs = tuple(inputs)
             solver.reinit_cvc5()
             self.o_ctx.call_oracle("io", inputs)
             self.o_ctx.oracles["io"].save_call_logs()

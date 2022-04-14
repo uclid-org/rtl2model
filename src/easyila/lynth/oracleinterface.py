@@ -12,7 +12,7 @@ import easyila.lynth.smt as smt
 
 @dataclass
 class CallResult:
-    inputs: List
+    inputs: Tuple[int, ...]
     output: int
 
     def to_tuple(self):
@@ -134,13 +134,13 @@ class IOOracle(OracleInterface):
                 inputs.append([int(s) for s in l.split()[:-1]])
         return IOOracle(name, in_widths, out_width, oracle, replay_inputs=inputs, log_path=new_log_path)
 
-    def new_random(self):
+    def new_random_inputs(self):
         """
         Returns a set of uniformly sampled, new random inputs.
         """
         repeated = True
         while repeated:
-            new_inputs = [self.rng.randint(2 ** w - 1) for w in self.in_widths]
+            new_inputs = tuple(self.rng.randint(0, 2 ** w - 1) for w in self.in_widths)
             repeated = new_inputs in self.i_history
         return new_inputs
 
