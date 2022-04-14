@@ -211,3 +211,67 @@ class TestManualModel:
         )
         assert actual.validate()
         assert actual == expected
+
+    def test_model_dce_instance(self):
+        """
+        Tests dead code elimination when a dependency goes through an instance.
+        """
+        bv2 = smt.BVSort(2)
+        v = smt.Variable
+        inner_a = v("inner_a", bv2)
+        inner_o = v("inner_o", bv2)
+        unused_s = v("unused_s", bv2)
+        # Even though there is no dependency from inner_o to inner_a,
+        # the top module isn't aware of this
+        sub = Model(
+            "sub",
+            inputs=[inner_a],
+            outputs=[inner_o],
+            state=[unused_s],
+            logic={inner_o: smt.BVConst(1, 2)},
+            default_next={unused_s: inner_a},
+        )
+        top_o = v("top_o", bv2)
+        s0 = v("s0", bv2)
+        s1 = v("s1", bv2)
+        s2 = v("s2", bv2)
+        s3 = v("s3", bv2)
+        i0 = v("i0", bv2)
+        i1 = v("i1", bv2)
+        top = Model(
+            "top",
+            inputs=[i0, i1],
+            outputs=[top_o],
+            state=[s0, s1, s2, s3], # s0/s2 are live, s1/s3 are not
+            instances={
+                "live": Instance(sub, {inner_a: s0}),
+                "dead": Instance(sub, {inner_a: s1}),
+            },
+            logic={
+                s0: i0,
+                s1: i1,
+                s2: v("live.inner_o", bv2) + 1,
+                s3: v("dead.inner_o", bv2) + 1,
+                top_o: s2,
+            },
+        )
+        assert top.validate()
+        exp_sub = Model(
+            "sub",
+            inputs=[inner_a],
+            outputs=[inner_o],
+            logic={inner_o: smt.BVConst(1, 2)},
+        )
+        expected = Model(
+            "top",
+            outputs=[top_o],
+            inputs=[i0, i1],
+            state=[s0, s2],
+            instances={"live": Instance(exp_sub, {inner_a: s0})},
+            logic={s0: i0, s2: v("live.inner_o", bv2) + 1, top_o: s2},
+        )
+        actual = top.eliminate_dead_code()
+        actual.print()
+        assert actual.validate()
+        assert actual == expected
+

@@ -20,6 +20,7 @@ class GeneratedBy(enum.IntFlag):
     MANUAL          = enum.auto()
     SYGUS2          = enum.auto()
     CASE_SPLIT      = enum.auto()
+    FLATTEN         = enum.auto()
 
 
 @dataclass(frozen=True)
@@ -99,7 +100,11 @@ class Model:
         for uf in self.ufs:
             assert isinstance(uf, UFPlaceholder)
         assert isinstance(self.logic, dict)
+        for _k, t in self.logic.items():
+            assert isinstance(t, smt.Term), t
         assert isinstance(self.default_next, dict)
+        for _k, t in self.default_next.items():
+            assert isinstance(t, smt.Term), t
         assert isinstance(self.instances, dict)
         for i, m in self.instances.items():
             assert isinstance(i, str), f"instance name {i} is not a str (was {type(i)})"
@@ -383,62 +388,74 @@ class Model:
         connections when examining liveness of a signal.
         """
         # Maps SMT var to set of SMT var parents
+        # Instance names are also added here as both keys and values
+        # e.g. a connection of s0 -> inst.out -> s1 would produce dependencies
+        # of inst: s0 and s1: inst
         dependencies = defaultdict(set)
-        # UFs already have dependencies encoded
+        def normalize(vs):
+            """Replaces instance fields by the instance name"""
+            return tuple(v.name.split(".")[0] if "." in v.name else v.name for v in vs)
+        # UFs already have parents encoded
         for u in self.ufs:
-            dependencies[u.get_ref()].update(set(u.params))
+            dependencies[u.name].update({v.name for v in u.params})
         for u in self.next_ufs:
-            dependencies[u.get_ref()].update(set(u.params))
-        to_visit = self.outputs[:]
+            dependencies[u.name].update({v.name for v in u.params})
+        # Instances already have parents encoded
+        for n, i in self.instances.items():
+            i_deps = set()
+            for term in i.inputs.values():
+                i_deps.update(normalize(term.get_vars()))
+            dependencies[n] = i_deps
+        to_visit = self.outputs[:] # List of vars, where everything else is Set[str]
         visited = set()
         non_state_set = set(self.inputs)
-        non_state_set.update(set(u.get_ref() for u in self.next_ufs))
-        non_state_set.update(set(u.get_ref() for u in self.ufs))
+        non_state_set.update(set(u.name for u in self.next_ufs))
+        non_state_set.update(set(u.name for u in self.ufs))
         for v in to_visit:
-            if v in visited or v in non_state_set:
+            if v.name in visited or v.name in non_state_set or "." in v.name:
+                # Parents of instance outputs are already handled
                 continue
-            visited.add(v)
-            if "." in v.name:
-                # TODO Signal is an instance field
-                continue
+            visited.add(v.name)
             if v in self.logic:
                 term = self.logic[v]
-                parents = term.get_vars()
-                dependencies[v].update(set(parents))
-                to_visit.extend(parents)
+                parent_vars = term.get_vars()
+                parents = normalize(parent_vars)
+                dependencies[v.name].update(set(parents))
+                to_visit.extend(parent_vars)
             elif v in self.default_next:
                 term = self.default_next[v]
-                parents = term.get_vars()
-                dependencies[v].update(set(parents))
-                to_visit.extend(parents)
+                parents = normalize(parent_vars)
+                dependencies[v.name].update(set(parents))
+                to_visit.extend(parent_vars)
             else:
                 raise Exception(f"signal {v} has no transition relation or logic")
         # Compute cone of influence from dependency graph
         coi = {}
         visited = set()
-        def visit(v):
-            if v in visited:
+        def visit(v_name):
+            if v_name in visited:
                 return {}
-            parents = dependencies[v]
-            if v not in coi:
-                coi[v.name] = {v.name: ()}
+            visited.add(v_name)
+            parents = dependencies[v_name]
+            if v_name not in coi:
+                # Use empty dict to preserve insertion order
+                coi[v_name] = {v_name: ()}
             for p in parents:
                 if p not in visited:
                     if p not in coi:
-                        coi[p.name] = {p.name: ()}
-                    coi[p.name] |= visit(p)
-                coi[v.name] |= coi[p.name]
-            return coi[v.name]
+                        coi[p] = {p: ()}
+                    coi[p] |= visit(p)
+                coi[v_name] |= coi[p]
+            return coi[v_name]
         for v in self.outputs:
-            visit(v)
+            visit(v.name)
         coi = {k: list(v.keys()) for k, v in coi.items()}
         all_parent_names = set()
         needed_instance_names = set()
         for v in self.outputs:
             all_parent_names.update(coi[v.name])
-            for sig_name in coi[v.name]:
-                if "." in sig_name:
-                    needed_instance_names.add(sig_name.split(".")[0])
+            for n in coi[v.name]:
+                needed_instance_names.add(n)
         new_state = [s for s in self.state if s.name in all_parent_names]
         new_ufs = [u for u in self.ufs if u.name in all_parent_names]
         new_next_ufs = [u for u in self.next_ufs if u.name in all_parent_names]
@@ -446,10 +463,8 @@ class Model:
         for n, i in self.instances.items():
             if n not in needed_instance_names:
                 continue
-            new_instances[n] = i
-            # TODO figure out how to recursively call for subinstances
-            # and deal with liveliness for input ports
-            # perhaps treat instance as a single variable, with input bindings as parents
+            # Recursively perform DCE on child instances as well
+            new_instances[n] = Instance(i.model.eliminate_dead_code(), i.inputs)
 
         new_transitions = {v: term for v, term in self.default_next.items() if v.name in all_parent_names}
         new_logic = {v: term for v, term in self.logic.items() if v.name in all_parent_names}
@@ -486,6 +501,7 @@ class Model:
             outputs=self.outputs + [s.add_prefix(NEXT_PREFIX) for s in new_state],
             logic=sub_logic,
             ufs=self.ufs,
+            generated_by=self.generated_by | GeneratedBy.FLATTEN,
         )
         inst_bindings = {i: i for i in self.inputs}
         inst_bindings.update({s: s for s in new_state})
@@ -507,6 +523,7 @@ class Model:
                 for o in self.outputs
             },
             next_ufs=self.next_ufs,
+            generated_by=self.generated_by | GeneratedBy.FLATTEN,
         )
 
     def case_split(self, var_name: str, possible_values: Optional[Collection[int]]=None) -> "Model":
@@ -539,6 +556,7 @@ class Model:
                 default_next=top.default_next,
                 logic=top.logic,
                 next_ufs=top.next_ufs,
+                generated_by=top.generated_by,
             )
         for v in self.inputs:
             if v.name == var_name:
