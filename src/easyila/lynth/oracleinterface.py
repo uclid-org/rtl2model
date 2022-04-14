@@ -18,6 +18,9 @@ class CallResult:
     def to_tuple(self):
         return (*self.inputs, self.output)
 
+    def __str__(self):
+        return "inputs=" + ", ".join(f"{i:#x}" for i in self.inputs) + "; output=" + f"{self.output:#x}"
+
 
 class OracleInterface(ABC):
     """

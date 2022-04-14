@@ -47,7 +47,7 @@ class RvMiniModel(ModelBuilder):
             # the trace seems to stall for some reason though? TODO ask adwait about that
             # for now, the pattern seems to be that 4 adds retire successfully, then the next add
             # stalls for an additional 3 cycles
-        ).fill({"a": int(inputs[0]), "b": int(inputs[1])})
+        ).fill({"a": inputs[0] & 0xFFF, "b": inputs[1] & 0xFFF})
 
     def simulate_and_read_signals(self, sketch):
         hex_arr = sketch.to_hex_str_array()
@@ -131,28 +131,23 @@ def main():
     model.build_binary()
     fn = model.main_sygus_loop()
 
-    v = smt.Variable
-    a = v("io_A", bv32)
-    b = v("io_B", bv32)
-    io_out = v("io_out", bv32)
-    alu = Model(
-        "ALUArea",
-        # TODO think about the variance of inputs/outputs for a module
-        # inputs (like io_alu_op here) can be omitted if their value is unused internally,
-        # though anything that instantiates this instance would have to somehow be aware of that
-        # (maybe via dependency graph traversal)
-        # outputs cannot be omitted, unless their parent doesn't use them
-        inputs=[a, b, v("io_alu_op", smt.BVSort(4))],
-        outputs=[io_out, v("io_sum", bv32)],
-        ufs=[smt.UFTerm("io_sum", bv32, ())],
-        logic={io_out: fn.apply(a, b)},
-    )
-    verilog_to_model(
-        "../hwlifting/processors/riscv-mini/full.v",
-        "Core",
-        clock_pattern=".*clock",
-        defined_modules=[alu],
-    ).print()
+    # v = smt.Variable
+    # a = v("io_A", bv32)
+    # b = v("io_B", bv32)
+    # io_out = v("io_out", bv32)
+    # alu = Model(
+    #     "ALUArea",
+    #     inputs=[a, b, v("io_alu_op", smt.BVSort(4))],
+    #     outputs=[io_out, v("io_sum", bv32)],
+    #     ufs=[UFPlaceholder("io_sum", bv32, (), False)],
+    #     logic={io_out: fn.apply(a, b)},
+    # )
+    # verilog_to_model(
+    #     "../hwlifting/processors/riscv-mini/full.v",
+    #     "Core",
+    #     clock_pattern=".*clock",
+    #     defined_modules=[alu],
+    # ).print()
 
 if __name__ == '__main__':
     main()

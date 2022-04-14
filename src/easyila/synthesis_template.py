@@ -97,6 +97,7 @@ class ModelBuilder(ABC):
         self.widths = widths
         self.signal_values = signal_values
         output_sigs = self.guidance.get_outputs()
+        sampled_outputs = set()
         output_vals = []
         def q2b(qp):
             """Converts qualified signal path ("top->reset") to a base path ("reset")"""
@@ -113,10 +114,18 @@ class ModelBuilder(ABC):
                 for cc, values in enumerate(signal_values):
                     should_sample = cond_or_cycle.eval({q2b(sig): v for sig, v in values.items()})
                     if bool(should_sample):
-                        output_vals.append(signal_values[cc][signame])
+                        sampled_outputs.add(signame)
+                        val = signal_values[cc][signame]
+                        print(f"Sampled {signame}@{cc}={val}")
+                        output_vals.append(val)
             else:
                 cycle = cond_or_cycle
-                output_vals.append(signal_values[cycle][signame])
+                sampled_outputs.add(signame)
+                val = signal_values[cc][signame]
+                print(f"Sampled {signame}@{cc}={val}")
+                output_vals.append(val)
+        if len(output_vals) != len(output_sigs):
+            raise Exception("Failed to sample signal", sampled_outputs - {t[0] for t in output_sigs})
         return output_vals
 
     def generate_test_block_verilog(self, signal_values, signal_widths, func: smt.LambdaTerm):
@@ -360,12 +369,12 @@ class ModelBuilder(ABC):
             if sr.is_unsat:
                 solution = sr.solution
                 # pycvc5_utils.print_synth_solutions(terms, solution)
-                print(solution.to_sygus2())
+                print(solution)
                 cr = self.o_ctx.call_oracle("corr", solution)
                 is_correct = cr.output
                 if is_correct:
                     print("All oracles passed. Found a solution: ")
-                    print(solution.to_sygus2())
+                    print(solution)
                     self.o_ctx.oracles["io"].save_call_logs()
                     return solution
             else:

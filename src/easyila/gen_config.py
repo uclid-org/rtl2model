@@ -23,7 +23,7 @@ MACROS = r'''
 		file_ << "2\n"; \
 	} \
 	else { \
-		sprintf(buf, "%d\n", (int) top_->varname); \
+		sprintf(buf, "%u\n", (int) top_->varname); \
 		file_ << std::string(buf); \
 		file_ << "1\n"; \
 	}
@@ -31,13 +31,13 @@ MACROS = r'''
 
 #ifndef CSV_FIRST_VAR_STMT
 #define CSV_FIRST_VAR_STMT(varname) \
-    sprintf(buf, "%d", (int) top_->varname); \
+    sprintf(buf, "%u", (int) top_->varname); \
     file_ << std::string(buf);
 #endif // CSV_FIRST_VAR_STMT
 
 #ifndef CSV_VAR_STMT
 #define CSV_VAR_STMT(varname) \
-    sprintf(buf, ",%d", (int) top_->varname); \
+    sprintf(buf, ",%u", (int) top_->varname); \
     file_ << std::string(buf);
 #endif // CSV_VAR_STMT
 
