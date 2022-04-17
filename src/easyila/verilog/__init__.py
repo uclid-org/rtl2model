@@ -153,7 +153,7 @@ def verilog_to_model(
             instance_names,
             True, # TODO configure preserve_all_signals?
             all_signals,
-            important_signals,
+            all_signals, # TODO set important_signals for children
             coi_conf,
             submodules,
             inline_renames
@@ -260,7 +260,7 @@ def _verilog_model_helper(
         important_signal_set = set(important_signals)
     elif coi_conf == COIConf.KEEP_COI:
         if preserve_all_signals:
-            pass
+            important_signal_set = set(important_signals)
         else:
             # When KEEP_COI is specified, all signals in the COI of an important signal is kept
             coi = deps.compute_coi(important_signals)

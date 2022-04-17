@@ -382,7 +382,58 @@ class Model:
         self._get_submodules(submodels, visited_submodel_names)
         return "\n\n".join(s.to_uclid() for s in submodels)
 
-    # === TRANSFORMATIONS ===
+    # === SOLVER STUFF ===
+
+    def get_solver_vars(self):
+        """
+        Returns all variables the solver might have to know about.
+
+        For any `UFTerm` with `free_arg=True`, an extra "__free__" variable is added.
+
+        TODO deal with instances
+        """
+        uf_vars = []
+        for uf_p in self.ufs:
+            if uf_p.free_arg:
+                uf_vars.append(smt.Variable("__free__" + uf_p.name, uf_p.sort))
+        for uf_p in self.next_ufs:
+            if uf_p.free_arg:
+                uf_vars.append(smt.Variable("__free__" + uf_p.name, uf_p.sort))
+        return self.inputs + self.outputs + self.state + uf_vars
+
+    def to_solver(self):
+        s = smt.Solver()
+        # BMC:
+        # TODO the approach uclid takes to modeling transitions is
+        # on every cycle of simulation is to create a separate set of state vars
+        # for each cycle, and then assert the vars of the next cycle wrt vars of the first cycle
+        # e.g. `b' <= b` would result in `assert (state_2_b == state_1_b)`
+        # Induction:
+        # basically the same story, with state_1_b in terms of initial_b
+        # logic from submodules gets inlined
+
+
+    # === LOGICAL TRANSFORMATIONS ===
+
+    def _get_logic_or_transition(self, var):
+        """
+        Checks if a variable is referenced on the LHS of an assignment.
+        This can either be a direct key, or as part of an array Select.
+
+        If the variable is not found, returns None.
+        """
+        if var in self.logic:
+            return self.logic[var]
+        if var in self.default_next:
+            return self.default_next[var]
+        for k, t in self.logic.items():
+            if isinstance(k, smt.OpTerm) and k.kind == smt.Kind.Select and k.args[0] == var:
+                return t
+        for k, t in self.default_next.items():
+            if isinstance(k, smt.OpTerm) and k.kind == smt.Kind.Select and k.args[0] == var:
+                return t
+        return None
+
 
     def eliminate_dead_code(self):
         """
@@ -413,7 +464,7 @@ class Model:
             dependencies[n] = i_deps
         to_visit = self.outputs[:] # List of vars, where everything else is Set[str]
         visited = set()
-        non_state_set = set(self.inputs)
+        non_state_set = set(i.name for i in self.inputs)
         non_state_set.update(set(u.name for u in self.next_ufs))
         non_state_set.update(set(u.name for u in self.ufs))
         for v in to_visit:
@@ -421,19 +472,13 @@ class Model:
                 # Parents of instance outputs are already handled
                 continue
             visited.add(v.name)
-            if v in self.logic:
-                term = self.logic[v]
-                parent_vars = term.get_vars()
-                parents = normalize(parent_vars)
-                dependencies[v.name].update(set(parents))
-                to_visit.extend(parent_vars)
-            elif v in self.default_next:
-                term = self.default_next[v]
-                parents = normalize(parent_vars)
-                dependencies[v.name].update(set(parents))
-                to_visit.extend(parent_vars)
-            else:
-                raise Exception(f"signal {v} has no transition relation or logic")
+            term = self._get_logic_or_transition(v)
+            if term is None:
+                raise Exception(f"{self.name}: signal {v} has no transition relation or logic")
+            parent_vars = term.get_vars()
+            parents = normalize(parent_vars)
+            dependencies[v.name].update(set(parents))
+            to_visit.extend(parent_vars)
         # Compute cone of influence from dependency graph
         coi = {}
         visited = set()
@@ -470,9 +515,14 @@ class Model:
                 continue
             # Recursively perform DCE on child instances as well
             new_instances[n] = Instance(i.model.eliminate_dead_code(), i.inputs)
-
-        new_transitions = {v: term for v, term in self.default_next.items() if v.name in all_parent_names}
-        new_logic = {v: term for v, term in self.logic.items() if v.name in all_parent_names}
+        def maybe_name(t):
+            if isinstance(t, smt.Variable):
+                return t.name
+            elif isinstance(t, smt.OpTerm) and t.kind == smt.Kind.Select:
+                return t.args[0].name
+            raise Exception(f"{self.name}: cannot get name for {t}")
+        new_transitions = {v: term for v, term in self.default_next.items() if maybe_name(v) in all_parent_names}
+        new_logic = {v: term for v, term in self.logic.items() if maybe_name(v) in all_parent_names}
         return Model(
             self.name,
             inputs=self.inputs,

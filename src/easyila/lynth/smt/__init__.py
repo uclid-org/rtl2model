@@ -64,11 +64,6 @@ class SynthFun:
 
 
 @dataclass
-class SygusConstraint:
-    term: Term
-
-
-@dataclass
 class Cvc5Ctx:
     solver: pycvc5.Solver
     sorts: Dict[Sort, pycvc5.Sort]
@@ -123,16 +118,22 @@ class Cvc5Ctx:
         )
 
     def add_sygus_constraint(self, constraint):
-        constraint_term = constraint.term.to_cvc5(self)
+        constraint_term = constraint.to_cvc5(self)
         self.solver.addSygusConstraint(constraint_term)
         self.constraints.append(constraint_term)
 
 
 class Solver:
+    """
+    Wrapper class for an SMT solver.
+
+    When a new term is added, all necessary sorts and sub-terms are added as well.
+    """
+
     sorts: Set[Sort]
     terms: List[Term]
     synthfuns: List[SynthFun]
-    constraints: List[SygusConstraint]
+    constraints: List[Term]
     _cvc5_wrapper: Optional[Cvc5Ctx]
 
     def __init__(self, sorts=None, terms=None, synthfuns=None, constraints=None, backend="cvc5"):
@@ -194,11 +195,11 @@ class Solver:
         return term
 
     # TODO restrict this to be a term that's a predicate
-    def add_sygus_constraint(self, term: Term) -> SygusConstraint:
-        newconstraint = SygusConstraint(term)
+    def add_sygus_constraint(self, term: Term) -> Term:
+        assert isintance(term.sort, BoolSort), f"Sygus constraint must be boolean; instead got {term}"
         if self._cvc5_wrapper:
-            self._cvc5_wrapper.add_sygus_constraint(newconstraint)
-        return newconstraint
+            self._cvc5_wrapper.add_sygus_constraint(term)
+        return term
 
     def add_synthfun(self, fn: SynthFun) -> SynthFun:
         self.synthfuns.append(fn)
