@@ -1216,6 +1216,8 @@ class ApplyUF(Term):
 
     @property
     def sort(self):
+        if isinstance(self.fun, UFTerm):
+            return self.fun.sort
         return self.fun.return_sort
 
     @property
@@ -1223,7 +1225,7 @@ class ApplyUF(Term):
         return list(self.input_values)
 
     def _replace_child(self, new_term, index):
-        return ApplyUF(self.fun, tuple(t._replace_child for t in self.input_values))
+        return ApplyUF(self.fun, tuple(t._replace_child(new_term, index) for t in self.input_values))
 
     @staticmethod
     def from_cvc5(cvc5_term):

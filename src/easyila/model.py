@@ -403,15 +403,56 @@ class Model:
 
     def to_solver(self):
         s = smt.Solver()
-        # BMC:
-        # TODO the approach uclid takes to modeling transitions is
+        BASE_PREFIX = "__BASE." # current cycle signals
+        STEP_PREFIX = "__STEP." # next cycle signals
+        FREE_PREFIX = "__FREE." # UF free variables
+        base_dict = {
+            v: v.add_prefix(BASE_PREFIX)
+            for v in self.inputs + self.outputs + self.state
+        }
+        # TODO deal with arrays
+        next_dict = {
+            v: v.add_prefix(STEP_PREFIX)
+            for v in self.outputs + self.state if v in self.default_next
+        }
+        # BMC: the approach uclid takes to modeling transitions is
         # on every cycle of simulation is to create a separate set of state vars
         # for each cycle, and then assert the vars of the next cycle wrt vars of the first cycle
         # e.g. `b' <= b` would result in `assert (state_2_b == state_1_b)`
         # Induction:
         # basically the same story, with state_1_b in terms of initial_b
         # logic from submodules gets inlined
-
+        for v in base_dict.values():
+            s.add_variable(v)
+        for v in next_dict.values():
+            s.add_variable(v)
+        # For each uninterpreted function with free variables, create a dummy free variable
+        uf_replacements = {}
+        for uf_p in self.ufs:
+            ref = uf_p.get_ref()
+            args = [base_dict[a] for a in uf_p.params]
+            if uf_p.free_arg:
+                free_var = ref.add_prefix(FREE_PREFIX)
+                s.add_variable(free_var)
+                args.append(free_var)
+            call = uf_p.to_ufterm().apply(*args)
+            uf_replacements[ref] = call
+        for uf_p in self.next_ufs:
+            ref = uf_p.get_ref()
+            s.add_variable(ref.add_prefix(BASE_PREFIX))
+            if uf_p.free_arg:
+                free_var = ref.add_prefix(FREE_PREFIX)
+                s.add_variable(free_var)
+            uf_replacements[ref] = ref.add_prefix(BASE_PREFIX)
+        # Replace any UFs that have other UFs as args
+        for k, t in uf_replacements.items():
+            uf_replacements[k] = t.replace_vars(uf_replacements)
+        rhs_replacements = {**base_dict, **uf_replacements}
+        for k, term in self.logic.items():
+            s.add_constraint(k.op_eq(term).replace_vars(rhs_replacements))
+        for k, term in self.default_next.items():
+            s.add_constraint(k.replace_vars(next_dict).op_eq(term.replace_vars(rhs_replacements)))
+        return s
 
     # === LOGICAL TRANSFORMATIONS ===
 

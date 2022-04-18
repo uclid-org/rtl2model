@@ -154,7 +154,7 @@ class IOOracle(OracleInterface):
             in_consts = [smt.BVConst(int(i_value), i_width) for i_width, i_value in zip(self.in_widths, call.inputs)]
             out_const = smt.BVConst(call.output, self.out_width)
             fn_apply = smt.ApplyUF(fun, tuple(in_consts))
-            slv.add_sygus_constraint(smt.OpTerm(smt.Kind.Equal, (fn_apply, out_const)))
+            slv.add_constraint(smt.OpTerm(smt.Kind.Equal, (fn_apply, out_const)))
 
 
 class CorrectnessOracle(OracleInterface):
@@ -222,7 +222,7 @@ class CorrectnessOracle(OracleInterface):
 #             smt.OpTerm(smt.Kind.And, (behave_constraint, cand_call, other_call, out_neq))
 #         )
 
-#         slv.add_sygus_constraint()
+#         slv.add_constraint()
 
 class OracleCtx:
     """

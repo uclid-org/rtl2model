@@ -148,7 +148,7 @@ class Cvc5Ctx:
             g
         )
 
-    def add_sygus_constraint(self, constraint):
+    def add_constraint(self, constraint):
         constraint_term = constraint.to_cvc5(self)
         self.solver.addSygusConstraint(constraint_term)
         self.constraints.append(constraint_term)
@@ -210,7 +210,7 @@ class Solver:
         for sf in self.synthfuns:
             wrapper.add_synthfun(sf)
         for constraint in self.constraints:
-            wrapper.add_sygus_constraint(constraint)
+            wrapper.add_constraint(constraint)
         self._cvc5_wrapper = wrapper
 
     def add_sort(self, sort: Sort) -> Sort:
@@ -219,14 +219,12 @@ class Solver:
             self._cvc5_wrapper.try_add_sort(sort)
         return sort
 
-    def add_variable(self, name: str, sort: Sort) -> Variable:
-        # warn if overwriting a variable?
-        newvar = Variable(name, sort)
+    def add_variable(self, v: Variable) -> Variable:
         # self.add_term(newvar)
-        self.variables.append(newvar)
+        self.variables.append(v)
         if self._cvc5_wrapper:
-            self._cvc5_wrapper.add_term(newvar)
-        return newvar
+            self._cvc5_wrapper.add_term(v)
+        return v
 
     def add_term(self, term: Term) -> Term:
         self.terms.append(term)
@@ -234,10 +232,11 @@ class Solver:
             self._cvc5_wrapper.add_term(term)
         return term
 
-    def add_sygus_constraint(self, term: Term) -> Term:
-        assert isintance(term.sort, BoolSort), f"Sygus constraint must be boolean; instead got {term}"
+    def add_constraint(self, term: Term) -> Term:
+        assert isinstance(term.sort, BoolSort), f"Sygus constraint must be boolean; instead got {term}"
+        self.constraints.append(term)
         if self._cvc5_wrapper:
-            self._cvc5_wrapper.add_sygus_constraint(term)
+            self._cvc5_wrapper.add_constraint(term)
         return term
 
     def add_synthfun(self, fn: SynthFun) -> SynthFun:
