@@ -166,7 +166,7 @@ class Term(Translatable, ABC):
                 other = other.value
             if isinstance(self.sort, BoolSort):
                 assert other in (0, 1), f"cannot coerce int {other} to {self.sort}"
-                return self, (BoolConst.T if other else BoolConst.F)
+                return self, (BoolConst.T if other else BoolConst.F) # type: ignore
             elif isinstance(self.sort, BVSort):
                 bitwidth = self.sort.bitwidth
                 assert other < (2 ** bitwidth), f"int constant {other} exceeds max value of bv{bitwidth}"
@@ -625,7 +625,7 @@ BVVariable = lambda s, w, **kwargs: Variable(s, BVSort(w), **kwargs)
 class VarDecl(Translatable):
     name: str
     sort: Sort
-    init_value: "BVConst" = None
+    init_value: Optional["BVConst"] = None
 
     def __str__(self):
         if self.init_value is None:
@@ -1204,7 +1204,7 @@ class ApplyUF(Term):
     """
     Term representing application of an uninterpreted function on the specified inputs.
     """
-    fun: "SynthFun" # TODO properly make this UF instead of SynthFun
+    fun: UFTerm
     # without making cvc5 unhappy
     input_values: Tuple[Term, ...]
 
@@ -1238,7 +1238,12 @@ class ApplyUF(Term):
         if tgt == TargetFormat.CVC5:
             cvc5_ctx = kwargs["cvc5_ctx"]
             cvc5_kind = pycvc5.Kind.ApplyUf
-            t = cvc5_ctx.solver.mkTerm(cvc5_kind, self.fun.to_cvc5(cvc5_ctx), *[v.to_cvc5(cvc5_ctx) for v in self.input_values])
+            # Distinguish between ordinary UFs and synthfuns
+            if self.fun.name in cvc5_ctx.synthfuns:
+                cvc5_fun = cvc5_ctx.synthfuns[self.fun.name]
+            else:
+                cvc5_fun = self.fun.to_cvc5(cvc5_ctx)
+            t = cvc5_ctx.solver.mkTerm(cvc5_kind, cvc5_fun, *[v.to_cvc5(cvc5_ctx) for v in self.input_values])
             return t
         elif tgt == TargetFormat.SYGUS2:
             return f"({self.fun.name} " + " ".join(a.to_sygus2() for a in self.input_values) + ")"

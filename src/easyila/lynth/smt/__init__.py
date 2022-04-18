@@ -20,30 +20,15 @@ from .terms import *
 @dataclass
 class Grammar:
     bound_vars: Tuple[Variable, ...]
-    input_vars: Tuple[Variable, ...]
-    terms: Dict[Term, Tuple[Term, ...]]
+    nonterminals: Tuple[Variable, ...]
+    terms: Dict[Variable, Tuple[Term, ...]]
     """
-    Maps a non-terminal Term to a list of reduction rules, each of which could either be another
+    Maps a non-terminal Variable to a list of reduction rules, each of which could either be another
     nonterminal or a variable.
     """
 
-    @property
-    def _all_terms(self) -> List[Term]:
-        all_terms = []
-        term_set = set()
-        for term, rules in self.terms.items():
-            all_terms.append(term)
-            term_set.add(term)
-            for subterm in rules:
-                # TODO probably need some kind of recursion/stack-based approach
-                # to handle fnterms that are children of other fnterms
-                if subterm not in term_set:
-                    term_set.add(subterm)
-                    all_terms.append(subterm)
-        return all_terms
-
     def get_sygus2(self) -> str:
-        block = "(" + " ".join(f"({b.name} {b.sort.to_sygus2()})" for b in self.input_vars) + ")"
+        block = "(" + " ".join(f"({b.name} {b.sort.to_sygus2()})" for b in self.non_terminals) + ")"
         block += "\n("
         for key, rules in self.terms.items():
             block += f"(({key} {key.sort.to_sygus2()})"
@@ -66,13 +51,10 @@ class SynthFun:
         Creates a new Solver instance to synthesize this function.
         """
         # sorts, variables get automatically read
-        if self.grammar is None:
-            return Solver(synthfuns=[self])
-        else:
-            return Solver(terms=self.grammar._all_terms, synthfuns=[self])
+        return Solver(synthfuns=[self])
 
     def apply(self, *args):
-        return ApplyUF(self, tuple(args))
+        return self.to_uf().apply(*args)
 
     def to_uf(self) -> UFTerm:
         return UFTerm(self.name, self.return_sort, self.bound_vars)
@@ -130,8 +112,8 @@ class Cvc5Ctx:
             [t.to_cvc5(self) for t in grammar.terms.keys()]
         )
         for t, rules in grammar.terms.items():
-            g.addRules(t.to_cvc5(self), [ s.to_cvc5(self) for s in rules ])
-        for v in grammar.input_vars:
+            g.addRules(t.to_cvc5(self), [s.to_cvc5(self) for s in rules])
+        for v in grammar.nonterminals:
             g.addAnyVariable(v.to_cvc5(self))
         self.grammars.append(g)
         return g

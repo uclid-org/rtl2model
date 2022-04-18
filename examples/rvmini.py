@@ -109,21 +109,20 @@ def main():
     addbv = start + start
     subbv = start - start
     orbv = start | start
-    solver = smt.SynthFun(
+    sf = smt.SynthFun(
         "alu_add",
         (x, y),
         bv32,
         smt.Grammar(
             bound_vars=(x, y),
-            input_vars=(start,),
+            nonterminals=(start,),
             terms={start: (addbv, subbv, orbv),},
         )
-    ).new_solver()
+    )
+    solver = sf.new_solver()
 
     model = RvMiniModel(
         ProjectConfig(os.path.join(BASEDIR, "symbiyosys"), clock_name="clock"),
-        [32, 32],
-        32,
         solver,
         SIGNALS,
         guidance

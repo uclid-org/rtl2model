@@ -19,7 +19,12 @@ class CallResult:
         return (*self.inputs, self.output)
 
     def __str__(self):
-        return "inputs=" + ", ".join(f"{i:#x}" for i in self.inputs) + "; output=" + f"{self.output:#x}"
+        if isinstance(self.output, int):
+            s = "inputs=" + ", ".join(f"{i:#x}" for i in self.inputs)
+            return s + "; output=" + f"{self.output:#x}"
+        else:
+            return str(self.to_tuple())
+
 
 
 class OracleInterface(ABC):
@@ -106,17 +111,12 @@ class OracleInterface(ABC):
 class IOOracle(OracleInterface):
     """
     Input/output oracle.
-
-    Parameters
-    ----------
-    in_widths: list of widths of inputs
-    out_width: width of output
     """
 
     def __init__(
         self,
         name: str,
-        in_widths: list,
+        in_vars: smt.Variable,
         out_width: int,
         oracle: Union[Callable, str],
         *,
@@ -125,17 +125,17 @@ class IOOracle(OracleInterface):
         seed: Optional[int]=None,
     ):
         super().__init__(name, oracle, replay_inputs, log_path)
-        self.in_widths = in_widths
+        self.in_vars = in_vars
         self.out_width = out_width
         self.rng = random.Random(seed)
 
     @staticmethod
-    def from_call_logs(name, in_widths, out_width, oracle, replay_log_path, *, new_log_path=None):
+    def from_call_logs(name, in_vars, out_width, oracle, replay_log_path, *, new_log_path=None):
         inputs = []
         with open(replay_log_path) as f:
             for l in f.readlines():
                 inputs.append([int(s) for s in l.split()[:-1]])
-        return IOOracle(name, in_widths, out_width, oracle, replay_inputs=inputs, log_path=new_log_path)
+        return IOOracle(name, in_vars, out_width, oracle, replay_inputs=inputs, log_path=new_log_path)
 
     def new_random_inputs(self):
         """
@@ -143,18 +143,17 @@ class IOOracle(OracleInterface):
         """
         repeated = True
         while repeated:
-            new_inputs = tuple(self.rng.randint(0, 2 ** w - 1) for w in self.in_widths)
+            new_inputs = tuple(self.rng.randint(0, 2 ** v.sort.bitwidth - 1) for v in self.in_vars)
             repeated = new_inputs in self.i_history
         return new_inputs
 
     # Generate the term that enforce input output pair matches with uninterpreted function
-    def apply_constraints(self, slv, fun):
-        # TODO: make this more general?
+    def apply_constraints(self, slv, synthfun):
         for call in self.calls:
-            in_consts = [smt.BVConst(int(i_value), i_width) for i_width, i_value in zip(self.in_widths, call.inputs)]
+            in_consts = [smt.BVConst(int(i_value), i_var.sort.bitwidth) for i_var, i_value in zip(self.in_vars, call.inputs)]
             out_const = smt.BVConst(call.output, self.out_width)
-            fn_apply = smt.ApplyUF(fun, tuple(in_consts))
-            slv.add_constraint(smt.OpTerm(smt.Kind.Equal, (fn_apply, out_const)))
+            fn_apply = synthfun.to_uf().apply(*in_consts)
+            slv.add_constraint(fn_apply.op_eq(out_const))
 
 
 class CorrectnessOracle(OracleInterface):
@@ -222,7 +221,7 @@ class CorrectnessOracle(OracleInterface):
 #             smt.OpTerm(smt.Kind.And, (behave_constraint, cand_call, other_call, out_neq))
 #         )
 
-#         slv.add_constraint()
+#         slv.add_sygus_constraint()
 
 class OracleCtx:
     """
@@ -239,6 +238,7 @@ class OracleCtx:
         self.oracles[oracle.name] = oracle
 
     def call_oracle(self, oraclename: str, args):
+        print(f"calling {oraclename} oracle")
         result = self.oracles[oraclename].invoke(args)
         if oraclename == "io":
             print(f"{oraclename} oracle result:", result)

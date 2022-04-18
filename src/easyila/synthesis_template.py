@@ -26,10 +26,6 @@ class ProjectConfig:
 
 class ModelBuilder(ABC):
     config: ProjectConfig
-    # TODO come up with more explicit mappings for input name > width
-    # rather than just ordinal position
-    input_widths: List[int]
-    output_width: int
     signals: List[SampledSignal]
     guidance: Guidance
     o_ctx: oi.OracleCtx
@@ -37,15 +33,15 @@ class ModelBuilder(ABC):
     def __init__(
         self,
         config: ProjectConfig,
-        input_widths: List[int],
-        output_width: int,
         solver: smt.Solver,
         signals: List[SampledSignal],
         guidance: Guidance
     ):
         self.config = config
-        self.input_widths = input_widths
-        self.output_width = output_width
+        # TODO generalize for multiple synth funs
+        sf = solver.synthfuns[0]
+        self.input_vars = list(sf.bound_vars)
+        self.output_width = sf.return_sort.bitwidth
         self.signals = signals
         self.guidance = guidance
         self.o_ctx = oi.OracleCtx(solver)
@@ -270,7 +266,10 @@ class ModelBuilder(ABC):
     def verify(self, func: smt.LambdaTerm):
         # TODO make less hacky
         if not hasattr(self, "signal_values"):
-            self.sample([random.randint(0, 100), random.randint(0, 100)])
+            # Because the signal variable width may not match the width of the ISA-level input
+            # to the program sketch, the max value of the signal may exceed the max allowable value
+            self.sample([0 for v in self.input_vars])
+            # self.sample([random.randint(0, 2 ** v.sort.bitwidth - 1) for v in self.input_vars])
         signal_values = self.signal_values
         widths = self.widths
         return self.run_bmc(signal_values, widths, func)
@@ -302,7 +301,7 @@ class ModelBuilder(ABC):
         if io_replay_path is not None:
             io = oi.IOOracle.from_call_logs(
                 "io",
-                self.input_widths,
+                self.input_vars,
                 self.output_width,
                 lambda *args: self.sample(*args)[0],
                 io_replay_path,
@@ -311,7 +310,7 @@ class ModelBuilder(ABC):
         else:
             io = oi.IOOracle(
                 "io",
-                self.input_widths,
+                self.input_vars,
                 self.output_width,
                 lambda *args: self.sample(*args)[0],
                 log_path=io_log_path
@@ -348,7 +347,6 @@ class ModelBuilder(ABC):
             # TODO key on names instead of just by order
             io_o = self.o_ctx.oracles["io"]
             replayed_inputs = io_o.next_replay_input()
-            # TODO prompt for input before anything else
             if replayed_inputs is not None:
                 inputs = replayed_inputs
                 print("REPLAYING INPUTS:")
@@ -365,16 +363,18 @@ class ModelBuilder(ABC):
             self.o_ctx.oracles["io"].save_call_logs()
 
             self.o_ctx.apply_all_constraints(solver, {"io": sf})
+            print("Running synthesis...")
             sr = solver.check_synth()
             if sr.is_unsat:
                 solution = sr.solution
                 # pycvc5_utils.print_synth_solutions(terms, solution)
-                print(solution)
-                cr = self.o_ctx.call_oracle("corr", solution)
+                # TODO generalize for multiple synthfuns
+                print(list(solution.values())[0])
+                cr = self.o_ctx.call_oracle("corr", list(solution.values())[0])
                 is_correct = cr.output
                 if is_correct:
                     print("All oracles passed. Found a solution: ")
-                    print(solution)
+                    print(list(solution.values())[0])
                     self.o_ctx.oracles["io"].save_call_logs()
                     return solution
             else:
