@@ -23,7 +23,7 @@ exprs = {
     "bvand": x & y,
     "bvnot": ~x,
     "bvxor": x ^ y,
-    "extract": x[y:y],
+    "extract": x[3:0],
     "concat": x.concat(y),
     "orr": x.orr(),
     "xorr": x.xorr(),

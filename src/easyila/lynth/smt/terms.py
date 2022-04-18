@@ -122,6 +122,7 @@ _OP_SYGUS_SYMBOLS = {
     Kind.BVSrl: "bvashr",
     Kind.BVSra: "bvlshr",
     # extract is a special case
+    Kind.BVConcat: "concat",
     Kind.Or: "or",
     Kind.And: "and",
     Kind.Not: "not",
@@ -131,6 +132,8 @@ _OP_SYGUS_SYMBOLS = {
     Kind.Implies: "=>",
     Kind.Exists: "exists",
     Kind.ForAll: "forall",
+    Kind.Select: "select",
+    Kind.Store: "store",
 }
 
 
@@ -443,6 +446,7 @@ class Term(Translatable, ABC):
                 lo = wrap(min(key.start, key.stop))
             else:
                 lo = key.stop
+            assert hi.val < width and lo.val >= 0, f"extract indices {hi.val}:{lo.val} exceed bounds of bv{width}"
             return OpTerm(Kind.BVExtract, (self, hi, lo))
         raise TypeError(f"cannot index {self} with {key}")
 
@@ -646,7 +650,9 @@ class VarDecl(Translatable):
             # and references of bound variables
             return self.get_ref().to_cvc5(cvc5_ctx=kwargs["cvc5_ctx"])
         elif tgt == TargetFormat.SYGUS2:
-            raise NotImplementedError()
+            if isinstance(self.sort, ArraySort):
+                raise NotImplementedError("VarDecl verilog array translation not supported yet")
+            return f"(declare-var {self.name} {self.sort.to_sygus2()})"
         elif tgt == TargetFormat.VERILOG:
             if isinstance(self.sort, ArraySort):
                 raise NotImplementedError("VarDecl verilog array translation not supported yet")
@@ -763,6 +769,20 @@ class OpTerm(Term):
             t = cvc5_ctx.solver.mkTerm(cvc5_kind, *[v.to_cvc5(cvc5_ctx) for v in self.args])
             return t
         elif tgt == TargetFormat.SYGUS2:
+            if self.kind == Kind.Match:
+                # Convert to a giant ITE chain
+                a0 = self.args[0]
+                # Last expression is the "else" case, so cond doesn't matter
+                t = self.args[-1]
+                for i in range(len(self.args) - 4, 0, -2):
+                    t = a0.op_eq(self.args[i]).ite(self.args[i + 1], t)
+                return t.to_sygus2()
+            if self.kind == Kind.BVExtract:
+                assert isinstance(self.args[1], BVConst), self.args
+                assert isinstance(self.args[2], BVConst), self.args
+                return f"((_ extract {self.args[1].val} {self.args[2].val}) {self.args[0].to_sygus2()})"
+            if self.kind == Kind.Distinct:
+                return f"(not (= " +  " ".join(a.to_sygus2() for a in self.args) + "))"
             return "(" + _OP_SYGUS_SYMBOLS[self.kind] + " " + " ".join([a.to_sygus2() for a in self.args]) + ")"
         elif tgt == TargetFormat.VERILOG:
             v = self.kind
@@ -1024,6 +1044,9 @@ class UFTerm(Term):
     _sort: Sort
     params: Tuple[Variable, ...]
 
+    def apply(self, *args):
+        return ApplyUF(self, tuple(args))
+
     def __str__(self):
         return self.name
 
@@ -1173,7 +1196,7 @@ class QuantTerm(Term):
                 self.body.sort.to_sygus2() + " " + \
                 self.body.to_sygus2() \
                 + ")"
-        raise NotImplementedError("cannot convert FunctionSort to " + str(tgt))
+        raise NotImplementedError("cannot convert QuantTerm to " + str(tgt))
 
 
 @dataclass(frozen=True)
@@ -1193,7 +1216,7 @@ class ApplyUF(Term):
 
     @property
     def sort(self):
-        raise NotImplementedError()
+        return self.fun.return_sort
 
     @property
     def _children(self):
@@ -1215,10 +1238,12 @@ class ApplyUF(Term):
             cvc5_kind = pycvc5.Kind.ApplyUf
             t = cvc5_ctx.solver.mkTerm(cvc5_kind, self.fun.to_cvc5(cvc5_ctx), *[v.to_cvc5(cvc5_ctx) for v in self.input_values])
             return t
+        elif tgt == TargetFormat.SYGUS2:
+            return f"({self.fun.name} " + " ".join(a.to_sygus2() for a in self.input_values) + ")"
         elif tgt == TargetFormat.UCLID:
             args = ", ".join(i.to_uclid(**kwargs) for i in self.input_values)
             return self.fun.name + "(" + args + ")"
-        raise NotImplementedError("cannot convert FunctionSort to " + str(tgt))
+        raise NotImplementedError("cannot convert ApplyUF to " + str(tgt))
 
 
 class BoolConst(Term, IntEnum, metaclass=_TermMeta):

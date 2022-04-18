@@ -8,6 +8,7 @@ TODO add str methods to everything
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
 from enum import Enum, EnumMeta, auto
+import textwrap
 from typing import Dict, List, Set, Tuple, Optional
 
 import pycvc5
@@ -41,26 +42,53 @@ class Grammar:
                     all_terms.append(subterm)
         return all_terms
 
+    def get_sygus2(self) -> str:
+        block = "(" + " ".join(f"({b.name} {b.sort.to_sygus2()})" for b in self.input_vars) + ")"
+        block += "\n("
+        for key, rules in self.terms.items():
+            block += f"(({key} {key.sort.to_sygus2()})"
+            for rule in rules:
+                block += f"  ({rule.to_sygus2()})"
+            block += "\n  )"
+        block += "\n)"
+        return block
+
 
 @dataclass
 class SynthFun:
     name: str
     bound_vars: Tuple[Variable, ...]
     return_sort: Sort
-    grammar: Grammar
+    grammar: Optional[Grammar] = None
 
     def new_solver(self) -> "Solver":
         """
         Creates a new Solver instance to synthesize this function.
         """
         # sorts, variables get automatically read
-        return Solver(terms=self.grammar._all_terms, synthfuns=[self])
+        if self.grammar is None:
+            return Solver(synthfuns=[self])
+        else:
+            return Solver(terms=self.grammar._all_terms, synthfuns=[self])
+
+    def apply(self, *args):
+        return ApplyUF(self, tuple(args))
 
     def to_uf(self) -> UFTerm:
         return UFTerm(self.name, self.return_sort, self.bound_vars)
 
     def to_cvc5(self, cvc5_ctx) -> Term:
         return cvc5_ctx.synthfuns[self.name]
+
+    def to_sygus2(self) -> str:
+        args = "(" + " ".join(f"({a.name} {a.sort.to_sygus2()})" for a in self.bound_vars) + \
+                ") " + self.return_sort.to_sygus2()
+        if self.grammar is None:
+            return f"(synth-fun {self.name} " + args + ")"
+        else:
+            return f"(synth-fun {self.name} {args}\n" + \
+                textwrap.indent(self.grammar.get_sygus2(), "  ") + "\n)"
+        raise NotImplementedError("sygus2 translation not yet implemented for synthfuns with grammar")
 
 
 @dataclass
@@ -109,7 +137,10 @@ class Cvc5Ctx:
         return g
 
     def add_synthfun(self, sf):
-        g = self._add_grammar(sf.grammar)
+        if sf.grammar is not None:
+            g = self._add_grammar(sf.grammar)
+        else:
+            g = None
         self.synthfuns[sf.name] = self.solver.synthFun(
             sf.name,
             [v.to_cvc5(self) for v in sf.bound_vars],
@@ -130,19 +161,23 @@ class Solver:
     When a new term is added, all necessary sorts and sub-terms are added as well.
     """
 
+    variables: List[Term]
+    """A list of bound variables."""
     sorts: Set[Sort]
     terms: List[Term]
     synthfuns: List[SynthFun]
     constraints: List[Term]
     _cvc5_wrapper: Optional[Cvc5Ctx]
 
-    def __init__(self, sorts=None, terms=None, synthfuns=None, constraints=None, backend="cvc5"):
+    def __init__(self, variables=None, sorts=None, terms=None, synthfuns=None, constraints=None, backend="cvc5"):
         # can't make these default args, since the same instance of a default arg is shared
         # across every call to __init__
+        variables = list(variables or [])
         sorts = set(sorts or set())
         terms = list(terms or [])
         synthfuns = list(synthfuns or [])
         constraints = list(constraints or [])
+        self.variables = variables
         self.sorts = sorts
         # This needs to be initialized one term at a time in order for the CVC5 wrapper
         # to be able to process each term 
@@ -166,6 +201,8 @@ class Solver:
         )
         # TODO Don't know why this is necessary, but it is?
         wrapper.solver.mkBitVector(8, 0)
+        for v in self.variables:
+            wrapper.add_term(v)
         for sort in self.sorts:
             wrapper.try_add_sort(sort)
         for term in self.terms:
@@ -185,7 +222,10 @@ class Solver:
     def add_variable(self, name: str, sort: Sort) -> Variable:
         # warn if overwriting a variable?
         newvar = Variable(name, sort)
-        self.add_term(newvar)
+        # self.add_term(newvar)
+        self.variables.append(newvar)
+        if self._cvc5_wrapper:
+            self._cvc5_wrapper.add_term(newvar)
         return newvar
 
     def add_term(self, term: Term) -> Term:
@@ -194,7 +234,6 @@ class Solver:
             self._cvc5_wrapper.add_term(term)
         return term
 
-    # TODO restrict this to be a term that's a predicate
     def add_sygus_constraint(self, term: Term) -> Term:
         assert isintance(term.sort, BoolSort), f"Sygus constraint must be boolean; instead got {term}"
         if self._cvc5_wrapper:
@@ -211,23 +250,41 @@ class Solver:
         if self._cvc5_wrapper:
             # TODO choose specific synth functions
             c_slv = self.get_cvc5_solver()
-            t = list(self._cvc5_wrapper.synthfuns.values())[0]
             s = c_slv.checkSynth()
             if not s.isUnsat():
                 return SynthResult(False, None)
             else:
-                return SynthResult(
-                    True,
-                    LambdaTerm.from_cvc5(c_slv.getSynthSolution(t)),
-                )
+                sols = c_slv.getSynthSolutions(list(self._cvc5_wrapper.synthfuns.values()))
+                sf_names = list(self._cvc5_wrapper.synthfuns.keys())
+                return SynthResult(True, {sf_names[i]: LambdaTerm.from_cvc5(t) for i, t in enumerate(sols)})
         raise NotImplementedError()
 
     def get_cvc5_solver(self):
-        # no consistency guarantees lol
+        """
+        Returns a reference to the underlying CVC5 solver (None if another backend was configured).
+
+        IMPORTANT: any modifications to this CVC5 solver are not reflected in this `Solver` object
+        -- make changes at your own risk.
+        """
         return self._cvc5_wrapper.solver
+
+    def get_sygus2(self):
+        """
+        Returns a string representing a SyGuS2 (.sy) encoding the variables and assumptions
+        in this solver.
+        """
+        text = "(set-logic QF_ABV)\n"
+        for v in self.variables:
+            text += v.get_decl().to_sygus2() + "\n"
+        for sf in self.synthfuns:
+            text += sf.to_sygus2() + "\n"
+        for constraint in self.constraints:
+            text += f"(constraint {constraint.to_sygus2()})\n"
+        text += "(check-synth)"
+        return text
 
 
 @dataclass
 class SynthResult:
     is_unsat: bool
-    solution: Optional[LambdaTerm]
+    solution: Optional[Dict[str, LambdaTerm]]

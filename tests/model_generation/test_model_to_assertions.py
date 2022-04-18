@@ -48,6 +48,7 @@ class TestModelToAssertions:
                 s1.add_prefix(STEP_PREFIX).op_eq(s1_expr),
             ]
         )
+        print(exp_solver.get_sygus2())
         actual_solver = top.to_solver()
         assert actual_solver == exp_solver
 
