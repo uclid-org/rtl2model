@@ -1,0 +1,4 @@
+[submodule "Pyverilog"]
+	path = Pyverilog
+	url = https://github.com/noloerino/Pyverilog/
+    branch = term-memoization
