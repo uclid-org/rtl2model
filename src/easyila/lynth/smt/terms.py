@@ -650,8 +650,6 @@ class VarDecl(Translatable):
             # and references of bound variables
             return self.get_ref().to_cvc5(cvc5_ctx=kwargs["cvc5_ctx"])
         elif tgt == TargetFormat.SYGUS2:
-            if isinstance(self.sort, ArraySort):
-                raise NotImplementedError("VarDecl verilog array translation not supported yet")
             return f"(declare-var {self.name} {self.sort.to_sygus2()})"
         elif tgt == TargetFormat.VERILOG:
             if isinstance(self.sort, ArraySort):

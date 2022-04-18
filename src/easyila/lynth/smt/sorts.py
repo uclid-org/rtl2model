@@ -89,7 +89,8 @@ class ArraySort(Sort):
         if tgt == TargetFormat.CVC5:
             cvc5_ctx = kwargs["cvc5_ctx"]
             return cvc5_ctx.solver.mkArraySort(self.idx_sort.to_cvc5(cvc5_ctx), self.elem_sort.to_cvc5(cvc5_ctx))
-        # elif tgt == TargetFormat.SYGUS2:
+        elif tgt == TargetFormat.SYGUS2:
+            return f"(Array {self.idx_sort.to_sygus2()} {self.elem_sort.to_sygus2()})"
         # elif tgt == TargetFormat.VERILOG:
         # elif tgt == TargetFormat.UCLID:
         raise NotImplementedError("cannot convert boolsort to " + str(tgt))

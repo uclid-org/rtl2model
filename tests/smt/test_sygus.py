@@ -45,7 +45,7 @@ class TestSygus:
             bv3,
             grammar=smt.Grammar(
                 bound_vars=(x,),
-                input_vars=(start,),
+                nonterminals=(start,),
                 terms={start: (start + 1, start & smt.BVConst(6, 3))}
             )
         )
@@ -55,7 +55,7 @@ class TestSygus:
             bv3,
             grammar=smt.Grammar(
                 bound_vars=(x,),
-                input_vars=(start,),
+                nonterminals=(start,),
                 terms={start: (start + 1, start & smt.BVConst(6, 3))}
             )
         )
@@ -73,7 +73,6 @@ class TestSygus:
             "f0": smt.LambdaTerm((x,), x & smt.BVConst(6, 3)),
             "f1": smt.LambdaTerm((x,), (x + 1) + 1),
         }
-
 
     def test_synth_one_to_sygus2(self):
         bv3 = smt.BVSort(3)

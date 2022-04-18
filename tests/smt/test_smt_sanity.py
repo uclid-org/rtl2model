@@ -95,7 +95,7 @@ class TestSMT:
             bv32,
             smt.Grammar(
                 bound_vars=(x, y),
-                input_vars=(start,),
+                nonterminals=(start,),
                 terms={start: (addbv, subbv, orbv),},
             )
         ).new_solver()

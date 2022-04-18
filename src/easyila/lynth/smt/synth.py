@@ -25,7 +25,7 @@ class Grammar:
     """
 
     def get_sygus2(self) -> str:
-        block = "(" + " ".join(f"({b.name} {b.sort.to_sygus2()})" for b in self.non_terminals) + ")"
+        block = "(" + " ".join(f"({b.name} {b.sort.to_sygus2()})" for b in self.nonterminals) + ")"
         block += "\n("
         for key, rules in self.terms.items():
             block += f"(({key} {key.sort.to_sygus2()})"

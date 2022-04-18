@@ -324,6 +324,10 @@ def _verilog_model_helper(
     m_outputs: List[smt.Variable] = []
     m_state: List[smt.Variable] = []
     instance_inputs: Dict[str, Dict[smt.Variable, smt.Term]] = defaultdict(dict)
+    """
+    `instance_inputs` maps an instance name to a dict of
+    instance port name to parent expression binding.
+    """
     for s in important_signals:
         sc = str_to_scope_chain(s)
         not_in_scope = not s.startswith(instance_name + ".")
@@ -384,15 +388,24 @@ def _verilog_model_helper(
     for qual_i_name, m_name in instance_names.items():
         if scope_prefix(qual_i_name) != instance_name:
             continue
+        sub = submodules[m_name]
         unqual_i_name = unqual_name(qual_i_name)
-        instances[unqual_i_name] = Instance(submodules[m_name], instance_inputs[qual_i_name])
+        bound_inputs = instance_inputs[qual_i_name]
+        # If any instance inputs are unbound, that means they were cut by dependency graph traversal --
+        # replace them with references to 1-arity UFs
+        for i_v in sub.inputs:
+            if i_v not in bound_inputs:
+                v_name = f"__in__{unqual_i_name}__{i_v.name}"
+                ufs.append(UFPlaceholder(v_name, i_v.sort, (), True))
+                instance_inputs[qual_i_name][i_v] = smt.Variable(v_name, i_v.sort)
+        instances[unqual_i_name] = Instance(sub, instance_inputs[qual_i_name])
     return Model(
         mod_name,
         inputs=m_inputs,
         outputs=m_outputs,
         state=m_state,
         ufs=ufs,
-        next_ufs=next_ufs,
+        next_ufs=next_ufs, # TODO populate next_ufs
         logic=logic,
         default_next=next_updates,
         instances=instances,

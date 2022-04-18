@@ -4,6 +4,9 @@ import pytest
 import easyila.lynth.smt as smt
 from easyila.model import *
 
+BASE_PREFIX = "__BASE."
+STEP_PREFIX = "__STEP."
+
 class TestModelToAssertions:
     """
     Tests generating SMT assertions from a Model object.
@@ -34,8 +37,6 @@ class TestModelToAssertions:
         # In the returned solver, each variable has a copy for the start state
         # and one in the next state.
         # Per the sygus standard, having a dot in variable names is fine
-        BASE_PREFIX = "__BASE."
-        STEP_PREFIX = "__STEP."
         base_a = a.add_prefix(BASE_PREFIX)
         base_b = b.add_prefix(BASE_PREFIX)
         base_o = o.add_prefix(BASE_PREFIX)
@@ -94,8 +95,6 @@ class TestModelToAssertions:
             ],
         )
         assert top.validate()
-        BASE_PREFIX = "__BASE."
-        STEP_PREFIX = "__STEP."
         base_a = a.add_prefix(BASE_PREFIX)
         base_b = b.add_prefix(BASE_PREFIX)
         base_o = o.add_prefix(BASE_PREFIX)
@@ -134,4 +133,51 @@ class TestModelToAssertions:
 
     def test_module_assertions_hierarchy(self):
         """Tests generating assertions across module boundaries."""
-        pytest.skip()
+        v = smt.Variable
+        bv3 = smt.BVSort(3)
+        a = v("a", bv3)
+        b = v("b", bv3)
+        o = v("o", bv3)
+        s1 = v("s1", bv3)
+        sub = Model(
+            "sub",
+            inputs=[a, b],
+            outputs=[o],
+            state=[s1],
+            logic={o: s1 + 1},
+            default_next={s1: a + b},
+        )
+        top = Model(
+            "top",
+            inputs=[a, b],
+            outputs=[o],
+            state=[s1],
+            instances={"sub": Instance(sub, {a: a, b: s1})},
+            logic={o: v("sub.o", bv3)},
+            default_next={s1: a + b},
+        )
+        base_a = a.add_prefix(BASE_PREFIX)
+        base_b = b.add_prefix(BASE_PREFIX)
+        base_o = o.add_prefix(BASE_PREFIX)
+        base_s1 = s1.add_prefix(BASE_PREFIX)
+        step_s1 = s1.add_prefix(STEP_PREFIX)
+        base_sub_a = a.add_prefix(BASE_PREFIX + "sub.")
+        base_sub_b = b.add_prefix(BASE_PREFIX + "sub.")
+        base_sub_o = o.add_prefix(BASE_PREFIX + "sub.")
+        base_sub_s1 = s1.add_prefix(BASE_PREFIX + "sub.")
+        step_sub_s1 = s1.add_prefix(STEP_PREFIX + "sub.")
+        exp_solver = smt.Solver(
+            variables=[
+                base_a, base_b, base_o, base_s1, step_s1,
+                base_sub_a, base_sub_b, base_sub_o,
+                base_sub_s1, step_sub_s1,
+            ],
+            constraints=[
+                base_o.op_eq(base_sub_o),
+                step_s1.op_eq(base_a + base_b),
+                base_sub_a.op_eq(base_a),
+                base_sub_b.op_eq(base_s1),
+                base_sub_o.op_eq(base_sub_s1 + 1),
+                step_sub_s1.op_eq(base_sub_a + base_sub_b),
+            ]
+        )

@@ -140,14 +140,20 @@ class Model:
         state_counts = get_var_counts(self.state)
         uf_counts = get_var_counts(self.ufs)
         # Zeroth pass: validate all instances and port bindings
-        for subname, sub in self.instances.items():
-            if not sub.model.validate():
+        for subname, inst in self.instances.items():
+            if not inst.model.validate():
                 report(f"validation error(s) in submodule {subname} (see above output)")
-            needed_inputs = sub.model.inputs
-            for missing_input in set(needed_inputs) - set(sub.inputs.keys()):
+            bound_names = [i.name for i in inst.inputs]
+            bound_sorts = {i.name: t.sort for i, t in inst.inputs.items()}
+            needed_names = [i.name for i in inst.model.inputs]
+            needed_sorts = {i.name: i.sort for i in inst.model.inputs}
+            for missing_input in set(needed_names) - set(bound_names):
                 report(f"instance {subname} is missing binding for input {missing_input}")
-            for extra_input in set(sub.inputs.keys()) - set(needed_inputs):
+            for extra_input in set(bound_names) - set(needed_names):
                 report(f"instance {subname} has binding for unknown input {extra_input}")
+            for name, sort in needed_sorts.items():
+                if name in bound_sorts and sort != bound_sorts[name]:
+                    report(f"instance {subname} has mismatched binding for input {name}: needed {sort}, got {bound_sorts[name]}")
         # First pass: no variable is declared multiple times
         # TODO don't be stateful if isinstance(v, smt.Variable)!
         for s, count in in_counts.items():
@@ -403,9 +409,12 @@ class Model:
 
     def to_solver(self):
         s = smt.Solver()
-        BASE_PREFIX = "__BASE." # current cycle signals
-        STEP_PREFIX = "__STEP." # next cycle signals
-        FREE_PREFIX = "__FREE." # UF free variables
+        return self._to_solver_helper(s, "")
+
+    def _to_solver_helper(self, s: smt.Solver, inst_prefix: str):
+        BASE_PREFIX = "__BASE." + inst_prefix # current cycle signals
+        STEP_PREFIX = "__STEP." + inst_prefix # next cycle signals
+        FREE_PREFIX = "__FREE." + inst_prefix # UF free variables
         base_dict = {
             v: v.add_prefix(BASE_PREFIX)
             for v in self.inputs + self.outputs + self.state
@@ -452,6 +461,14 @@ class Model:
             s.add_constraint(k.op_eq(term).replace_vars(rhs_replacements))
         for k, term in self.default_next.items():
             s.add_constraint(k.replace_vars(next_dict).op_eq(term.replace_vars(rhs_replacements)))
+        # Add terms for instances
+        for inst_name, instance in self.instances.items():
+            # Add terms for input port bindings
+            for i, term in instance.inputs.items():
+                s.add_constraint(i.add_prefix(BASE_PREFIX).op_eq(term.replace_vars(rhs_replacements)))
+            # Recursively add terms for instance state
+            # TODO IMPORTANT make multiple instances of the same module share UFs
+            instance.model._to_solver_helper(s, inst_name + ".")
         return s
 
     # === LOGICAL TRANSFORMATIONS ===
@@ -474,7 +491,6 @@ class Model:
             if isinstance(k, smt.OpTerm) and k.kind == smt.Kind.Select and k.args[0] == var:
                 return t
         return None
-
 
     def eliminate_dead_code(self):
         """
@@ -574,6 +590,7 @@ class Model:
             logic=new_logic,
             ufs=new_ufs,
             next_ufs=new_next_ufs,
+            generated_by=self.generated_by,
         )
 
     def flatten_state(self):
