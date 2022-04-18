@@ -365,6 +365,7 @@ class ModelBuilder(ABC):
             self.o_ctx.apply_all_constraints(solver, {"io": sf})
             print("Running synthesis...")
             sr = solver.check_synth()
+            print("Synthesis done")
             if sr.is_unsat:
                 solution = sr.solution
                 # pycvc5_utils.print_synth_solutions(terms, solution)
