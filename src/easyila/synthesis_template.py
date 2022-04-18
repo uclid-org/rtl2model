@@ -353,6 +353,8 @@ class ModelBuilder(ABC):
                 # for i, v in enumerate(sf.bound_vars):
                 #     inputs.append(input(f"{v.name} (input {i + 1}): "))
                 # inputs = tuple(inputs)
+            # TODO add blocking constraint to prevent sygus from repeating guesses?
+            # TODO do we still need to call this?
             solver.reinit_cvc5()
             self.o_ctx.call_oracle("io", inputs)
             self.o_ctx.oracles["io"].save_call_logs()
@@ -367,6 +369,7 @@ class ModelBuilder(ABC):
                 # TODO generalize for multiple synthfuns
                 print(list(solution.values())[0])
                 cr = self.o_ctx.call_oracle("corr", list(solution.values())[0])
+                # TODO read counterexample back from correctness oracle (symbiyosys dumps to VCD)
                 is_correct = cr.output
                 if is_correct:
                     print("All oracles passed. Found a solution: ")

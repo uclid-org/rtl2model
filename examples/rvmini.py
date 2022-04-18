@@ -101,6 +101,11 @@ def main():
     guidance.annotate("lft_tile_fe_inst", {
         (fe_pc_var > 520) & (fe_pc_var < 512): AnnoType.ASSUME
     })
+    # TODO need to also constrain specific bits of the instruction
+    # in order to restrict adding and reg destination
+    guidance.annotate("lft_tile_regFile_io_waddr", {
+        ew_pc_var.op_eq(512) | ew_pc_var.op_eq(516): AnnoType.ASSUME
+    })
 
     bv32 = smt.BVSort(32)
     x = smt.Variable("__shadow_0", bv32)
@@ -113,11 +118,15 @@ def main():
         "alu_add",
         (x, y),
         bv32,
-        # smt.Grammar(
-        #     bound_vars=(x, y),
-        #     nonterminals=(start,),
-        #     terms={start: (addbv, subbv, orbv),},
-        # )
+        smt.Grammar(
+            bound_vars=(x, y),
+            nonterminals=(start,),
+            terms={start: (
+                start + start,
+                start - start,
+                start | start,
+            ),},
+        )
     )
     solver = sf.new_solver()
 

@@ -8,7 +8,7 @@ from enum import Enum, EnumMeta, auto
 import textwrap
 from typing import Dict, List, Set, Tuple, Optional
 
-import pycvc5
+import cvc5 as pycvc5
 
 from .sorts import *
 from .terms import *
@@ -82,8 +82,9 @@ class Cvc5Ctx:
     def __post_init__(self):
         sv = self.solver
         sv.setOption("lang", "sygus2")
+        sv.setOption("sygus", "true")
         sv.setOption("incremental", "false")
-        sv.setLogic("BV")
+        sv.setLogic("ABV")
 
     def try_add_sort(self, sort: Sort):
         if sort not in self.sorts:
@@ -103,7 +104,7 @@ class Cvc5Ctx:
         self.terms[k] = v
 
     def _add_grammar(self, grammar):
-        g = self.solver.mkSygusGrammar(
+        g = self.solver.mkGrammar(
             [v.to_cvc5(self) for v in grammar.bound_vars],
             # TODO merge nt map with variables
             [t.to_cvc5(self) for t in grammar.terms.keys()]
@@ -178,8 +179,6 @@ class Solver:
             synthfuns={},
             constraints=[],
         )
-        # TODO Don't know why this is necessary, but it is?
-        wrapper.solver.mkBitVector(8, 0)
         for v in self.variables:
             wrapper.add_term(v)
         for sort in self.sorts:
@@ -229,7 +228,8 @@ class Solver:
             # TODO choose specific synth functions
             c_slv = self.get_cvc5_solver()
             s = c_slv.checkSynth()
-            if not s.isUnsat():
+            if not s.hasSolution():
+                # Result may be unknown
                 return SynthResult(False, None)
             else:
                 sols = c_slv.getSynthSolutions(list(self._cvc5_wrapper.synthfuns.values()))

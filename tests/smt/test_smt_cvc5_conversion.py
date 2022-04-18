@@ -1,5 +1,5 @@
 
-import pycvc5
+import cvc5
 
 from easyila.lynth import smt
 
@@ -9,7 +9,7 @@ class TestSmtCvc5Conversion:
     """
 
     def test_array_to_cvc5(self):
-        c_slv = pycvc5.Solver()
+        c_slv = cvc5.Solver()
         c_slv.setOption("lang", "sygus2")
         c_slv.setOption("incremental", "false")
         c_slv.setLogic("BV")
@@ -20,7 +20,7 @@ class TestSmtCvc5Conversion:
         assert smt.ArraySort(smt.BVSort(5), smt.BVSort(32)).to_cvc5(ctx) == exp_arr
 
     def test_array_from_cvc5(self):
-        c_slv = pycvc5.Solver()
+        c_slv = cvc5.Solver()
         c_slv.setOption("lang", "sygus2")
         c_slv.setOption("incremental", "false")
         c_slv.setLogic("BV")

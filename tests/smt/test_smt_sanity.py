@@ -2,7 +2,7 @@
 import random
 import os
 
-import pycvc5
+import cvc5
 
 from easyila.lynth import smt
 from easyila.lynth.oracleinterface import *
@@ -27,7 +27,8 @@ class TestSMT:
         assert actual == expected
 
     def test_from_cvc5(self):
-        c_slv = pycvc5.Solver()
+        c_slv = cvc5.Solver()
+        c_slv.setOption("sygus", "true")
         c_slv.setOption("lang", "sygus2")
         c_slv.setOption("incremental", "false")
         c_slv.setLogic("BV")
@@ -35,14 +36,14 @@ class TestSMT:
         x = c_slv.mkVar(bv32, "x")
         y = c_slv.mkVar(bv32, "y")
         start = c_slv.mkVar(bv32, "start")
-        c_add = c_slv.mkTerm(pycvc5.Kind.BVAdd, [x, y])
+        c_add = c_slv.mkTerm(cvc5.Kind.BITVECTOR_ADD, x, y)
         # the Python API seems not not expose the correct mkTerm call to create a Term with kind
         # Lambda, so we just do a really dumb sygus call instead
-        g = c_slv.mkSygusGrammar([x, y], [start])
+        g = c_slv.mkGrammar([x, y], [start])
         g.addRules(start, {c_add})
         g.addAnyVariable(start)
         sfn = c_slv.synthFun("fn", [x, y], bv32, g)
-        assert c_slv.checkSynth().isUnsat()
+        assert c_slv.checkSynth().hasSolution()
         actual = c_slv.getSynthSolutions([sfn])[0]
         expected = smt.LambdaTerm(
             (smt.Variable("x", smt.BVSort(32)), smt.Variable("y", smt.BVSort(32))),

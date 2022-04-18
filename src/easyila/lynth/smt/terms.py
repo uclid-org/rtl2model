@@ -5,7 +5,7 @@ from enum import Enum, EnumMeta, IntEnum, auto
 import json
 from typing import Callable, Dict, Mapping, Optional, TypeVar, Union, List
 
-import pycvc5
+import cvc5 as pycvc5
 
 from .sorts import *
 
@@ -65,47 +65,47 @@ class Kind(Enum):
 # https://cvc5.github.io/docs/api/cpp/kind.html
 # Maps our Kind class to pycvc5.Kind...
 _OP_KIND_MAPPING = {
-    Kind.BVAdd:         pycvc5.Kind.BVAdd,
-    Kind.BVSub:         pycvc5.Kind.BVSub,
-    Kind.BVMul:         pycvc5.Kind.BVMult,
+    Kind.BVAdd:         pycvc5.Kind.BITVECTOR_ADD,
+    Kind.BVSub:         pycvc5.Kind.BITVECTOR_SUB,
+    Kind.BVMul:         pycvc5.Kind.BITVECTOR_MULT,
 
-    Kind.BVOr:          pycvc5.Kind.BVOr,
-    Kind.BVAnd:         pycvc5.Kind.BVAnd,
-    Kind.BVNot:         pycvc5.Kind.BVNot,
-    Kind.BVXor:         pycvc5.Kind.BVXor,
-    Kind.BVSll:         pycvc5.Kind.BVShl,
-    Kind.BVSrl:         pycvc5.Kind.BVLshr,
-    Kind.BVSra:         pycvc5.Kind.BVAshr,
+    Kind.BVOr:          pycvc5.Kind.BITVECTOR_OR,
+    Kind.BVAnd:         pycvc5.Kind.BITVECTOR_AND,
+    Kind.BVNot:         pycvc5.Kind.BITVECTOR_NOT,
+    Kind.BVXor:         pycvc5.Kind.BITVECTOR_XOR,
+    Kind.BVSll:         pycvc5.Kind.BITVECTOR_SHL,
+    Kind.BVSrl:         pycvc5.Kind.BITVECTOR_LSHR,
+    Kind.BVSra:         pycvc5.Kind.BITVECTOR_ASHR,
 
-    Kind.BVExtract:     pycvc5.Kind.BVExtract,
-    Kind.BVConcat:      pycvc5.Kind.BVConcat,
+    Kind.BVExtract:     pycvc5.Kind.BITVECTOR_EXTRACT,
+    Kind.BVConcat:      pycvc5.Kind.BITVECTOR_CONCAT,
 
-    Kind.BVOrr:         pycvc5.Kind.BVRedor,
+    Kind.BVOrr:         pycvc5.Kind.BITVECTOR_REDOR,
 
-    Kind.BVUle:         pycvc5.Kind.BVUle,
-    Kind.BVUlt:         pycvc5.Kind.BVUlt,
-    Kind.BVUge:         pycvc5.Kind.BVUge,
-    Kind.BVUgt:         pycvc5.Kind.BVUgt,
+    Kind.BVUle:         pycvc5.Kind.BITVECTOR_ULE,
+    Kind.BVUlt:         pycvc5.Kind.BITVECTOR_ULT,
+    Kind.BVUge:         pycvc5.Kind.BITVECTOR_UGE,
+    Kind.BVUgt:         pycvc5.Kind.BITVECTOR_UGT,
 
-    Kind.BVZeroPad:     pycvc5.Kind.BVZeroExtend,
-    Kind.BVSignExtend:  pycvc5.Kind.BVSignExtend,
+    Kind.BVZeroPad:     pycvc5.Kind.BITVECTOR_ZERO_EXTEND,
+    Kind.BVSignExtend:  pycvc5.Kind.BITVECTOR_SIGN_EXTEND,
 
-    Kind.Equal:         pycvc5.Kind.Equal,
-    Kind.Distinct:      pycvc5.Kind.Distinct,
-    Kind.Or:            pycvc5.Kind.Or,
-    Kind.And:           pycvc5.Kind.And,
-    Kind.Not:           pycvc5.Kind.Not,
-    Kind.Xor:           pycvc5.Kind.Xor,
-    Kind.Implies:       pycvc5.Kind.Implies,
-    Kind.Ite:           pycvc5.Kind.Ite,
-    Kind.Match:         pycvc5.Kind.Match,
+    Kind.Equal:         pycvc5.Kind.EQUAL,
+    Kind.Distinct:      pycvc5.Kind.DISTINCT,
+    Kind.Or:            pycvc5.Kind.OR,
+    Kind.And:           pycvc5.Kind.AND,
+    Kind.Not:           pycvc5.Kind.NOT,
+    Kind.Xor:           pycvc5.Kind.XOR,
+    Kind.Implies:       pycvc5.Kind.IMPLIES,
+    Kind.Ite:           pycvc5.Kind.ITE,
+    Kind.Match:         pycvc5.Kind.MATCH,
 
-    Kind.Lambda:        pycvc5.Kind.Lambda,
-    Kind.Exists:        pycvc5.Kind.Exists,
-    Kind.ForAll:        pycvc5.Kind.Forall,
+    Kind.Lambda:        pycvc5.Kind.LAMBDA,
+    Kind.Exists:        pycvc5.Kind.EXISTS,
+    Kind.ForAll:        pycvc5.Kind.FORALL,
 
-    Kind.Select:        pycvc5.Kind.Select,
-    Kind.Store:         pycvc5.Kind.Store
+    Kind.Select:        pycvc5.Kind.SELECT,
+    Kind.Store:         pycvc5.Kind.STORE
 }
 # ...and vice versa
 _OP_KIND_REV_MAPPING = {v: k for k, v in _OP_KIND_MAPPING.items()}
@@ -488,15 +488,15 @@ class Term(Translatable, ABC):
     # === ABSTRACT AND SHARED STATIC METHODS ===
     @staticmethod
     def from_cvc5(cvc5_term):
-        from pycvc5 import Kind as k
+        from cvc5 import Kind as k
         cvc5_kind = cvc5_term.getKind()
-        if cvc5_kind == k.Variable:
+        if cvc5_kind == k.VARIABLE:
             return Variable.from_cvc5(cvc5_term)
-        elif cvc5_kind == k.Lambda:
+        elif cvc5_kind == k.LAMBDA:
             return LambdaTerm.from_cvc5(cvc5_term)
-        elif cvc5_kind in (k.Exists, k.Forall):
+        elif cvc5_kind in (k.EXISTS, k.FORALL):
             return QuantTerm.from_cvc5(cvc5_term)
-        elif cvc5_kind == k.ConstBV:
+        elif cvc5_kind == k.CONST_BITVECTOR:
             return BVConst.from_cvc5(cvc5_term)
         elif cvc5_kind in _OP_KIND_REV_MAPPING:
             return OpTerm.from_cvc5(cvc5_term)
@@ -562,8 +562,8 @@ class Variable(Term):
 
     @staticmethod
     def from_cvc5(cvc5_term) -> "Variable":
-        if cvc5_term.getKind() != pycvc5.Kind.Variable:
-            raise TypeError("Variable must be translated from pycvc5.Kind.Variable, instead got " + str(cvc5_term.getKind()))
+        if cvc5_term.getKind() != pycvc5.Kind.VARIABLE:
+            raise TypeError("Variable must be translated from pycvc5.Kind.VARIABLE, instead got " + str(cvc5_term.getKind()))
         # it seems like cvc5 will wrap the variable name in |var| if there are square brackets inside
         # so we need to strip those off
         name = str(cvc5_term)
@@ -1110,7 +1110,7 @@ class LambdaTerm(Term):
 
     @staticmethod
     def from_cvc5(cvc5_term):
-        if cvc5_term.getKind() == pycvc5.Kind.Lambda:
+        if cvc5_term.getKind() == pycvc5.Kind.LAMBDA:
             c_params = cvc5_term[0]
             c_body = cvc5_term[1]
             return LambdaTerm(
@@ -1118,7 +1118,7 @@ class LambdaTerm(Term):
                 Term.from_cvc5(c_body),
             )
         else:
-            raise TypeError("LambdaTerm must be translated from pycvc5.Kind.Lambda, instead got " + str(cvc5_term.getKind()))
+            raise TypeError("LambdaTerm must be translated from pycvc5.Kind.LAMBDA, instead got " + str(cvc5_term.getKind()))
 
     def to_target_format(self, tgt: TargetFormat, **kwargs):
         if tgt == TargetFormat.CVC5:
@@ -1126,9 +1126,9 @@ class LambdaTerm(Term):
             if self in cvc5_ctx.terms:
                 return cvc5_ctx.terms[self]
             else:
-                cvc5_kind = pycvc5.Kind.Lambda
+                cvc5_kind = pycvc5.Kind.LAMBDA
                 # TODO this needs to be tested
-                vlist = cvc5_ctx.solver.mkTerm(pycvc5.Kind.VariableList, [p.to_cvc5(cvc5_ctx) for p in self.params])
+                vlist = cvc5_ctx.solver.mkTerm(pycvc5.Kind.VARIABLE_LIST, [p.to_cvc5(cvc5_ctx) for p in self.params])
                 t = cvc5_ctx.solver.mkTerm(cvc5_kind, vlist, [self.body.to_cvc5(cvc5_ctx)])
                 cvc5_ctx.terms[self] = t
                 return t
@@ -1185,7 +1185,7 @@ class QuantTerm(Term):
             else:
                 cvc5_kind = self.kind.to_cvc5(cvc5_ctx)
                 # TODO this needs to be tested
-                vlist = cvc5_ctx.solver.mkTerm(pycvc5.Kind.VariableList, [p.to_cvc5(cvc5_ctx) for p in self.bound_vars])
+                vlist = cvc5_ctx.solver.mkTerm(pycvc5.Kind.VARIABLE_LIST, [p.to_cvc5(cvc5_ctx) for p in self.bound_vars])
                 t = cvc5_ctx.solver.mkTerm(cvc5_kind, vlist, [self.body.to_cvc5(cvc5_ctx)])
                 cvc5_ctx.terms[self] = t
                 return t
@@ -1226,15 +1226,15 @@ class ApplyUF(Term):
 
     @staticmethod
     def from_cvc5(cvc5_term):
-        if cvc5_term.getKind() == pycvc5.Kind.ApplyUf:
+        if cvc5_term.getKind() == pycvc5.Kind.APPLY_UF:
             raise NotImplementedError()
         else:
-            raise TypeError("ApplyUF must be translated from pycvc5.Kind.ApplyUf, instead got " + str(cvc5_term.getKind()))
+            raise TypeError("ApplyUF must be translated from pycvc5.Kind.APPLY_UF, instead got " + str(cvc5_term.getKind()))
 
     def to_target_format(self, tgt: TargetFormat, **kwargs):
         if tgt == TargetFormat.CVC5:
             cvc5_ctx = kwargs["cvc5_ctx"]
-            cvc5_kind = pycvc5.Kind.ApplyUf
+            cvc5_kind = pycvc5.Kind.APPLY_UF
             # Distinguish between ordinary UFs and synthfuns
             if self.fun.name in cvc5_ctx.synthfuns:
                 cvc5_fun = cvc5_ctx.synthfuns[self.fun.name]
@@ -1308,8 +1308,8 @@ class BVConst(Term):
     @staticmethod
     def from_cvc5(cvc5_term):
         kind = cvc5_term.getKind()
-        if kind != pycvc5.Kind.ConstBV:
-            raise TypeError("BVConst must be translated from pycvc5.Kind.ConstBV, instead got " + str(kind))
+        if kind != pycvc5.Kind.CONST_BITVECTOR:
+            raise TypeError("BVConst must be translated from pycvc5.Kind.CONST_BITVECTOR, instead got " + str(kind))
         return BVConst(int(cvc5_term.getBitVectorValue(base=10)), cvc5_term.getSort().getBitVectorSize())
 
     def eval(self, values):

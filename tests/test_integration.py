@@ -86,7 +86,7 @@ class TestIntegration:
         """
         Tests that necessary dependencies etc. have installed properly, and the library can be initialized.
         """
-        import pycvc5 as cvc5
+        import cvc5
         cvc5.Solver()
 
     def init_model(self):

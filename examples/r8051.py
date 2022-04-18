@@ -123,8 +123,6 @@ def main():
 
     model = R8051Model(
         ProjectConfig(os.path.join(BASEDIR, "symbiyosys")),
-        [8, 8],
-        8,
         solver,
         SIGNALS,
         guidance
