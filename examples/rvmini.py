@@ -99,7 +99,7 @@ def main():
     # a3 (output)
     guidance.annotate("lft_tile_regs_13", {ew_pc_var.op_eq(524): AnnoType.OUTPUT})
     guidance.annotate("lft_tile_fe_inst", {
-        fe_pc_var > 520 and fe_pc_var < 512: AnnoType.ASSUME
+        (fe_pc_var > 520) & (fe_pc_var < 512): AnnoType.ASSUME
     })
 
     bv32 = smt.BVSort(32)
@@ -113,11 +113,11 @@ def main():
         "alu_add",
         (x, y),
         bv32,
-        smt.Grammar(
-            bound_vars=(x, y),
-            nonterminals=(start,),
-            terms={start: (addbv, subbv, orbv),},
-        )
+        # smt.Grammar(
+        #     bound_vars=(x, y),
+        #     nonterminals=(start,),
+        #     terms={start: (addbv, subbv, orbv),},
+        # )
     )
     solver = sf.new_solver()
 

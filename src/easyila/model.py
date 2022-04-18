@@ -468,6 +468,8 @@ class Model:
                 s.add_constraint(i.add_prefix(BASE_PREFIX).op_eq(term.replace_vars(rhs_replacements)))
             # Recursively add terms for instance state
             # TODO IMPORTANT make multiple instances of the same module share UFs
+            # TODO to accomodate that, it may be prudent to prefix all UFs by module names
+            # this will affect the replacement dict
             instance.model._to_solver_helper(s, inst_name + ".")
         return s
 
@@ -724,15 +726,15 @@ class Model:
                 name=f"_{self.name}__{suffixes[i]}",
                 inputs=inputs,
                 outputs=self.outputs,
-                state=self.state,
+                state=state,
                 ufs=self.ufs,
                 instances={
                     name: Instance(
                         # Rewrite expressions for all input bindings
                         inst.model,
                         {
-                            v_name: t.replace_vars({input_var: cs_value_t})
-                            for v_name, t in inst.inputs.items()
+                            v: t.replace_vars({split_var: cs_value_t})
+                            for v, t in inst.inputs.items()
                         }
                     )
                     for name, inst in self.instances.items()

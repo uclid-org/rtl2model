@@ -251,7 +251,7 @@ class Solver:
         Returns a string representing a SyGuS2 (.sy) encoding the variables and assumptions
         in this solver.
         """
-        text = "(set-logic QF_ABV)\n"
+        text = "(set-logic ABV)\n"
         for v in self.variables:
             text += v.get_decl().to_sygus2() + "\n"
         for sf in self.synthfuns:

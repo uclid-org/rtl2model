@@ -3,7 +3,7 @@ from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import asdict, dataclass
 from enum import Enum, EnumMeta, IntEnum, auto
 import json
-from typing import Callable, Dict, Optional, TypeVar, Union, List
+from typing import Callable, Dict, Mapping, Optional, TypeVar, Union, List
 
 import pycvc5
 
@@ -201,7 +201,7 @@ class Term(Translatable, ABC):
 
     # === OPTIMIZATIONS AND TREE TRAVERSALS ===
 
-    def replace_vars(self, m: Dict["Variable", "Term"]) -> "Term":
+    def replace_vars(self, m: Mapping["Variable", "Term"]) -> "Term":
         """
         Returns a new term tree with all references to `var` replaced by `new_term`.
         """
@@ -701,7 +701,8 @@ class OpTerm(Term):
             return self.args[1].sort
         elif self.kind == Kind.Match:
             return self.args[2].sort # Match args are (cond, c1, v1, c2, v2, ...)
-        bitops = { Kind.Or, Kind.And, Kind.Xor, Kind.Not, Kind.Equal, Kind.Distinct }
+        bitops = { Kind.Or, Kind.And, Kind.Xor, Kind.Not, Kind.Equal, Kind.Distinct,
+                   Kind.BVUle, Kind.BVUlt, Kind.BVUge, Kind.BVUgt}
         if self.kind in bitops:
             return BoolSort()
         if self.kind == Kind.Select:
@@ -1214,9 +1215,7 @@ class ApplyUF(Term):
 
     @property
     def sort(self):
-        if isinstance(self.fun, UFTerm):
-            return self.fun.sort
-        return self.fun.return_sort
+        return self.fun.sort
 
     @property
     def _children(self):

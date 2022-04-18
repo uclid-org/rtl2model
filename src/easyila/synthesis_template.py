@@ -4,7 +4,6 @@ import argparse
 from dataclasses import dataclass
 import math
 import os
-import random
 from subprocess import Popen, PIPE
 import textwrap
 from typing import List
@@ -115,7 +114,7 @@ class ModelBuilder(ABC):
                         print(f"Sampled {signame}@{cc}={val}")
                         output_vals.append(val)
             else:
-                cycle = cond_or_cycle
+                cc = cond_or_cycle
                 sampled_outputs.add(signame)
                 val = signal_values[cc][signame]
                 print(f"Sampled {signame}@{cc}={val}")
@@ -135,7 +134,6 @@ class ModelBuilder(ABC):
         ctr_width = int(math.ceil(math.log(guidance.num_cycles, 2)))
         signalnames = [qpath for s in self.signals for qpath in s.get_all_qp_instances()]
         basenames = [basename for s in self.signals for basename in s.get_all_bp_instances()]
-        base_to_qualified = dict(zip(basenames, signalnames))
         def get_width(qp):
             """Gets width of the signal corresponding to the provided qualified path."""
             return signal_widths[qp]
@@ -156,7 +154,6 @@ class ModelBuilder(ABC):
 
         for stepnum in range(guidance.num_cycles):
             itercond = ctr.op_eq(ctr_values[stepnum])
-            stmts: List[v.Statement] = []
             assumes = []
             asserts = []
             for signal in guidance.signals:
@@ -237,15 +234,13 @@ class ModelBuilder(ABC):
         return shadow_decls + textwrap.dedent(f"""\
 
             {ctr.get_decl(smt.BVConst(0, ctr_width)).to_verilog_str(is_reg=True)}
-            always @(posedge clk) begin
+            always @(posedge {clock_name}) begin
                 {ctr.to_verilog_str()} <= {ctr.to_verilog_str()} + 1;
             end
-            """) + "always @(posedge clk) begin\n" + \
+            """) + f"always @(posedge {clock_name}) begin\n" + \
             textwrap.indent("\n".join(ctr_cases_l), "    ") + \
             "\n\n" + textwrap.indent("\n".join(pred_cases_l), "    ") + \
             "\nend"
-
-        return ctr_cases
 
     def run_bmc(self, signal_values, signal_widths, hypothesis_func: smt.LambdaTerm):
         """
@@ -381,4 +376,3 @@ class ModelBuilder(ABC):
             else:
                 print("Sorry, no solution found!")
                 return None
-
