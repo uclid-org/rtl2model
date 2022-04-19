@@ -87,7 +87,7 @@ class TestSygus:
         )
         sygus_block = s.get_sygus2()
         expected = textwrap.dedent("""\
-            (set-logic ABV)
+            (set-logic AUFBV)
             (declare-var x (_ BitVec 3))
             (declare-var y (_ BitVec 3))
             (synth-fun add ((x (_ BitVec 3)) (y (_ BitVec 3))) (_ BitVec 3))

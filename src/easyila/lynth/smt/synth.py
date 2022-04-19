@@ -24,6 +24,11 @@ class Grammar:
     nonterminal or a variable.
     """
 
+    def __post_init__(self):
+        for t, rules in self.terms.items():
+            for rule in rules:
+                assert t.sort == rule.sort, f"misatched rule for expansion rule of {t} ({t.sort}): {rule} ({rule.sort})"
+
     def get_sygus2(self) -> str:
         block = "(" + " ".join(f"({b.name} {b.sort.to_sygus2()})" for b in self.nonterminals) + ")"
         block += "\n("
@@ -251,7 +256,8 @@ class Solver:
         Returns a string representing a SyGuS2 (.sy) encoding the variables and assumptions
         in this solver.
         """
-        text = "(set-logic ABV)\n"
+        # Arrays, Uninterpreted Functions, fixed-width Bit Vectors
+        text = "(set-logic AUFBV)\n"
         for v in self.variables:
             text += v.get_decl().to_sygus2() + "\n"
         for sf in self.synthfuns:

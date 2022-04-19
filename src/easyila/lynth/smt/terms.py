@@ -433,11 +433,22 @@ class Term(Translatable, ABC):
             assert isinstance(self.sort, BVSort), "only BV terms support indexing, instead term was " + str(self)
             width = self.sort.bitwidth
         wrap = lambda i: BVConst(i, width)
+        def shift_and_mask(term):
+            """
+            Encodes extracts of a variable index as a shift + mask.
+            """
+            if term.sort.bitwidth == width:
+                shamt = term
+            else:
+                shamt = term.zpad(width - term.sort.bitwidth)
+            return OpTerm(Kind.BVAnd, (OpTerm(Kind.BVSrl, (self, shamt)), BVConst(1, width)))
         if isinstance(key, int):
             return OpTerm(Kind.BVExtract, (self, wrap(key), wrap(key)))
         elif isinstance(key, Term):
-            return OpTerm(Kind.BVExtract, (self, key, key))
+            return shift_and_mask(key.start)
         elif isinstance(key, slice):
+            if isinstance(key.start, Term) and key.start == key.stop:
+                return shift_and_mask(key.start)
             if isinstance(key.start, int):
                 hi = wrap(max(key.start, key.stop))
             else:
@@ -446,7 +457,10 @@ class Term(Translatable, ABC):
                 lo = wrap(min(key.start, key.stop))
             else:
                 lo = key.stop
-            assert hi.val < width and lo.val >= 0, f"extract indices {hi.val}:{lo.val} exceed bounds of bv{width}"
+            if isinstance(hi, BVConst):
+                assert hi.val < width, f"extract upper index {hi.val} exceeds bounds of bv{width}"
+            if isinstance(lo, BVConst):
+                assert lo.val >= 0, f"extract lower index {lo.val} was negative"
             return OpTerm(Kind.BVExtract, (self, hi, lo))
         raise TypeError(f"cannot index {self} with {key}")
 
@@ -471,12 +485,22 @@ class Term(Translatable, ABC):
     def concat(self, *others):
         return OpTerm(Kind.BVConcat, (self, *others))
 
-    def zero_pad(self, extra_bits: "BVConst"):
+    def zpad(self, extra_bits: Union["BVConst", int]):
+        return self.zero_pad(extra_bits)
+
+    def zero_pad(self, extra_bits: Union["BVConst", int]):
         """Zero pads this term with an addition `extra_bits` bits."""
+        if isinstance(extra_bits, int):
+            extra_bits = BVConst(extra_bits, self.sort.bitwidth)
         return OpTerm(Kind.BVZeroPad, (self, extra_bits))
 
-    def sign_extend(self, extra_bits: "BVConst"):
+    def sext(self, extra_bits: Union["BVConst", int]):
+        return self.sign_extend(extra_bits)
+
+    def sign_extend(self, extra_bits: Union["BVConst", int]):
         """Sign extends this term with an addition `extra_bits` bits."""
+        if isinstance(extra_bits, int):
+            extra_bits = BVConst(extra_bits, self.sort.bitwidth)
         return OpTerm(Kind.BVSignExtend, (self, extra_bits))
 
     def orr(self):

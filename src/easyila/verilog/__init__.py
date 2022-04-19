@@ -296,8 +296,8 @@ def _verilog_model_helper(
             is_curr_scope = str(sc[:-1]) == instance_name
             if not is_curr_scope:
                 continue
-            assert isinstance(term.msb, DFIntConst), term.msb
-            assert isinstance(term.lsb, DFIntConst), term.lsb
+            assert isinstance(term.msb, DFIntConst), term
+            assert isinstance(term.lsb, DFIntConst), term
             # TODO deal with `dims` for arrays?
             width = term.msb.eval() - term.lsb.eval() + 1
             s = str(sc)
@@ -359,7 +359,8 @@ def _verilog_model_helper(
                         idx_width = v.sort.bitwidth
                         msb_expr = pv_to_smt_expr(p.msb, idx_width, terms, None, mod_depth, rename_substitutions)
                         lsb_expr = pv_to_smt_expr(p.lsb, idx_width, terms, None, mod_depth, rename_substitutions)
-                        assignee = v[msb_expr:lsb_expr]
+                        raise NotImplementedError("BV index assignment not yet supported", p.tocode())
+                        # assignee = v[msb_expr:lsb_expr]
                     elif p.ptr is not None:
                         # Array index assignment
                         assert isinstance(v.sort, smt.ArraySort)

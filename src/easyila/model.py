@@ -408,6 +408,9 @@ class Model:
         return self.inputs + self.outputs + self.state + uf_vars
 
     def to_solver(self):
+        """
+        Encodes the transition relations of this model as a one-cycle unrolling of SMT assertions.
+        """
         s = smt.Solver()
         return self._to_solver_helper(s, "")
 
@@ -428,6 +431,10 @@ class Model:
         # on every cycle of simulation is to create a separate set of state vars
         # for each cycle, and then assert the vars of the next cycle wrt vars of the first cycle
         # e.g. `b' <= b` would result in `assert (state_2_b == state_1_b)`
+        # for some assumed invariant/property (e.g. b > 0), you would assert the property holds
+        # on state_1_b (assert (not (> state_1_b 0))), then assert it falsifiable on state_2_b
+        # (assert (not (> state_1_b 0))) -- if you get an UNSAT result, then that tells you no
+        # assignment of variables violates the invariant
         # Induction:
         # basically the same story, with state_1_b in terms of initial_b
         # logic from submodules gets inlined
@@ -436,6 +443,7 @@ class Model:
         for v in next_dict.values():
             s.add_variable(v)
         # For each uninterpreted function with free variables, create a dummy free variable
+        # TODO havoc uf free variables
         uf_replacements = {}
         for uf_p in self.ufs:
             ref = uf_p.get_ref()

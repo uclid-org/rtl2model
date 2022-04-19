@@ -30,8 +30,6 @@ class R8051Model(ModelBuilder):
         self.run_proc(["make", "default"], cwd=BASEDIR)
 
     def generate_program(self, inputs) -> ConcreteProgram:
-        i0 = int(inputs[0])
-        i1 = int(inputs[1])
         # https://www.keil.com/support/man/docs/is51/is51_opcodes.htm
         return ProgramSketch(
             inst_byte(0x00),       # nop
@@ -50,7 +48,7 @@ class R8051Model(ModelBuilder):
             inst_byte(0x31),
             inst_byte(0x31),
             inst_byte(0x31)
-        ).fill({"i0": i0, "i1": i1})
+        ).fill({"i0": inputs[0], "i1": inputs[1]})
 
     def simulate_and_read_signals(self, program):
         with open(os.path.join(BASEDIR, "myhello"), "wb") as f:

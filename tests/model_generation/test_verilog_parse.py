@@ -393,15 +393,56 @@ class TestVerilogParse:
             logic={o_inner: i_state[0]}
         )
 
-    @pytest.mark.skip()
     def test_verilog_bv_var_index(self):
         """
         Tests indexing a bitvector with a variable.
-
-        TODO this should effectively just be a bitvector mask
         """
-        ...
-        assert False
+        rtl = textwrap.dedent("""\
+            module top(input clk, input bit, input [2:0] idx, output out);
+                reg [7:0] op;
+                always @(posedge clk) begin
+                    op[idx] = bit; // Sets the idxth bit
+                end
+                assign out = op[idx];
+            endmodule
+            """)
+        var = smt.Variable
+        bit = var("bit", smt.BoolSort())
+        idx = var("idx", smt.BVSort(3))
+        out = var("out", smt.BoolSort())
+        op = var("op", smt.BVSort(8))
+        exp_model = Model(
+            "top",
+            inputs=[bit, idx],
+            outputs=[out],
+            state=[op],
+            logic={
+                # Encode extracting a bit as a shift + mask
+                # because SMT extracts require constant indices
+                out: smt.OpTerm(
+                    smt.Kind.BVAnd,
+                    (
+                        smt.OpTerm(
+                            smt.Kind.BVSrl,
+                            (
+                                op,
+                                idx.zpad(5),
+                            )
+                        ),
+                        smt.BVConst(1, 8),
+                    )
+                )
+            },
+            default_next={
+                # TODO
+                op: smt.BVConst(0, 8)
+            }
+        )
+        assert exp_model.validate()
+        actual = verilog_to_model(rtl, "top")
+        actual.print()
+        assert actual.validate()
+        assert actual == exp_model
 
     def test_verilog_one_child_module(self):
         rtl = textwrap.dedent("""\
