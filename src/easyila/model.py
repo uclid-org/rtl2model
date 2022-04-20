@@ -396,23 +396,6 @@ class Model:
 
     # === SOLVER STUFF ===
 
-    def get_solver_vars(self):
-        """
-        Returns all variables the solver might have to know about.
-
-        For any `UFTerm` with `free_arg=True`, an extra "__free__" variable is added.
-
-        TODO deal with instances
-        """
-        uf_vars = []
-        for uf_p in self.ufs:
-            if uf_p.free_arg:
-                uf_vars.append(smt.Variable("__free__" + uf_p.name, uf_p.sort))
-        for uf_p in self.next_ufs:
-            if uf_p.free_arg:
-                uf_vars.append(smt.Variable("__free__" + uf_p.name, uf_p.sort))
-        return self.inputs + self.outputs + self.state + uf_vars
-
     def to_solver(self):
         """
         Encodes the transition relations of this model as a one-cycle unrolling of SMT assertions.
@@ -501,11 +484,13 @@ class Model:
         if var in self.default_next:
             return self.default_next[var]
         for k, t in self.logic.items():
-            if isinstance(k, smt.OpTerm) and k.kind == smt.Kind.Select and k.args[0] == var:
-                return t
+            if isinstance(k, smt.OpTerm) and \
+                (k.kind == smt.Kind.Select or k.kind == smt.Kind.BVExtract) and k.args[0] == var:
+                    return t
         for k, t in self.default_next.items():
-            if isinstance(k, smt.OpTerm) and k.kind == smt.Kind.Select and k.args[0] == var:
-                return t
+            if isinstance(k, smt.OpTerm) and \
+                (k.kind == smt.Kind.Select or k.kind == smt.Kind.BVExtract) and k.args[0] == var:
+                    return t
         return None
 
     def eliminate_dead_code(self):

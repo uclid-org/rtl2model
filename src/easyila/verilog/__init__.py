@@ -587,7 +587,7 @@ def find_direct_parent_nodes(p, parents=None) -> List[str]:
         sc_str = str(p.name)
         # unqualified_name = sc_str.split(".")[-1]
         parents.append(sc_str)
-    elif isinstance(p, DFIntConst):
+    elif isinstance(p, DFIntConst) or isinstance(p, DFEvalValue):
         pass
     elif isinstance(p, DFBranch):
         assert p.condnode is not None, p.tocode()

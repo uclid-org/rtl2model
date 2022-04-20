@@ -906,8 +906,9 @@ class OpTerm(Term):
                 a0_str = wrap(self.args[0])
                 a1_str = wrap(self.args[1])
                 return f"{a0_str}[{a1_str}]"
-            if v == Kind.BVSignExtend:
-                return f"$signed({self.args[0].to_verilog_str()})"
+            # if v == Kind.BVSignExtend:
+                # TODO duplicate MSB, then concat
+                # return f"$signed({self.args[0].to_verilog_str()})"
             if v == Kind.BVZeroPad:
                 return wrap(self.args[0])
             raise NotImplementedError(v)
