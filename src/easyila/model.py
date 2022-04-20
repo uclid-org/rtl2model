@@ -747,8 +747,7 @@ class Model:
                 },
                 generated_by=GeneratedBy.CASE_SPLIT,
             )
-            # TODO do a DCE pass
-            # new_model = new_model.eliminate_dead_code()
+            new_model = new_model.eliminate_dead_code()
             instances[inst_names[i]] = Instance(new_model, bindings)
         if isinstance(split_var.sort, smt.BoolSort):
             new_logic = {

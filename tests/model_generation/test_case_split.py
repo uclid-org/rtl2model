@@ -1,6 +1,8 @@
 
 import textwrap
 
+import pytest
+
 import easyila.lynth.smt as smt
 from easyila.verilog import verilog_to_model
 from easyila.model import *
@@ -83,7 +85,7 @@ class TestCaseSplit:
             state=[v_f],
             instances={"c_f": Instance(c_false, {})},
             logic={
-                v_f: v("c_t.o", bv4),
+                v_f: v("c_f.o", bv4),
                 big_o: ignore & v_f,
             }
         )
@@ -100,8 +102,8 @@ class TestCaseSplit:
             },
             logic={
                 big_o: either.ite(
-                    v("_top__either__TRUE_inst.o", bv4),
-                    v("_top__either__FALSE_inst.o", bv4),
+                    v("_top__either__TRUE_inst.big_o", bv4),
+                    v("_top__either__FALSE_inst.big_o", bv4),
                 ),
             }
         )
@@ -190,8 +192,8 @@ class TestCaseSplit:
         )
         # In the case split model, state that doesn't determine v_t is elided and pushed
         # into the submodule instances
-        cs_top = Model(
-            "top",
+        cs_logic_top = Model(
+            "__logic__top",
             inputs=[ignore],
             outputs=[big_o],
             state=[v_t],
@@ -211,6 +213,12 @@ class TestCaseSplit:
                     3: v("_top__v_t__11_inst.big_o", bv2),
                 }),
             }
+        )
+        cs_top = Model(
+            "top",
+            inputs=[ignore],
+            outputs=[big_o],
+            state=[v_t, v_f],
         )
         print("=== CASE SPLIT MODEL ===")
         assert cs_top.validate()
@@ -291,3 +299,6 @@ class TestCaseSplit:
         alg_split = top.case_split("s_a")
         alg_split.print()
         assert alg_split == cs_top
+
+    def test_case_split_stateful_instance(self):
+        pytest.skip()
