@@ -68,19 +68,24 @@ class RvMiniModel(ModelBuilder):
 def main():
     v = smt.Variable
     bv32 = smt.BVSort(32)
-    a, b = v("a", bv32), v("b", bv32)
+    a, b = v("io_A", bv32), v("io_B", bv32)
+    io_out = v("io_out", bv32)
     alu = Model(
         "ALUArea",
         inputs=[a, b, v("io_alu_op", smt.BVSort(4))],
-        outputs=[v("io_out", bv32), v("io_sum", bv32)],
-        ufs=[UFPlaceholder("alu_result", bv32, (a, b), False)],
+        outputs=[io_out, v("io_sum", bv32)],
+        ufs=[
+            UFPlaceholder("alu_result", bv32, (a, b), False),
+            UFPlaceholder("io_sum", bv32, (), False)
+        ],
         logic={io_out: v("alu_result", bv32)}
     )
+    assert alu.validate()
     core = verilog_to_model(
         os.path.join(BASEDIR, "full.v"),
         "Datapath",
         clock_pattern=".*clock",
-        defined_modules=alu,
+        defined_modules=[alu],
         # important_signals=[
         #     "io_lft_dpath__pc",
         #     "io_lft_dpath__fe_pc",
@@ -110,3 +115,8 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+class TestRun:
+    def test_rvmini_main(self):
+        main()

@@ -216,10 +216,9 @@ class Model:
                 report(f"uninterpreted function {s} cannot have . in its name")
             if count > 1:
                 report(f"uninterpreted function {s} was declared multiple times")
-        # Second pass: all state and output have assigned expressions xor transition relations
+        # Second pass: all state have assigned expressions xor transition relations
+        # and outputs have logic xor transition xor UF
         # and that inputs + UFs do NOT have declared logic
-        # TODO for now, outputs can also be UFs
-
         logic_and_next = {_get_assignee_name(v) for v in self.logic}
         next_keys = set()
         names = {_get_assignee_name(v) for v in self.default_next}
@@ -482,6 +481,7 @@ class Model:
             uf_replacements[k] = t.replace_vars(uf_replacements)
         rhs_replacements = {**base_dict, **uf_replacements}
         for k, term in self.logic.items():
+            # TODO if LHS is an array Select, convert it to an array Store
             s.add_constraint(k.op_eq(term).replace_vars(rhs_replacements))
         for k, term in self.default_next.items():
             s.add_constraint(k.replace_vars(next_dict).op_eq(term.replace_vars(rhs_replacements)))

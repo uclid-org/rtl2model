@@ -121,6 +121,9 @@ _OP_SYGUS_SYMBOLS = {
     Kind.BVSll: "bvshl",
     Kind.BVSrl: "bvashr",
     Kind.BVSra: "bvlshr",
+    Kind.BVUle: "bvule",
+    Kind.BVUgt: "bvugt",
+    Kind.BVUge: "bvuge",
     # extract is a special case
     Kind.BVConcat: "concat",
     Kind.Or: "or",
@@ -294,6 +297,15 @@ class Term(Translatable, ABC):
         raise NotImplementedError()
 
     # === OPERATOR OVERRIDES ===
+
+    def _maybe_bool2bv1(self):
+        if isinstance(self, BoolConst):
+            return BVConst(int(self), 1)
+        elif isinstance(self.sort, BoolSort):
+            return self.ite(BVConst(1, 1), BVConst(0, 1))
+        else:
+            return self
+
     def ite(self, t_term, f_term):
         """
         Constructs an ITE expression with this variable as condition.
@@ -507,7 +519,10 @@ class Term(Translatable, ABC):
         raise TypeError(key)
 
     def concat(self, *others):
-        return OpTerm(Kind.BVConcat, (self, *others))
+        if len(others) == 0:
+            return self
+        else:
+            return OpTerm(Kind.BVConcat, (self, *others))
 
     def zpad(self, extra_bits: Union["BVConst", int]):
         return self.zero_pad(extra_bits)
@@ -802,6 +817,10 @@ class OpTerm(Term):
                 assert isinstance(self.args[2], BVConst)
                 op = cvc5_ctx.solver.mkOp(cvc5_kind, self.args[1].val, self.args[2].val)
                 return cvc5_ctx.solver.mkTerm(op, self.args[0].to_cvc5(cvc5_ctx))
+            elif self.kind == Kind.BVConcat:
+                # Special case for bool operands for a concat
+                args = [o._maybe_bool2bv1().to_cvc5(cvc5_ctx) for o in self.args]
+                return cvc5_ctx.solver.mkTerm(cvc5_kind, *args)
             elif self.kind in (Kind.BVZeroPad, Kind.BVSignExtend):
                 assert isinstance(self.args[1], BVConst)
                 op = cvc5_ctx.solver.mkOp(cvc5_kind, self.args[1].val)
@@ -839,6 +858,12 @@ class OpTerm(Term):
                 assert isinstance(self.args[1], BVConst), self.args
                 assert isinstance(self.args[2], BVConst), self.args
                 return f"((_ extract {self.args[1].val} {self.args[2].val}) {self.args[0].to_sygus2()})"
+            if self.kind == Kind.BVZeroPad:
+                assert isinstance(self.args[1], BVConst), self.args
+                return f"((_ zero_extend {self.args[1].to_sygus2()}) {self.args[0].to_sygus2()})"
+            if self.kind == Kind.BVSignExtend:
+                assert isinstance(self.args[1], BVConst), self.args
+                return f"((_ sign_extend {self.args[1].to_sygus2()}) {self.args[0].to_sygus2()})"
             if self.kind == Kind.Distinct:
                 return f"(not (= " +  " ".join(a.to_sygus2() for a in self.args) + "))"
             return "(" + _OP_SYGUS_SYMBOLS[self.kind] + " " + " ".join([a.to_sygus2() for a in self.args]) + ")"
