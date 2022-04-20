@@ -168,7 +168,7 @@ class ModelBuilder(ABC):
                         # Add assume statement
                         constval = smt.BVConst(signal_values[stepnum][qp], get_width(qp))
                         assumes.append(qp_var.op_eq(constval))
-                    elif atype == AnnoType.PARAM:
+                    elif atype.is_param():
                         # Add new shadow register
                         new_shadow = smt.BVVariable(f"__shadow_{numshadow}", get_width(qp))
                         shadow_decls.append(new_shadow.get_decl())
@@ -204,7 +204,7 @@ class ModelBuilder(ABC):
                             constval = smt.BVConst(signal_values[cc.val][qp], get_width(qp))
                             s += f"        {cc.to_verilog_str()}: assume ({qp_var.op_eq(constval).to_verilog_str()});\n"
                         s += f"    endcase\n"
-                    elif anno == AnnoType.PARAM:
+                    elif anno.is_param():
                         # Add new shadow register
                         new_shadow = smt.BVVariable(f"__shadow_{numshadow}", get_width(qp))
                         shadow_decls.append(new_shadow.get_decl())

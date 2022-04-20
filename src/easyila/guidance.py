@@ -3,25 +3,63 @@ Annotations that provide guidance for oracles.
 """
 
 from collections import defaultdict
+from dataclasses import dataclass
 from enum import Enum
 from typing import Dict, List, Tuple, Set, Optional, Union
 
 import easyila.lynth.smt as smt
 
-class AnnoType(Enum):
+
+@dataclass(frozen=True)
+class AnnoType:
     """
-    Types of annotations
+    Guidance annotations to represent the refinement relation between RTL signals
+    and synthesis formula variables.
     """
-    DONT_CARE = 0
-    ASSUME = 1
-    PARAM = 2
-    OUTPUT = 3
+
+    val: int
+    var: smt.Variable = None
+
+    def __post_init__(self):
+        if self.val < 0 or self.val > 3:
+            raise TypeError(f"invalid value for AnnoType: {self.val}")
+
+    def __str__(self):
+        if self.val == 0:
+            return "DONT_CARE"
+        elif self.val == 1:
+            return "ASSUME"
+        elif self.val == 2:
+            return f"Param({self.var})"
+        elif self.val == 3:
+            return "OUTPUT"
+        else:
+            raise TypeError(f"invalid AnnoType with val {self.val}")
+
+    def is_param(self):
+        return self.val == 2
+
+
+# These fields must be declared afterwards in order to resolve the AnnoType name
+
+AnnoType.DONT_CARE = AnnoType(0)
+"""The value of this signal is not relevant."""
+
+AnnoType.ASSUME = AnnoType(1)
+"""The value of this signal should be assumed to match the value during simulation."""
+
+AnnoType.Param = lambda v: AnnoType(2, v)
+"""This signal represents a synthesis function parameter."""
+
+AnnoType.OUTPUT = AnnoType(3)
+"""This signal represents a function output."""
+
 
 class Guidance:
     """
     Allows the user to provide guidance for whether or not a value at a particular clock cycle
     is `DONT_CARE` ("Don't Care"), `ASSUME` ("Assumed" to be the value read during simulation),
-    `PARAM` ("Parameter" of the synthesis function), or `OUTPUT` ("Output" of the synthesis function).
+    `Param` ("Parameter" of a synthesis function), or `OUTPUT` ("Output" of the synthesis function).
     """
 
     def __init__(self, signals, num_cycles: int):
