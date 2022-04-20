@@ -463,7 +463,9 @@ class Term(Translatable, ABC):
                 shamt = term.zpad(width - term.sort.bitwidth)
             return OpTerm(Kind.BVAnd, (OpTerm(Kind.BVSrl, (self, shamt)), BVConst(1, width)))
         if isinstance(key, int):
-            return OpTerm(Kind.BVExtract, (self, wrap(key), wrap(key)))
+            # Extracts a single bit
+            # ite will auto-cast to a bool
+            return OpTerm(Kind.BVExtract, (self, wrap(key), wrap(key))).ite(BoolConst.T, BoolConst.F)
         elif isinstance(key, Term):
             return shift_and_mask(key.start)
         elif isinstance(key, slice):
@@ -481,6 +483,8 @@ class Term(Translatable, ABC):
                 assert hi.val < width, f"extract upper index {hi.val} of '{self}' exceeds bounds of bv{width}"
             if isinstance(lo, BVConst):
                 assert lo.val >= 0, f"extract lower index {lo.val} of '{self}' was negative"
+                if hi == lo:
+                    return OpTerm(Kind.BVExtract, (self, hi, lo)).ite(BoolConst.T, BoolConst.F)
             return OpTerm(Kind.BVExtract, (self, hi, lo))
         raise TypeError(f"cannot index {self} with {key}")
 

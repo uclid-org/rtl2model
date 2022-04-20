@@ -378,7 +378,7 @@ class TestVerilogParse:
         i_inner = boolvar("i_inner")
         o_inner = boolvar("o_inner")
         assert model.validate()
-        assert model == Model(
+        expected = Model(
             "top",
             inputs=[rst, i_inner],
             outputs=[boolvar("o_inner")],
@@ -392,6 +392,8 @@ class TestVerilogParse:
             },
             logic={o_inner: i_state[0]}
         )
+        expected.print()
+        assert model == expected
 
     def test_verilog_bv_var_index(self):
         """
