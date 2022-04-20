@@ -51,7 +51,11 @@ formats = [tf.CVC5, tf.SYGUS2, tf.VERILOG, tf.UCLID] #, tf.JSON]
 # skip.extend(itertools.product(["zpad", "sext"], [tf.CVC5, tf.SYGUS2, tf.UCLID]))
 
 class TestSMTConversionException:
-    @pytest.mark.parametrize("op,fmt", itertools.product(list(exprs.keys()), formats))
+    @pytest.mark.parametrize(
+        "op,fmt",
+        itertools.product(list(exprs.keys()), formats),
+        ids=["-".join(pair) for pair in itertools.product(list(exprs.keys()), [f.name for f in formats])]
+    )
     def test_conversion(self, op, fmt):
         expr = exprs[op]
         if fmt == tf.CVC5:
