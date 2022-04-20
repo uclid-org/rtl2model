@@ -66,20 +66,31 @@ class RvMiniModel(ModelBuilder):
 
 
 def main():
+    v = smt.Variable
+    bv32 = smt.BVSort(32)
+    a, b = v("a", bv32), v("b", bv32)
+    alu = Model(
+        "ALUArea",
+        inputs=[a, b, v("io_alu_op", smt.BVSort(4))],
+        outputs=[v("io_out", bv32), v("io_sum", bv32)],
+        ufs=[UFPlaceholder("alu_result", bv32, (a, b), False)],
+        logic={io_out: v("alu_result", bv32)}
+    )
     core = verilog_to_model(
         os.path.join(BASEDIR, "full.v"),
         "Datapath",
         clock_pattern=".*clock",
-        important_signals=[
-            "io_lft_dpath__pc",
-            "io_lft_dpath__fe_pc",
-            "io_lft_dpath__ew_pc",
-            "io_lft_dpath__fe_inst",
-            "io_lft_dpath__regs_11",
-            "io_lft_dpath__regs_12",
-            "io_lft_dpath__regs_13",
-        ],
-        coi_conf=COIConf.NO_COI,
+        defined_modules=alu,
+        # important_signals=[
+        #     "io_lft_dpath__pc",
+        #     "io_lft_dpath__fe_pc",
+        #     "io_lft_dpath__ew_pc",
+        #     "io_lft_dpath__fe_inst",
+        #     "io_lft_dpath__regs_11",
+        #     "io_lft_dpath__regs_12",
+        #     "io_lft_dpath__regs_13",
+        # ],
+        # coi_conf=COIConf.NO_COI,
     )
     core = core.eliminate_dead_code()
     core.print()

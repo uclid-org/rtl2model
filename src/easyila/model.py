@@ -50,6 +50,13 @@ class UFPlaceholder:
         return smt.UFTerm(self.name, self.sort, params)
 
 
+def _get_assignee_name(term):
+    if isinstance(term, smt.Variable):
+        return term.name
+    else:
+        return _get_assignee_name(term._children[0])
+
+
 @dataclass
 class Model:
     name: str
@@ -114,6 +121,27 @@ class Model:
             assert isinstance(a.sort, smt.BoolSort)
         for a in self.assumptions:
             assert isinstance(a.sort, smt.BoolSort)
+
+    def copy(self):
+        """
+        Creates a copy of this model, where each field of the copy is a shallow copy of the
+        original model (i.e. adding an element to `copy.state` will not modify `self.state`).
+        """
+        return Model(
+            self.name,
+            self.inputs[:],
+            self.outputs[:],
+            self.state[:],
+            self.ufs[:],
+            self.next_ufs[:],
+            self.instances.copy(),
+            self.logic.copy(),
+            self.default_next.copy(),
+            self.init_values.copy(),
+            self.assertions[:],
+            self.assumptions[:],
+            self.generated_by,
+        )
 
     @property
     def is_stateful(self):
@@ -191,14 +219,10 @@ class Model:
         # Second pass: all state and output have assigned expressions xor transition relations
         # and that inputs + UFs do NOT have declared logic
         # TODO for now, outputs can also be UFs
-        def get_assignee_name(term):
-            if isinstance(term, smt.Variable):
-                return term.name
-            else:
-                return get_assignee_name(term._children[0])
-        logic_and_next = {get_assignee_name(v) for v in self.logic}
+
+        logic_and_next = {_get_assignee_name(v) for v in self.logic}
         next_keys = set()
-        names = {get_assignee_name(v) for v in self.default_next}
+        names = {_get_assignee_name(v) for v in self.default_next}
         next_keys.update(names)
         logic_and_next.update(names)
         for v in self.inputs:
@@ -376,22 +400,25 @@ class Model:
                 }}
             }}""")
 
-    def _get_submodules(self, submodel_list, visited_submodel_names):
+    def _get_submodules(self, submodel_list=None, visited_submodel_names=None):
+        if submodel_list is None:
+            submodel_list = []
+        if visited_submodel_names is None:
+            visited_submodel_names = set()
         for i in self.instances.values():
             if i.model.name not in visited_submodel_names:
                 i.model._get_submodules(submodel_list, visited_submodel_names)
         # DFS postorder traversal
         submodel_list.append(self)
         visited_submodel_names.add(self.name)
+        return submodel_list
 
     def to_uclid_with_children(self) -> str:
         """
         Generates a uclid model, as well as a uclid model for every child instance.
         """
-        submodels = []
-        visited_submodel_names = set()
         # Submodules are added in DFS postorder traversal
-        self._get_submodules(submodels, visited_submodel_names)
+        submodels = self._get_submodules()
         return "\n\n".join(s.to_uclid() for s in submodels)
 
     # === SOLVER STUFF ===
@@ -471,6 +498,64 @@ class Model:
         return s
 
     # === LOGICAL TRANSFORMATIONS ===
+
+    def replace_uf_transition(self, uf_name, term):
+        """
+        Replaces a copy of this module with the uninterpreted function replaced by the specified term.
+        """
+        in_curr = False
+        in_next = False
+        m = self.copy()
+        # uf_p deliberately leaks scope here
+        for i, uf_p in enumerate(m.ufs):
+            if uf_p.name == uf_name:
+                m.ufs.pop(i)
+                in_curr = True
+                break
+        state_dict = m.logic
+        if not in_curr:
+            state_dict = m.default_next
+            for i, uf_p in enumerate(m.next_ufs):
+                if uf_p.name == uf_name:
+                    m.next_ufs.pop(i)
+                    in_next = True
+                    break
+        if not in_curr and not in_next:
+            raise KeyError(f"uninterpreted function {uf_name} not found in model {self.name}")
+        assert uf_p.sort == term.sort, f"cannot assign {term} with sort {term.sort} to UF {uf_name} with sort {uf_p.sort}"
+        uf_v = uf_p.get_ref() # new state variable
+        if uf_v not in m.outputs:
+            m.state.append(uf_v)
+        state_dict[uf_v] = term
+        return m
+
+    def _inplace_replace_mod_uf(self, name, new_model):
+        """
+        In-place recursively replaces all instances of models with name `name` with `new_model`.
+        """
+        instance_names = list(self.instances.keys())
+        for i_name in instance_names:
+            inst = self.instances[i_name]
+            if inst.model.name == name:
+                self.instances[i_name] = Instance(new_model, inst.inputs)
+                # A model cannot instantiate itself, so no need to recurse
+            else:
+                inst.model._replace_submodules(name, new_model)
+
+    def replace_mod_uf_transition(self, mod_name, uf_name, term):
+        """
+        Returns a new model which replaces all instances of `mod_name` with models that fill
+        uninterpreted function `uf_name` with `term`.
+        """
+        submodels = self._get_submodules()
+        for m in submodels:
+            if m.name == mod_name:
+                new_submodel = m.replace_uf_transition(uf_name, term)
+                break
+        assert new_submodel is not None, f"could not find instances of {mod_name}"
+        copy = self.copy()
+        copy._inplace_replace_mod_uf(mod_name, new_submodel)
+        return copy
 
     def _get_logic_or_transition(self, var):
         """
@@ -794,6 +879,13 @@ class Instance:
     Maps UNQUALIFIED input names to an expression in the parent module (all variable references
     within the expression are relative to that parent.)
     """
+
+    def __post_init__(self):
+        assert isinstance(self.model, Model)
+        assert isinstance(self.inputs, dict), self.inputs
+        for k, v in self.inputs.items():
+            assert isinstance(k, smt.Variable)
+            assert isinstance(v, smt.Term)
 
     def pretty_str(self, indent_level=0):
         newline = '\n' + ' ' * 16

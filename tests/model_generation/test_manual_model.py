@@ -276,3 +276,62 @@ class TestManualModel:
         assert actual.validate()
         assert actual == expected
 
+    def test_model_replace_uf(self):
+        """
+        Tests replacing a UF in a model with a concrete function.
+        """
+        bv3 = smt.BVSort(3)
+        v = smt.Variable
+        a = v("a", bv3)
+        b = v("b", bv3)
+        out = v("out", bv3)
+        sub = Model(
+            "sub",
+            inputs=[a, b],
+            outputs=[out],
+            ufs=[UFPlaceholder("out", bv3, (a, b), False)],
+        )
+        a0 = v("a0", bv3)
+        a1 = v("a1", bv3)
+        b0 = v("b0", bv3)
+        b1 = v("b1", bv3)
+        o0 = v("o0", bv3)
+        o1 = v("o1", bv3)
+        top = Model(
+            "top",
+            inputs=[a0, b0, a1, b1],
+            outputs=[o0, o1],
+            instances={
+                "sub0": Instance(sub, {a: a0, b: b0}),
+                "sub1": Instance(sub, {a: a1, b: b1}),
+            },
+            logic={
+                o0: v("sub0.out", bv3),
+                o1: v("sub1.out", bv3),
+            }
+        )
+        assert top.validate()
+        sub_filled = Model(
+            "sub",
+            inputs=[a, b],
+            outputs=[out],
+            logic={out: a + b,}
+        )
+        exp_filled = Model(
+            "top",
+            inputs=[a0, b0, a1, b1],
+            outputs=[o0, o1],
+            instances={
+                "sub0": Instance(sub_filled, {a: a0, b: b0}),
+                "sub1": Instance(sub_filled, {a: a1, b: b1})
+            },
+            logic={
+                o0: v("sub0.out", bv3),
+                o1: v("sub1.out", bv3),
+            }
+        )
+        assert exp_filled.validate()
+        actual = top.replace_mod_uf_transition("sub", "out", a + b)
+        actual.print()
+        assert actual.validate()
+        assert actual == exp_filled

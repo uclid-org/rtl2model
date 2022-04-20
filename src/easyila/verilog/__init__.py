@@ -240,23 +240,38 @@ def _verilog_model_helper(
     transition relations must be left uninterpereted. COI behavior is the same as for UFs.
     """
 
-    all_missing = set()
+    # all_missing = set()
+    # Set of all dependencies {b . exists a' <= b}; these become modeled as "next" UFs
+    next_missing = set()
+    # Set of all dependencies {b . exists a <= b}; these become modeled as UFs
+    curr_missing = set()
     for s in important_signals:
-        all_missing.update(deps.next_parents[s])
-        all_missing.update(deps.curr_parents[s])
-    all_missing.difference_update(important_signals)
-    uf_names = set()
-    for s in all_missing:
+        next_missing.update(deps.next_parents[s])
+        curr_missing.update(deps.curr_parents[s])
+    #     all_missing.update(deps.next_parents[s])
+    #     all_missing.update(deps.curr_parents[s])
+    # all_missing.difference_update(important_signals)
+    next_missing.difference_update(important_signals)
+    curr_missing.difference_update(important_signals)
+    curr_uf_names = set()
+    next_uf_names = set()
+    for s in curr_missing:
         is_curr_scope = scope_prefix(s) == instance_name
         if is_curr_scope and (not inline_renames or not signaltype.isRename(terms[str_to_scope_chain(s)].termtype)):
-            uf_names.add(s)
+            curr_uf_names.add(s)
+    for s in next_missing:
+        is_curr_scope = scope_prefix(s) == instance_name
+        if is_curr_scope and (not inline_renames or not signaltype.isRename(terms[str_to_scope_chain(s)].termtype)):
+            next_uf_names.add(s)
     if coi_conf == COIConf.NO_COI:
         # Model missing variables (all 1 edge away from important signal in dep graph)
         # as 0-arity uninterpreted functions.
-        for s in uf_names:
+        for s in curr_uf_names:
             tmp = term_to_smt_var(s, terms, mod_depth)
-            # TODO set free args properly
             ufs.append(UFPlaceholder(tmp.name, tmp.sort, (), True))
+        for s in next_uf_names:
+            tmp = term_to_smt_var(s, terms, mod_depth)
+            next_ufs.append(UFPlaceholder(tmp.name, tmp.sort, (), True))
         important_signal_set = set(important_signals)
     elif coi_conf == COIConf.KEEP_COI:
         if preserve_all_signals:
@@ -275,7 +290,9 @@ def _verilog_model_helper(
         # as arguments
         coi = deps.compute_coi(important_signals)
         important_signal_set = set(important_signals)
-        for s in uf_names:
+        # TODO some amount of recursion needs to happen, since if a UF depends on another variable
+        # across a cycle boundary, extra UFs are needed
+        for s in curr_uf_names:
             width = get_term_width(s, terms)
             unqual_s = ".".join(s.split(".")[mod_depth:])
             params = tuple(
@@ -283,6 +300,14 @@ def _verilog_model_helper(
             )
             # TODO figure out how to determine whether a degree of freedom is needed
             ufs.append(UFPlaceholder(unqual_s, smt.BVSort(width), params, True))
+        for s in next_uf_names:
+            width = get_term_width(s, terms)
+            unqual_s = ".".join(s.split(".")[mod_depth:])
+            params = tuple(
+                term_to_smt_var(p, terms, mod_depth) for p in coi[s] if p in important_signal_set
+            )
+            # TODO figure out how to determine whether a degree of freedom is needed
+            next_ufs.append(UFPlaceholder(unqual_s, smt.BVSort(width), params, True))
     else:
         raise NotImplementedError("unimplemented COIConf " + str(coi_conf))
     # 1.5th pass: traverse AST to get expressions for _rn variables.
