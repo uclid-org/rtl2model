@@ -191,12 +191,18 @@ class Model:
         # Second pass: all state and output have assigned expressions xor transition relations
         # and that inputs + UFs do NOT have declared logic
         # TODO for now, outputs can also be UFs
-        logic_and_next = {v.name for v in self.logic if isinstance(v, smt.Variable)}
+        def get_assignee_name(term):
+            if isinstance(term, smt.Variable):
+                return term.name
+            else:
+                return get_assignee_name(term._children[0])
+        logic_and_next = {get_assignee_name(v) for v in self.logic}
         next_keys = set()
-        names = {v.name for v in self.default_next if isinstance(v, smt.Variable)}
+        names = {get_assignee_name(v) for v in self.default_next}
         next_keys.update(names)
         logic_and_next.update(names)
         for v in self.inputs:
+            # TODO allow multiple assigns to different bit fields of the same wire?
             if v.name in self.logic:
                 report(f"input variable {v.name} has illegal declared logic")
             if v.name in next_keys:

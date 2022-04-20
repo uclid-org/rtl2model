@@ -352,15 +352,26 @@ def _verilog_model_helper(
             if sc in binddict and not signaltype.isInput(termtype) or len(sc) == mod_depth + 2:
                 parents = binddict[sc]
                 for p in parents:
-                    # assert p.msb is None and p.lsb is None, "slice assignment not yet supported"
+                    bv_index_assign = False # Special case for b[v] = expr
+                    bv_index_expr = None
+                    expr_width = width
                     if p.msb and p.lsb:
                         # BV slice assignment
                         assert isinstance(v.sort, smt.BVSort) or isinstance(v.sort, smt.BoolSort), v
                         idx_width = v.sort.bitwidth
                         msb_expr = pv_to_smt_expr(p.msb, idx_width, terms, None, mod_depth, rename_substitutions)
+                        msb_expr = msb_expr.const_fold()
                         lsb_expr = pv_to_smt_expr(p.lsb, idx_width, terms, None, mod_depth, rename_substitutions)
-                        raise NotImplementedError("BV index assignment not yet supported", p.tocode())
-                        # assignee = v[msb_expr:lsb_expr]
+                        lsb_expr = lsb_expr.const_fold()
+                        if not (msb_expr.is_const() and lsb_expr.is_const()):
+                            assert p.msb == p.lsb, "MSB and LSB for BV indexed assign must match"
+                            assignee = v
+                            bv_index_assign = True
+                            bv_index_expr = msb_expr
+                        elif lsb_expr.val == 0 and msb_expr.val == idx_width - 1:
+                            assignee = v
+                        else:
+                            assignee = v[msb_expr:lsb_expr]
                     elif p.ptr is not None:
                         # Array index assignment
                         assert isinstance(v.sort, smt.ArraySort)
@@ -370,7 +381,10 @@ def _verilog_model_helper(
                         # Plain old variable assignment
                         assignee = v
                     if p.tree is not None:
-                        expr = pv_to_smt_expr(p.tree, width, terms, assignee, mod_depth, rename_substitutions)
+                        expr = pv_to_smt_expr(p.tree, expr_width, terms, assignee, mod_depth, rename_substitutions)
+                        if bv_index_assign:
+                            expr = (assignee & ~(smt.BVConst(1, expr_width).sll(bv_index_expr))) | \
+                                expr.zpad(expr_width - expr.sort.bitwidth).sll(bv_index_expr)
                         if is_curr_scope:
                             if p.alwaysinfo is not None and p.alwaysinfo.isClockEdge():
                                 # Clocked state update
@@ -652,8 +666,21 @@ def pv_to_smt_expr(node, width: Optional[int], terms, assignee, mod_depth, subst
             # assert node.msb == node.lsb, "MSB and LSB of non-constant index must be identical"
             # TODO handle the distinction between array and BV indexing?
             msb_expr = pv_to_smt_expr(node.msb, None, terms, assignee, mod_depth, substitutions)
+            # Pyverilog will produce weird arithmetic expressions when doing assignments to
+            # concatenated wires (e.g. assign {a, b} = 32'h3;), so we have to evaluate them
+            msb_expr = msb_expr.const_fold()
             lsb_expr = pv_to_smt_expr(node.lsb, None, terms, assignee, mod_depth, substitutions)
-            return body_expr[msb_expr:lsb_expr]
+            lsb_expr = lsb_expr.const_fold()
+            if msb_expr.is_const() and lsb_expr.is_const():
+                # Index with raw values to do type conversion properly
+                if msb_expr.val >= body_expr.sort.bitwidth:
+                    # The MSB can exceed prescribed widths in idioms like addition
+                    # with carry (assign {C, out} = A + B;), where the argument needs to
+                    # be sign extended
+                    body_expr = body_expr.zpad_all_children(body_expr.sort.bitwidth - msb_expr.val + 1)
+                return body_expr[msb_expr.val:lsb_expr.val]
+            else:
+                return body_expr[msb_expr:lsb_expr]
     elif isinstance(node, DFBranch):
         assert node.condnode is not None, node.tocode()
         cond = pv_to_smt_expr(node.condnode, 1, terms ,assignee, mod_depth, substitutions)

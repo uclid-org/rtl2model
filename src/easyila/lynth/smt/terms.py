@@ -212,6 +212,16 @@ class Term(Translatable, ABC):
             t = t._replace_child(child.replace_vars(m), i)
         return t
 
+    def zpad_all_children(self, extra_bits: int) -> "Term":
+        """
+        Zero pads all immediate children by `extra_bits`.
+        This is necessary to implement verilog carry bit idioms.
+        """
+        t = self
+        for i, child in enumerate(self._children):
+            t = t._replace_child(child.zpad(extra_bits), i)
+        return t
+
     def preorder_visit_tree(self, visit_fn: Callable[["Term"], _T], shortcircuit=True) -> _T:
         """
         Calls `visit_fn` on this node, then recursively on all children.
@@ -250,6 +260,16 @@ class Term(Translatable, ABC):
         for i, child in enumerate(self._children):
             t = t._replace_child(child.optimize(), i)
         return t
+
+    def const_fold(self) -> "Term":
+        if isinstance(self, OpTerm):
+            # This method must also traverse children!
+            return self.const_fold()
+        t = self
+        for i, child in enumerate(self._children):
+            t = t._replace_child(child.const_fold(), i)
+        return t
+
 
     def typecheck(self) -> bool:
         """
@@ -447,7 +467,7 @@ class Term(Translatable, ABC):
         elif isinstance(key, Term):
             return shift_and_mask(key.start)
         elif isinstance(key, slice):
-            if isinstance(key.start, Term) and key.start == key.stop:
+            if isinstance(key.start, Term) and not key.start.is_const() and key.start == key.stop:
                 return shift_and_mask(key.start)
             if isinstance(key.start, int):
                 hi = wrap(max(key.start, key.stop))
@@ -458,9 +478,9 @@ class Term(Translatable, ABC):
             else:
                 lo = key.stop
             if isinstance(hi, BVConst):
-                assert hi.val < width, f"extract upper index {hi.val} exceeds bounds of bv{width}"
+                assert hi.val < width, f"extract upper index {hi.val} of '{self}' exceeds bounds of bv{width}"
             if isinstance(lo, BVConst):
-                assert lo.val >= 0, f"extract lower index {lo.val} was negative"
+                assert lo.val >= 0, f"extract lower index {lo.val} of '{self}' was negative"
             return OpTerm(Kind.BVExtract, (self, hi, lo))
         raise TypeError(f"cannot index {self} with {key}")
 
@@ -492,6 +512,9 @@ class Term(Translatable, ABC):
         """Zero pads this term with an addition `extra_bits` bits."""
         if isinstance(extra_bits, int):
             extra_bits = BVConst(extra_bits, self.sort.bitwidth)
+        if isinstance(self.sort, BoolSort):
+            new_width = self.sort.bitwidth + extra_bits.val
+            return self.ite(BVConst(1, new_width), BVConst(0, new_width))
         return OpTerm(Kind.BVZeroPad, (self, extra_bits))
 
     def sext(self, extra_bits: Union["BVConst", int]):
@@ -501,6 +524,9 @@ class Term(Translatable, ABC):
         """Sign extends this term with an addition `extra_bits` bits."""
         if isinstance(extra_bits, int):
             extra_bits = BVConst(extra_bits, self.sort.bitwidth)
+        if isinstance(self.sort, BoolSort):
+            new_width = self.sort.bitwidth + extra_bits.val
+            return self.ite(BVSort(new_width).max_bv_const(), BVConst(0, new_width))
         return OpTerm(Kind.BVSignExtend, (self, extra_bits))
 
     def orr(self):
@@ -509,7 +535,11 @@ class Term(Translatable, ABC):
     def xorr(self):
         return OpTerm(Kind.BVXorr, (self,))
 
+    def is_const(self) -> bool:
+        return isinstance(self, BVConst) or isinstance(self, BoolConst)
+
     # === ABSTRACT AND SHARED STATIC METHODS ===
+
     @staticmethod
     def from_cvc5(cvc5_term):
         from cvc5 import Kind as k
@@ -705,15 +735,16 @@ class OpTerm(Term):
     @property
     def sort(self):
         # TODO better type checking
-        bvops = { Kind.BVAdd, Kind.BVSub, Kind.BVOr, Kind.BVAnd, Kind.BVXor, Kind.BVNot, Kind.Implies }
+        bvops = { Kind.BVAdd, Kind.BVSub, Kind.BVOr, Kind.BVAnd, Kind.BVXor, Kind.BVNot,
+                  Kind.BVSll, Kind.BVSrl, Kind.BVSra }
         if self.kind in bvops:
             return self.args[0].sort
         elif self.kind == Kind.BVExtract:
             # TODO fix this hack: in the CVC5 API, BVExtract must first be turned into
             # an operator via Solver::mkOp(BVExtract, high, low)
             # As a workaround, we store the high/low parameters as BVConst arguments
-            assert isinstance(self.args[1], BVConst)
-            assert isinstance(self.args[2], BVConst)
+            assert isinstance(self.args[1], BVConst), f"extract first index must be BVConst, instead was {self.args[1]}"
+            assert isinstance(self.args[2], BVConst), f"extract second index must be BVConst, instead was {self.args[2]}"
             return BVSort(self.args[1].val - self.args[2].val + 1)
         elif self.kind in (Kind.BVZeroPad, Kind.BVSignExtend):
             assert isinstance(self.args[0].sort, BVSort), repr(self.args[0])
@@ -725,7 +756,7 @@ class OpTerm(Term):
             return self.args[1].sort
         elif self.kind == Kind.Match:
             return self.args[2].sort # Match args are (cond, c1, v1, c2, v2, ...)
-        bitops = { Kind.Or, Kind.And, Kind.Xor, Kind.Not, Kind.Equal, Kind.Distinct,
+        bitops = { Kind.Or, Kind.And, Kind.Xor, Kind.Not, Kind.Equal, Kind.Distinct, Kind.Implies,
                    Kind.BVUle, Kind.BVUlt, Kind.BVUge, Kind.BVUgt}
         if self.kind in bitops:
             return BoolSort()
@@ -948,18 +979,19 @@ class OpTerm(Term):
         raise NotImplementedError("cannot convert OpTerm to " + str(tgt))
 
     def optimize(self) -> Term:
+        return self.const_fold()
+
+    def const_fold(self) -> Term:
         # Optimize all children first
         t = self
         for i, child in enumerate(self._children):
-            t = t._replace_child(child.optimize(), i)
+            t = t._replace_child(child.const_fold(), i)
         assert isinstance(t, OpTerm), t
         assert self.kind == t.kind
-        def is_const(term):
-            return isinstance(term, BVConst) or isinstance(term, BoolConst)
         # Special case for constant folding: ITEs/match where the cond is constant
         if t.kind == Kind.Match:
             cond = t.args[0]
-            if is_const(cond):
+            if cond.is_const():
                 # Return value for correct case
                 # Recall that every other arg is cond, then value
                 for i in range(1, len(t.args) - 1):
@@ -970,7 +1002,7 @@ class OpTerm(Term):
                 return t
         if t.kind == Kind.Ite:
             cond = t.args[0]
-            if is_const(cond):
+            if cond.is_const():
                 return t.args[1] if bool(cond) else t.args[2]
             else:
                 return t
@@ -979,7 +1011,7 @@ class OpTerm(Term):
         # but this heuristic works for binops and unops
         args = t._children
         for child in args:
-            if not is_const(child):
+            if not child.is_const():
                 return t
         return t._do_const_eval(args)
 
@@ -1278,6 +1310,10 @@ class BoolConst(Term, IntEnum, metaclass=_TermMeta):
     """SMT boolean constants for true and false. Can be coerced to/from an `int`."""
     F = 0
     T = 1
+
+    @property
+    def val(self) -> int:
+        return int(self.value)
 
     @property
     def sort(self):

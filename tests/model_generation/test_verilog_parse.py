@@ -422,20 +422,102 @@ class TestVerilogParse:
                 out: smt.OpTerm(
                     smt.Kind.BVAnd,
                     (
-                        smt.OpTerm(
-                            smt.Kind.BVSrl,
-                            (
-                                op,
-                                idx.zpad(5),
-                            )
-                        ),
+                        smt.OpTerm(smt.Kind.BVSrl, (op, idx.zpad(5),)),
                         smt.BVConst(1, 8),
                     )
                 )
             },
             default_next={
-                # TODO
-                op: smt.BVConst(0, 8)
+                # Encode assigning to a variable bitvector index as shift + mask
+                # op[idx] = bit is equivalent to
+                # op = (op & ~(1 << idx)) | (bit << idx)
+                op: smt.OpTerm(
+                    smt.Kind.BVOr,
+                    (
+                        smt.OpTerm(
+                            smt.Kind.BVAnd,
+                            (
+                                op,
+                                smt.OpTerm(
+                                    smt.Kind.BVNot,
+                                    (smt.OpTerm(smt.Kind.BVSll, (smt.BVConst(1, 8), idx.zpad(5))),)
+                                )
+                            )
+                        ),
+                        smt.OpTerm(smt.Kind.BVSll, (bit.zpad(7), idx.zpad(5))),
+                    )
+                )
+            }
+        )
+        assert exp_model.validate()
+        actual = verilog_to_model(rtl, "top")
+        actual.print()
+        assert actual.validate()
+        assert actual == exp_model
+
+    def test_verilog_weird_bv_assigns(self):
+        """
+        Tests behavior for a few different mechanisms of bitvector assignment.
+        """
+        rtl = textwrap.dedent("""\
+            module top(input [3:0] in, output [1:0] out);
+                reg [1:0] s0;
+                reg [3:0] s1;
+                always @(posedge clk) begin
+                    s1[2] = in[2];
+                    s1[1:0] = s0[1:0];
+                end
+                assign {{out, s0}} = in;
+            endmodule
+            """)
+        v = smt.Variable
+        in_ = v("in", smt.BVSort(4))
+        out = v("out", smt.BVSort(2))
+        s0 = v("s0", smt.BVSort(2))
+        s1 = v("s1", smt.BVSort(4))
+        exp_model = Model(
+            "top",
+            inputs=[in_],
+            outputs=[out],
+            state=[s0, s1],
+            logic={
+                out: in_[3:2],
+                s0: in_[1:0],
+            },
+            default_next={
+                s1[2]: in_[2],
+                s1[1:0]: s0[1:0],
+            }
+        )
+        exp_model.print()
+        assert exp_model.validate()
+        actual = verilog_to_model(rtl, "top")
+        actual.print()
+        assert actual.validate()
+        assert actual == exp_model
+
+    def test_verilog_carry_add(self):
+        """
+        Tests weird bitvector casting stuff that happens in a carry addition idiom.
+        """
+        rtl = textwrap.dedent("""\
+            module top(input [3:0] a, input [3:0] b, output c, output [3:0] out);
+                assign {{c, out}} = a + b;
+            endmodule
+            """)
+        bv4 = smt.BVSort(4)
+        v = smt.Variable
+        a = v("a", bv4)
+        b = v("b", bv4)
+        c = v("c", smt.BoolSort())
+        out = v("out", bv4)
+        exp_model = Model(
+            "top",
+            inputs=[a, b],
+            outputs=[c, out],
+            logic={
+                c: (a.zpad(1) + b.zpad(1))[4],
+                out: (a + b)[3:0],
             }
         )
         assert exp_model.validate()
