@@ -11,7 +11,7 @@ from typing import List
 from easyila.common import *
 from easyila.guidance import Guidance, AnnoType
 from easyila.lynth import smt
-from easyila.sketch import ConcreteProgram
+from easyila.sketch import ConcreteProgram, ProgramSketch
 import easyila.lynth.oracleinterface as oi
 
 @dataclass
@@ -32,11 +32,13 @@ class ModelBuilder(ABC):
     def __init__(
         self,
         config: ProjectConfig,
+        sketch: ProgramSketch,
         solver: smt.Solver,
         signals: List[SampledSignal],
         guidance: Guidance
     ):
         self.config = config
+        self.sketch = sketch
         # TODO generalize for multiple synth funs
         sf = solver.synthfuns[0]
         self.input_vars = list(sf.bound_vars)
@@ -61,14 +63,6 @@ class ModelBuilder(ABC):
         pass
 
     @abstractmethod
-    def generate_program(self, inputs) -> ConcreteProgram:
-        """
-        Produces a program to be run during simulation.
-        INPUTS is a list of inputs to the model that may be used in constructing the program.
-        """
-        pass
-
-    @abstractmethod
     def simulate_and_read_signals(self, program: ConcreteProgram) -> Tuple[Dict[str, int], List[Dict[str, int]]]:
         """
         Invokes the simulation binary and reads the resulting signals.
@@ -79,14 +73,21 @@ class ModelBuilder(ABC):
         """
         pass
 
-    def sample(self, inputs) -> List[int]:
+    def generate_program(self, input_values: Dict[str, int]) -> ConcreteProgram:
+        """
+        Generates a concrete program from this instance's `ProgramSketch`, with variables
+        replaced by the specified `input_values`.
+        """
+        return self.sketch.fill(input_values)
+
+    def sample(self, input_values: Dict[str, int]) -> List[int]:
         """
         Runs a simulation with the provided inputs, and returns sampled output values.
 
         TODO name outputs instead of just ordering them
         """
         print("Beginning sample")
-        tc = self.generate_program(inputs)
+        tc = self.generate_program(input_values)
         widths, signal_values = self.simulate_and_read_signals(tc)
         # TODO less hacky way to set these
         self.widths = widths
@@ -263,7 +264,7 @@ class ModelBuilder(ABC):
         if not hasattr(self, "signal_values"):
             # Because the signal variable width may not match the width of the ISA-level input
             # to the program sketch, the max value of the signal may exceed the max allowable value
-            self.sample([0 for v in self.input_vars])
+            self.sample({v.name: 0 for v in self.input_vars})
             # self.sample([random.randint(0, 2 ** v.sort.bitwidth - 1) for v in self.input_vars])
         signal_values = self.signal_values
         widths = self.widths
@@ -356,7 +357,7 @@ class ModelBuilder(ABC):
             # TODO add blocking constraint to prevent sygus from repeating guesses?
             # TODO do we still need to call this?
             solver.reinit_cvc5()
-            self.o_ctx.call_oracle("io", inputs)
+            self.o_ctx.call_oracle("io", {v: i for v, i in zip(self.input_vars, inputs)})
             self.o_ctx.oracles["io"].save_call_logs()
 
             self.o_ctx.apply_all_constraints(solver, {"io": sf})

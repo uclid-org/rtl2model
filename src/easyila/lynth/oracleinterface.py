@@ -101,7 +101,7 @@ class OracleInterface(ABC):
         """
         Adds constraints on the specified candidate function within the solver instance.
         """
-        raise NotImplementedError
+        raise NotImplementedError()
 
     def save_call_logs(self):
         with open(self.log_path, 'w') as logfile:

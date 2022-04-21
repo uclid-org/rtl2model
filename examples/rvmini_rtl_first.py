@@ -38,12 +38,12 @@ class RvMiniModel(ModelBuilder):
         )
         self.run_proc(["make", "verilatorM"], cwd=BASEDIR)
 
-    def generate_program(self, inputs) -> ConcreteProgram:
+    def program_sketch(self, input_vars) -> ProgramSketch:
         return ProgramSketch(
             inst_word(0) * (31 * 4),     # @000 496 bytes of 0s
             inst_word(0x13) * 4,        # @496 through 508: nop
-            Inst(SketchHole("a", 12), SketchValue(0b11000010011, 20)), # @512 addi a2, x0, ???
-            Inst(SketchHole("b", 12), SketchValue(0b10110010011, 20)), # @516 addi a1, x0, ???
+            Inst(input_vars["a"][11:0], SketchValue(0b11000010011, 20)), # @512 addi a2, x0, ???
+            Inst(input_vars["b"][11:0], SketchValue(0b10110010011, 20)), # @516 addi a1, x0, ???
             inst_word(0xc586b3) * 20,   # @520 (and later) add a3, a1, a2
             # a1 is x11, a2 is x12, a3 is x13
             # remember that instructions don't commit until they reach the last stage, making
@@ -52,7 +52,7 @@ class RvMiniModel(ModelBuilder):
             # the trace seems to stall for some reason though? TODO ask adwait about that
             # for now, the pattern seems to be that 4 adds retire successfully, then the next add
             # stalls for an additional 3 cycles
-        ).fill({"a": inputs[0] & 0xFFF, "b": inputs[1] & 0xFFF})
+        )
 
     def simulate_and_read_signals(self, sketch):
         hex_arr = sketch.to_hex_str_array()

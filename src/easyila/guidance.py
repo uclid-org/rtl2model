@@ -14,11 +14,11 @@ import easyila.lynth.smt as smt
 class AnnoType:
     """
     Guidance annotations to represent the refinement relation between RTL signals
-    and synthesis formula variables.
+    and synthesis formula expressions.
     """
 
     val: int
-    var: smt.Variable = None
+    var: smt.Term = None
 
     def __post_init__(self):
         if self.val < 0 or self.val > 3:

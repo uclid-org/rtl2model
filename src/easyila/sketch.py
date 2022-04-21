@@ -7,13 +7,16 @@ Facilities for generating a low-level program sketch.
 from dataclasses import dataclass
 from typing import Dict, Tuple, Union, Optional
 
+import easyila.lynth.smt as smt
 
 @dataclass(frozen=True)
 class SketchHole:
     """Represents a hole within an instruction of a program sketch."""
-    name: str
+    expr: smt.Term
     bitwidth: int
 
+    def __post_init__(self):
+        assert self.expr.bitwidth == self.bitwidth
 
 @dataclass(frozen=True)
 class SketchValue:
@@ -133,6 +136,6 @@ class ProgramSketch:
             lst = list(inst.value)
             for i, field in enumerate(lst):
                 if isinstance(field, SketchHole):
-                    lst[i] = SketchValue(mappings[field.name], field.bitwidth)
+                    lst[i] = SketchValue(field.expr.eval(mappings).value, field.bitwidth)
             new_insts.append(Inst(*lst))
         return ConcreteProgram(*new_insts)

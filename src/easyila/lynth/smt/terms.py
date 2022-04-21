@@ -273,7 +273,6 @@ class Term(Translatable, ABC):
             t = t._replace_child(child.const_fold(), i)
         return t
 
-
     def typecheck(self) -> bool:
         """
         Performs rudimentary type checking (no scope/semantic checking).
@@ -296,7 +295,18 @@ class Term(Translatable, ABC):
         """
         raise NotImplementedError()
 
-    # === OPERATOR OVERRIDES ===
+    # === PROPERTIES AND HELPER FUNCTIONS ===
+
+    def is_const(self) -> bool:
+        return isinstance(self, BVConst) or isinstance(self, BoolConst)
+
+    def c_bitwidth(self) -> int:
+        """
+        Gets the bitwidth of this term's sort, erroring if the sort does not have a bitwidth.
+        """
+        if not isinstance(self.sort, BVSort) and not isinstance(self.sort, BoolSort):
+            raise Exception(f"cannot get bitwidth of non-bv/bool term {self}")
+        return self.sort.bitwidth
 
     def _maybe_bool2bv1(self):
         if isinstance(self, BoolConst):
@@ -305,6 +315,8 @@ class Term(Translatable, ABC):
             return self.ite(BVConst(1, 1), BVConst(0, 1))
         else:
             return self
+
+    # === OPERATOR OVERRIDES AND SYNTACTIC SUGAR ===
 
     def ite(self, t_term, f_term):
         """
@@ -553,9 +565,6 @@ class Term(Translatable, ABC):
 
     def xorr(self):
         return OpTerm(Kind.BVXorr, (self,))
-
-    def is_const(self) -> bool:
-        return isinstance(self, BVConst) or isinstance(self, BoolConst)
 
     # === ABSTRACT AND SHARED STATIC METHODS ===
 
