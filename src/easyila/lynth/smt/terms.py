@@ -660,7 +660,7 @@ class Variable(Term):
             raise TypeError("Variable must be translated from pycvc5.Kind.VARIABLE, instead got " + str(cvc5_term.getKind()))
         # it seems like cvc5 will wrap the variable name in |var| if there are square brackets inside
         # so we need to strip those off
-        name = str(cvc5_term)
+        name = cvc5_term.getSymbol()
         # technically fails if NAME is length 1, but at that point we don't care anymore
         if name[0] == "|" and name[-1] == "|":
             name = name[1:-1]
@@ -1129,7 +1129,7 @@ class OpTerm(Term):
             low = a2.val
             width = (high - low) + 1
             mask = ((1 << width) - 1) << low
-            return BVConst((a0.val & mask) >> high, width)
+            return BVConst((a0.val & mask) >> low, width)
         # if self.kind == Kind.BVConcat:
         # Ternary operator
         if self.kind == Kind.Ite:

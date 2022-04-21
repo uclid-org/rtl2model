@@ -14,6 +14,7 @@ from easyila.lynth import smt
 from easyila.sketch import ConcreteProgram, ProgramSketch
 from easyila.model import *
 import easyila.lynth.oracleinterface as oi
+from easyila.verilog import VcdWrapper
 
 @dataclass
 class ProjectConfig:
@@ -50,8 +51,9 @@ class ModelBuilder(ABC):
             # TODO account for next_ufs
             sf = submodel_map[sf_mod].find_uf_p(sf_name).to_synthfun(g)
             break # TODO generalize for multiple synth funs
+        self._uf_mod_name = sf_mod
+        self._uf_name = sf_name
         solver = sf.new_solver()
-        # sf = solver.synthfuns[0]
         self.input_vars = list(sf.bound_vars)
         self.output_width = sf.return_sort.bitwidth
         self.guidance = guidance
@@ -164,11 +166,9 @@ class ModelBuilder(ABC):
         ctr = smt.BVVariable("__lift_cc", ctr_width)
         ctr_values = [smt.BVConst(i, ctr_width) for i in range(guidance.num_cycles)]
         ctr_cases = [] # Each item is a tuple of (iterator condition, assumptions, assertions)
-        # Shadow variable for synthfun output to allow parsing counterexample from symbiyosys
-        out_shadow = smt.Variable("__shadow_out", func.sort.codomain)
         shadow_decls = []
+        shadow_param_map = {} # Maps input variable to shadow
         numshadow = 0
-
         for stepnum in range(guidance.num_cycles):
             itercond = ctr.op_eq(ctr_values[stepnum])
             assumes = []
@@ -189,16 +189,14 @@ class ModelBuilder(ABC):
                         # Add new shadow register
                         new_shadow = smt.BVVariable(f"__shadow_{numshadow}", get_width(qp))
                         shadow_decls.append(new_shadow.get_decl())
+                        shadow_param_map[atype.var] = new_shadow
                         # TODO add comments to assumes somehow?
                         assumes.append(new_shadow.op_eq(qp_var))
                         numshadow += 1
                     elif atype == AnnoType.OUTPUT:
                         # Assert output
                         # TODO allow for a more coherent mapping from synth funs to outputs
-                        # Assume __shadow_out == f(...)
-                        # Assert __shadow_out == <RTL output variable>
-                        assumes.append(out_shadow.op_eq(func.body))
-                        asserts.append(out_shadow.op_eq(qp_var))
+                        asserts.append(func.body.replace_vars(shadow_param_map).op_eq(qp_var))
                     else:
                         raise NotImplementedError()
             ctr_cases.append((itercond, assumes, asserts))
@@ -212,11 +210,13 @@ class ModelBuilder(ABC):
                 for cond, anno in guidance.get_predicated_annotations(qp).items():
                     if anno == AnnoType.DONT_CARE:
                         continue
+                    # Add condition
                     if first:
                         s = f"if ({cond.to_verilog_str()}) begin\n"
                         first = False
                     else:
                         s = f"else if ({cond.to_verilog_str()}) begin\n"
+                    # Add assume/assert
                     if anno == AnnoType.ASSUME:
                         s += f"    case ({ctr.to_verilog_str()})\n"
                         # Add assume statements
@@ -228,23 +228,20 @@ class ModelBuilder(ABC):
                         # Add new shadow register
                         new_shadow = smt.BVVariable(f"__shadow_{numshadow}", get_width(qp))
                         shadow_decls.append(new_shadow.get_decl())
+                        shadow_param_map[anno.var] = new_shadow
                         # TODO add comments to assumes somehow?
                         s += f"    assume ({new_shadow.op_eq(qp_var).to_verilog_str()});\n"
                         numshadow += 1
                     elif anno == AnnoType.OUTPUT:
                         # Assert output
                         # TODO allow for a more coherent mapping from synth funs to outputs
-                        # Assume __shadow_out == f(...)
-                        # Assert __shadow_out == <RTL output variable>
-                        s += f"    assume ({out_shadow.op_eq(func.body).to_verilog_str()});\n"
-                        s += f"    assert ({out_shadow.op_eq(qp_var).to_verilog_str()});\n"
+                        s += f"    assert ({func.body.replace_vars(shadow_param_map).op_eq(qp_var).to_verilog_str()});\n"
                     else:
                         raise NotImplementedError()
                     s += "end"
                     pred_cases_l.append(s)
 
         shadow_decls = "\n".join(s.to_verilog_str(is_reg=True, anyconst=True) for s in shadow_decls)
-        shadow_decls += "\n" + out_shadow.get_decl().to_verilog_str(is_reg=True, anyconst=True)
         ctr_cases_l = []
         for itercond, assumes, asserts in ctr_cases:
             s = f"if ({itercond.to_verilog_str()}) begin\n"
@@ -288,19 +285,41 @@ class ModelBuilder(ABC):
     def _parse_sby_cex(self, sby_lines) -> Tuple[List[int], int]:
         """
         Parses a counterexample from symbiyosys output.
+
+        Inputs (shadow variables) are read from stdout.
+        Output is read from the VCD.
+        (we could add a shadow variable to represent the output so it gets parsed back from stdout,
+        but this adds a significant amount of time to the solver)
         """
         # Assume sby outputs variables in reverse order of declaration
         # (output is first, then last input, etc.)
-        out_val = None
         in_vals = []
         for line in sby_lines:
             if "Value for anyconst" in line:
-                if out_val is None:
-                    out_val = int(line.split()[-1])
-                else:
-                    in_vals.insert(0, line.split()[-1])
-            # TODO regex parse variable name
-        assert out_val is not None, "could not parse output value from sby counterexample"
+                # TODO regex parse variable name
+                in_vals.insert(0, line.split()[-1])
+        top_prefix = self.model.name + "."
+        vcd_r = VcdWrapper(
+            os.path.join(self.config.sby_dir, "corr_taskBMC/engine_0/trace.vcd"),
+            top_prefix + self.config.clock_name
+        )
+        out_annos = self.guidance.get_outputs()
+        assert len(out_annos) == 1, "multiple output annotations found"
+        sig_name, cc_or_pred = list(out_annos)[0]
+        if isinstance(cc_or_pred, smt.Term):
+            cond = cc_or_pred
+            all_vars = cond.get_vars()
+            for cc in range(self.guidance.num_cycles):
+                values = {
+                    v.name: vcd_r.get_value_at(top_prefix + v.name, cc)
+                    for v in all_vars
+                }
+                should_sample = cond.eval(values)
+                if should_sample:
+                    out_val = vcd_r.get_value_at(sig_name.replace("->", "."), cc)
+                    break
+        else:
+            out_val = vcd_r.get_value_at(sig_name, cc_or_pred)
         return in_vals, out_val
 
     def verify(self, func: smt.LambdaTerm):
@@ -365,8 +384,8 @@ class ModelBuilder(ABC):
         print("Adding counterexample: (" + ", ".join(map(str, input_vals)) + f") -> {out_val}")
         self.o_ctx.oracles["corr"].add_cex(input_vals, out_val)
 
-    def main_sygus_loop(self):
-        parser = argparse.ArgumentParser(description="Run synthesis loop.")
+    def main_sygus_loop(self) -> Model:
+        # parser = argparse.ArgumentParser(description="Run synthesis loop.")
         # parser.add_argument(
         #     "--io-replay-path",
         #     nargs="?",
@@ -417,15 +436,20 @@ class ModelBuilder(ABC):
                 solution = sr.solution
                 # pycvc5_utils.print_synth_solutions(terms, solution)
                 # TODO generalize for multiple synthfuns
-                print(list(solution.values())[0])
-                cr = self.o_ctx.call_oracle("corr", list(solution.values())[0])
+                candidate = list(solution.values())[0]
+                print(candidate)
+                cr = self.o_ctx.call_oracle("corr", candidate)
                 # Counterexample is implicitly added by the oracle function
                 is_correct = cr.output
                 if is_correct:
                     print("All oracles passed. Found a solution: ")
-                    print(list(solution.values())[0])
+                    print(candidate)
                     self.o_ctx.oracles["io"].save_call_logs()
-                    return solution
+                    return self.model.replace_mod_uf_transition(
+                        self._uf_mod_name,
+                        self._uf_name,
+                        candidate,
+                    )
             else:
                 print("Sorry, no solution found!")
                 return None

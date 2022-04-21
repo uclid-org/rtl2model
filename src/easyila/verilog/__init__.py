@@ -33,6 +33,8 @@ from pyverilog.utils import signaltype
 from easyila.model import Model, Instance, GeneratedBy, UFPlaceholder
 import easyila.lynth.smt as smt
 
+from .vcd_wrapper import VcdWrapper
+
 class COIConf(Enum):
     """
     Configuration for how to treat cone-of-influence behavior for model generation from Verilog.

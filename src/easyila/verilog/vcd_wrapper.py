@@ -32,10 +32,19 @@ class VcdWrapper:
                 elif tok.kind is TokenKind.CHANGE_TIME:
                     curr_ts = tok.time_change
                 elif tok.kind is TokenKind.CHANGE_SCALAR:
-                    # ignore x/z case for now
-                    ts_change_dict[tok.scalar_change.id_code].append((curr_ts, int(tok.scalar_change.value)))
+                    # HACK: for now, treat x/z as 0s
+                    try:
+                        new_val = int(tok.scalar_change.value)
+                    except ValueError:
+                        new_val = 0
+                    ts_change_dict[tok.scalar_change.id_code].append((curr_ts, new_val))
                 elif tok.kind is TokenKind.CHANGE_VECTOR:
-                    ts_change_dict[tok.vector_change.id_code].append((curr_ts, int(tok.vector_change.value)))
+                    # HACK: for now, treat x/z as 0s
+                    try:
+                        new_val = int(tok.vector_change.value)
+                    except ValueError:
+                        new_val = 0
+                    ts_change_dict[tok.vector_change.id_code].append((curr_ts, new_val))
         if clock_name not in var_dict:
             raise KeyError("Clock signal '" + clock_name + "' not found in VCD file (did you mean to specify it as argument to the constructor?)")
         self.var_dict = var_dict
@@ -73,6 +82,8 @@ class VcdWrapper:
 
         Raises KeyError if the variable is not present.
         """
+        if not isinstance(cycle, int):
+            raise TypeError(f"cycle must be int, instead got {type(cycle)}: {cycle}")
         if var_name not in self.var_dict:
             # HACK: verilator seems to add an invisible "TOP" module, so attempt to look up the variable with "TOP" first
             if not var_name.startswith("TOP."):

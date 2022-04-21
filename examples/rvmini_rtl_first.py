@@ -168,7 +168,7 @@ def main():
         (fe_pc_var > 520) & (fe_pc_var < 512): AnnoType.ASSUME
     })
     guidance.annotate("lft_tile_regFile_io_raddr1", AnnoType.ASSUME)
-    guidance.annotate("lft_tile_regFile_io_raddr1", AnnoType.ASSUME)
+    guidance.annotate("lft_tile_regFile_io_raddr2", AnnoType.ASSUME)
     guidance.annotate("lft_tile_regFile_io_waddr", AnnoType.ASSUME)
     model = RvMiniModel(
         ProjectConfig(os.path.join(BASEDIR, "symbiyosys"), clock_name="clock"),
@@ -177,6 +177,8 @@ def main():
         {("ALUArea", "alu_result"): None},
         guidance,
     )
+    import faulthandler
+    faulthandler.enable()
     model.main_sygus_loop()
 
 if __name__ == "__main__":

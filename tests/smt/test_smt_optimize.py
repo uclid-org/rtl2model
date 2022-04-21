@@ -2,6 +2,11 @@
 import easyila.lynth.smt as smt
 
 class TestSMTOptimize:
+
+    def test_bvconst_index(self):
+        expr = smt.BVConst(0xABCD, 16)[11:0]
+        assert expr.eval({}) == smt.BVConst(0xBCD, 12)
+
     def test_constfold(self):
         # Wrapping addition
         expr = smt.BVConst(0x8, 4) + smt.BVConst(0x8, 4)

@@ -85,7 +85,7 @@ class OracleInterface(ABC):
         else:
             return None
 
-    def invoke(self, args: Dict[str, int]):
+    def invoke(self, args):
         # args is a mapping of smt var name -> value
         if self.is_external_binary:
             process = Popen([self.binpath] + args, stdout=PIPE)
@@ -93,7 +93,11 @@ class OracleInterface(ABC):
         else:
             output = self.lfun(args)
         output = int(output)
-        i_list = list(args.values())
+        if isinstance(args, dict):
+            i_list = list(args.values())
+        else:
+            # HACK: for correctness oracle, args is the function candidate (LambdaTerm)
+            i_list = args
         self.i_history.append(i_list)
         self.o_history.append(output)
         return CallResult(i_list, output)
@@ -184,8 +188,8 @@ class CorrectnessOracle(OracleInterface):
         """
         return [CallResult(i, o) for i, o in zip(self.cex_inputs, self.cex_outputs)]
 
-    def add_cex(self, input_map, output_val):
-        self.cex_inputs.append(list(input_map.values()))
+    def add_cex(self, input_vals, output_val):
+        self.cex_inputs.append(input_vals)
         self.cex_outputs.append(output_val)
 
     def apply_constraints(self, slv, synthfun):

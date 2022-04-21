@@ -2,3 +2,6 @@
 	path = Pyverilog
 	url = https://github.com/noloerino/Pyverilog/
     branch = term-memoization
+[submodule "pyvcd"]
+	path = pyvcd
+	url = git@github.com:noloerino/pyvcd.git
