@@ -387,7 +387,7 @@ def _verilog_model_helper(
                     if p.msb and p.lsb:
                         # BV slice assignment
                         assert v.is_bv_or_bool_expr(), v
-                        idx_width = v.sort.bitwidth
+                        idx_width = v.c_bitwidth()
                         msb_expr = pv_to_smt_expr(p.msb, idx_width, terms, None, mod_depth, rename_substitutions)
                         msb_expr = msb_expr.const_fold()
                         lsb_expr = pv_to_smt_expr(p.lsb, idx_width, terms, None, mod_depth, rename_substitutions)
@@ -413,7 +413,7 @@ def _verilog_model_helper(
                         expr = pv_to_smt_expr(p.tree, expr_width, terms, assignee, mod_depth, rename_substitutions)
                         if bv_index_assign:
                             expr = (assignee & ~(smt.BVConst(1, expr_width).sll(bv_index_expr))) | \
-                                expr.zpad(expr_width - expr.sort.bitwidth).sll(bv_index_expr)
+                                expr.zpad(expr_width - expr.c_bitwidth()).sll(bv_index_expr)
                         if is_curr_scope:
                             if p.alwaysinfo is not None and p.alwaysinfo.isClockEdge():
                                 # Clocked state update
@@ -702,11 +702,11 @@ def pv_to_smt_expr(node, width: Optional[int], terms, assignee, mod_depth, subst
             lsb_expr = lsb_expr.const_fold()
             if msb_expr.is_const() and lsb_expr.is_const():
                 # Index with raw values to do type conversion properly
-                if msb_expr.val >= body_expr.sort.bitwidth:
+                if msb_expr.val >= body_expr.c_bitwidth():
                     # The MSB can exceed prescribed widths in idioms like addition
                     # with carry (assign {C, out} = A + B;), where the argument needs to
                     # be sign extended
-                    body_expr = body_expr.zpad_all_children(body_expr.sort.bitwidth - msb_expr.val + 1)
+                    body_expr = body_expr.zpad_all_children(body_expr.c_bitwidth() - msb_expr.val + 1)
                 return body_expr[msb_expr.val:lsb_expr.val]
             else:
                 return body_expr[msb_expr:lsb_expr]

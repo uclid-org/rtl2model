@@ -166,8 +166,8 @@ class ModelBuilder(ABC):
         ctr = smt.BVVariable("__lift_cc", ctr_width)
         ctr_values = [smt.BVConst(i, ctr_width) for i in range(guidance.num_cycles)]
         ctr_cases = [] # Each item is a tuple of (iterator condition, assumptions, assertions)
-        shadow_decls = []
-        shadow_param_map = {} # Maps input variable to shadow
+        # Maps input variable to shadow
+        shadow_param_map = {v: v.add_prefix("__shadow_") for v in self.input_vars}
         numshadow = 0
         for stepnum in range(guidance.num_cycles):
             itercond = ctr.op_eq(ctr_values[stepnum])
@@ -179,26 +179,27 @@ class ModelBuilder(ABC):
                     # TODO convert this into an index expression if necessary
                     qp_var = smt.BVVariable(q2b(qp), get_width(qp))
                     atype = guidance.get_annotation_at(qp, stepnum)
-                    if atype is None or atype == AnnoType.DONT_CARE:
-                        pass
-                    elif atype == AnnoType.ASSUME:
+                    if atype is None or atype.is_dont_care():
+                        continue
+                    bounds = atype.bounds
+                    if bounds is not None:
+                        qp_var = qp_var[bounds[0]:bounds[1]]
+                    if atype.is_assume():
                         # Add assume statement
                         constval = smt.BVConst(signal_values[stepnum][qp], get_width(qp))
+                        if bounds:
+                            constval = constval[bounds[0]:bounds[1]].eval({})
                         assumes.append(qp_var.op_eq(constval))
                     elif atype.is_param():
                         # Add new shadow register
-                        new_shadow = smt.BVVariable(f"__shadow_{numshadow}", get_width(qp))
-                        shadow_decls.append(new_shadow.get_decl())
-                        shadow_param_map[atype.var] = new_shadow
                         # TODO add comments to assumes somehow?
-                        assumes.append(new_shadow.op_eq(qp_var))
-                        numshadow += 1
-                    elif atype == AnnoType.OUTPUT:
+                        assumes.append(anno.expr.replace_vars(shadow_param_map).op_eq(qp_var))
+                    elif atype.is_output():
                         # Assert output
                         # TODO allow for a more coherent mapping from synth funs to outputs
                         asserts.append(func.body.replace_vars(shadow_param_map).op_eq(qp_var))
                     else:
-                        raise NotImplementedError()
+                        raise TypeError(f"invalid annotation {atype}")
             ctr_cases.append((itercond, assumes, asserts))
 
         pred_cases_l = []
@@ -208,40 +209,47 @@ class ModelBuilder(ABC):
                 # TODO convert this into an index expression if necessary
                 qp_var = smt.BVVariable(q2b(qp), get_width(qp))
                 for cond, anno in guidance.get_predicated_annotations(qp).items():
-                    if anno == AnnoType.DONT_CARE:
+                    if anno.is_dont_care():
                         continue
+                    bounds = anno.bounds
+                    if bounds is not None:
+                        bounds = anno.bounds
+                        qp_expr = qp_var[bounds[0]:bounds[1]]
+                    else:
+                        qp_expr = qp_var
                     # Add condition
                     if first:
                         s = f"if ({cond.to_verilog_str()}) begin\n"
                         first = False
+                    elif cond == smt.BoolConst.T:
+                        s = f"else begin\n"
                     else:
                         s = f"else if ({cond.to_verilog_str()}) begin\n"
                     # Add assume/assert
-                    if anno == AnnoType.ASSUME:
+                    if anno.is_assume():
                         s += f"    case ({ctr.to_verilog_str()})\n"
                         # Add assume statements
                         for cc in ctr_values:
                             constval = smt.BVConst(signal_values[cc.val][qp], get_width(qp))
-                            s += f"        {cc.to_verilog_str()}: assume ({qp_var.op_eq(constval).to_verilog_str()});\n"
+                            if bounds:
+                                constval = constval[bounds[0]:bounds[1]].eval({})
+                            s += f"        {cc.to_verilog_str()}: assume ({qp_expr.op_eq(constval).to_verilog_str()});\n"
                         s += f"    endcase\n"
                     elif anno.is_param():
                         # Add new shadow register
                         new_shadow = smt.BVVariable(f"__shadow_{numshadow}", get_width(qp))
-                        shadow_decls.append(new_shadow.get_decl())
-                        shadow_param_map[anno.var] = new_shadow
                         # TODO add comments to assumes somehow?
-                        s += f"    assume ({new_shadow.op_eq(qp_var).to_verilog_str()});\n"
-                        numshadow += 1
-                    elif anno == AnnoType.OUTPUT:
+                        s += f"    assume ({anno.expr.replace_vars(shadow_param_map).op_eq(qp_expr).to_verilog_str()});\n"
+                    elif anno.is_output():
                         # Assert output
                         # TODO allow for a more coherent mapping from synth funs to outputs
-                        s += f"    assert ({func.body.replace_vars(shadow_param_map).op_eq(qp_var).to_verilog_str()});\n"
+                        s += f"    assert ({func.body.replace_vars(shadow_param_map).op_eq(qp_expr).to_verilog_str()});\n"
                     else:
-                        raise NotImplementedError()
+                        raise TypeError(f"invalid annotation {anno}")
                     s += "end"
                     pred_cases_l.append(s)
 
-        shadow_decls = "\n".join(s.to_verilog_str(is_reg=True, anyconst=True) for s in shadow_decls)
+        shadow_decls = "\n".join(s.get_decl().to_verilog_str(is_reg=True, anyconst=True) for s in shadow_param_map.values())
         ctr_cases_l = []
         for itercond, assumes, asserts in ctr_cases:
             s = f"if ({itercond.to_verilog_str()}) begin\n"
@@ -297,7 +305,7 @@ class ModelBuilder(ABC):
         for line in sby_lines:
             if "Value for anyconst" in line:
                 # TODO regex parse variable name
-                in_vals.insert(0, line.split()[-1])
+                in_vals.insert(0, int(line.split()[-1]))
         top_prefix = self.model.name + "."
         vcd_r = VcdWrapper(
             os.path.join(self.config.sby_dir, "corr_taskBMC/engine_0/trace.vcd"),
@@ -328,7 +336,7 @@ class ModelBuilder(ABC):
             # Because the signal variable width may not match the width of the ISA-level input
             # to the program sketch, the max value of the signal may exceed the max allowable value
             self.sample({v.name: 0 for v in self.input_vars})
-            # self.sample([random.randint(0, 2 ** v.sort.bitwidth - 1) for v in self.input_vars])
+            # self.sample([random.randint(0, 2 ** v.c_bitwidth() - 1) for v in self.input_vars])
         signal_values = self.signal_values
         widths = self.widths
         return self.run_bmc(signal_values, widths, func)
@@ -377,7 +385,7 @@ class ModelBuilder(ABC):
         self.o_ctx.add_oracle(io)
 
     def _add_correctness_oracle(self):
-        corr = oi.CorrectnessOracle("corr", self.verify)
+        corr = oi.CorrectnessOracle("corr", self.input_vars, self.output_width, self.verify)
         self.o_ctx.add_oracle(corr)
 
     def add_cex(self, input_vals: List[int], out_val: int):
@@ -406,10 +414,12 @@ class ModelBuilder(ABC):
         self._add_correctness_oracle()
         solver = self.solver
         sf = solver.synthfuns[0]
+        prev_candidates = []
         while True:
             print("Correctness oracle returned false, please provide more constraints: ")
             # TODO key on names instead of just by order
             io_o = self.o_ctx.oracles["io"]
+            corr_o = self.o_ctx.oracles["corr"]
             replayed_inputs = io_o.next_replay_input()
             if replayed_inputs is not None:
                 inputs = replayed_inputs
@@ -417,7 +427,10 @@ class ModelBuilder(ABC):
                 for i, v in enumerate(sf.bound_vars):
                     print(f"- {v.name} (input {i + 1}):", inputs[i])
             else:
-                inputs = io_o.new_random_inputs()
+                if len(corr_o.cex_inputs) != 0:
+                    inputs = corr_o.cex_inputs[-1]
+                else:
+                    inputs = io_o.new_random_inputs()
                 # inputs = []
                 # for i, v in enumerate(sf.bound_vars):
                 #     inputs.append(input(f"{v.name} (input {i + 1}): "))
@@ -426,9 +439,11 @@ class ModelBuilder(ABC):
             # TODO do we still need to call this?
             solver.reinit_cvc5()
             self.o_ctx.call_oracle("io", {v.name: i for v, i in zip(self.input_vars, inputs)})
-            self.o_ctx.oracles["io"].save_call_logs()
+            io_o.save_call_logs()
 
-            self.o_ctx.apply_all_constraints(solver, {"io": sf})
+            self.o_ctx.apply_all_constraints(solver, {"io": sf, "corr": sf})
+            for o_cand in prev_candidates:
+                self.solver.add_constraint(smt.OpTerm(smt.Kind.Distinct, (sf.to_uf(), o_cand)))
             print("Running synthesis...")
             sr = solver.check_synth()
             print("Synthesis done")
@@ -438,13 +453,14 @@ class ModelBuilder(ABC):
                 # TODO generalize for multiple synthfuns
                 candidate = list(solution.values())[0]
                 print(candidate)
+                prev_candidates.append(candidate)
                 cr = self.o_ctx.call_oracle("corr", candidate)
                 # Counterexample is implicitly added by the oracle function
                 is_correct = cr.output
                 if is_correct:
                     print("All oracles passed. Found a solution: ")
                     print(candidate)
-                    self.o_ctx.oracles["io"].save_call_logs()
+                    io_o.save_call_logs()
                     return self.model.replace_mod_uf_transition(
                         self._uf_mod_name,
                         self._uf_name,

@@ -159,21 +159,38 @@ def main():
     for sig in ["reset", "lft_tile_pc", "lft_tile_fe_pc", "lft_tile_ew_pc"]:
         guidance.annotate(sig, AnnoType.ASSUME)
     # a1 (shadow var)
-    guidance.annotate("lft_tile_regs_11", {ew_pc_var.op_eq(516): AnnoType.Param(a[11:0].sext(20))})
+    guidance.annotate("lft_tile_regs_11", {ew_pc_var.op_eq(516): AnnoType.Param(a & 0xFFF)})
     # a2 (shadow var)
-    guidance.annotate("lft_tile_regs_12", {ew_pc_var.op_eq(520): AnnoType.Param(b[11:0].sext(20))})
+    guidance.annotate("lft_tile_regs_12", {ew_pc_var.op_eq(520): AnnoType.Param(b & 0xFFF)})
     # a3 (output)
     guidance.annotate("lft_tile_regs_13", {ew_pc_var.op_eq(524): AnnoType.OUTPUT})
     guidance.annotate("lft_tile_fe_inst", {
-        (fe_pc_var > 520) & (fe_pc_var < 512): AnnoType.ASSUME
+        (fe_pc_var > 520) & (fe_pc_var < 512): AnnoType.ASSUME,
+        # For everything except the placeholder instructions, assume the whole inst
+        # Otherwise, assume everything but the immediate
+        smt.BoolConst.T: AnnoType.AssumeIndexed((19, 0))
     })
     guidance.annotate("lft_tile_regFile_io_raddr1", AnnoType.ASSUME)
     guidance.annotate("lft_tile_regFile_io_raddr2", AnnoType.ASSUME)
     guidance.annotate("lft_tile_regFile_io_waddr", AnnoType.ASSUME)
+    start = smt.BVVariable("start", 32)
+    grammar = smt.Grammar(
+        bound_vars=(a, b),
+        nonterminals=(start,),
+        terms={start: (
+            start + start,
+            start - start,
+            start | start,
+            start & smt.BVConst(0xFFF, 32),
+            a,
+            b,
+        ),},
+    )
     model = RvMiniModel(
         ProjectConfig(os.path.join(BASEDIR, "symbiyosys"), clock_name="clock"),
         sketch,
         tile,
+        # {("ALUArea", "alu_result"): grammar},
         {("ALUArea", "alu_result"): None},
         guidance,
     )

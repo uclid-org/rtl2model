@@ -29,6 +29,9 @@ class Sort(Translatable, ABC):
 class BVSort(Sort):
     bitwidth: int
 
+    def __post_init__(self):
+        assert isinstance(self.bitwidth, int), type(self.bitwidth)
+
     @staticmethod
     def max_bv_const(self):
         return BVConst(2 ** self.bitwidth - 1, bitwidth)

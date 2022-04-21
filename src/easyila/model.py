@@ -786,7 +786,7 @@ class Model:
                     if v.is_bool_expr():
                         possible_values = (True, False)
                     elif v.is_bv_expr():
-                        possible_values = range(0, 2 ** v.sort.bitwidth)
+                        possible_values = range(0, 2 ** v.c_bitwidth())
                     else:
                         raise TypeError(f"cannot case split on input {v}: case splits can only be performed on bool/bv variables")
                 return self._case_split_input(v, possible_values)
@@ -797,7 +797,7 @@ class Model:
                     if v.is_bool_expr():
                         possible_values = (True, False)
                     elif v.is_bv_expr():
-                        possible_values = range(0, 2 ** v.sort.bitwidth)
+                        possible_values = range(0, 2 ** v.c_bitwidth())
                     else:
                         raise TypeError(f"cannot case split on input {v}: case splits can only be performed on bool/bv variables")
                 return self._case_split_var(v, possible_values)
@@ -819,14 +819,14 @@ class Model:
         if possible_values == (True, False):
             suffixes = [f"{varname}__TRUE", f"{varname}__FALSE"]
         else:
-            suffixes = [f"{varname}__{n:0{split_var.sort.bitwidth}b}" for n in possible_values]
+            suffixes = [f"{varname}__{n:0{split_var.c_bitwidth()}b}" for n in possible_values]
         instances = {}
         inst_names = [f"_{self.name}__{suffix}_inst" for suffix in suffixes]
         for i, cs_value in enumerate(possible_values):
             if split_var.is_bool_expr():
                 cs_value_t = smt.BoolConst.T if cs_value else smt.BoolConst.F
             else:
-                cs_value_t = smt.BVConst(cs_value, split_var.sort.bitwidth)
+                cs_value_t = smt.BVConst(cs_value, split_var.c_bitwidth())
             bindings = {i: i for i in inputs}
             new_model = Model(
                 name=f"_{self.name}__{suffixes[i]}",

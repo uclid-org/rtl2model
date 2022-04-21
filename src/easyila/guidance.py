@@ -18,7 +18,8 @@ class AnnoType:
     """
 
     val: int
-    var: smt.Term = None
+    bounds: Tuple[int, int] = None
+    expr: smt.Term = None
 
     def __post_init__(self):
         if self.val < 0 or self.val > 3:
@@ -36,9 +37,17 @@ class AnnoType:
         else:
             raise TypeError(f"invalid AnnoType with val {self.val}")
 
+    def is_dont_care(self):
+        return self.val == 0
+
+    def is_assume(self):
+        return self.val == 1
+
     def is_param(self):
         return self.val == 2
 
+    def is_output(self):
+        return self.val == 3
 
 # These fields must be declared afterwards in order to resolve the AnnoType name
 
@@ -46,13 +55,16 @@ AnnoType.DONT_CARE = AnnoType(0)
 """The value of this signal is not relevant."""
 
 AnnoType.ASSUME = AnnoType(1)
+AnnoType.AssumeIndexed = lambda b: AnnoType(1, b)
 """The value of this signal should be assumed to match the value during simulation."""
 
-AnnoType.Param = lambda v: AnnoType(2, v)
+AnnoType.Param = lambda v: AnnoType(2, expr=v)
 """This signal represents a synthesis function parameter."""
+AnnoType.ParamIndexed = lambda b, v: AnnoType(2, b, v)
 
 AnnoType.OUTPUT = AnnoType(3)
 """This signal represents a function output."""
+AnnoType.OutputIndexed = lambda b: AnnoType(3, b)
 
 
 class Guidance:

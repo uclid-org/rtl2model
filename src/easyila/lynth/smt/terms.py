@@ -171,14 +171,14 @@ class Term(Translatable, ABC):
                 assert other in (0, 1), f"cannot coerce int {other} to {self.sort}"
                 return self, (BoolConst.T if other else BoolConst.F) # type: ignore
             elif self.is_bv_expr():
-                bitwidth = self.sort.bitwidth
+                bitwidth = self.c_bitwidth()
                 assert other < (2 ** bitwidth), f"int constant {other} exceeds max value of bv{bitwidth}"
                 return self, BVConst(other, bitwidth)
         assert isinstance(other, Term), f"cannot combine {self} with {other}"
         assert hasattr(self, "sort"), repr(self)
         assert hasattr(other, "sort"), repr(other)
-        s_bw = self.sort.bitwidth
-        o_bw = other.sort.bitwidth
+        s_bw = self.c_bitwidth()
+        o_bw = other.c_bitwidth()
         if s_bw == o_bw:
             return self, other
         if sext:
@@ -338,8 +338,8 @@ class Term(Translatable, ABC):
         check if this is equal to the constant 1bv1.
         """
         if self.is_bv_expr():
-            assert self.sort.bitwidth == 1
-            cond = OpTerm(Kind.Equal, (self, BVConst(1, self.sort.bitwidth)))
+            assert self.c_bitwidth() == 1
+            cond = OpTerm(Kind.Equal, (self, BVConst(1, self.c_bitwidth())))
         else:
             assert self.is_bool_expr()
             cond = self
@@ -365,12 +365,12 @@ class Term(Translatable, ABC):
         is not exhaustive.
         """
         assert self.is_bv_expr()
-        sort_max = (1 << self.sort.bitwidth) - 1
+        sort_max = (1 << self.c_bitwidth()) - 1
         covered = 0 # Bit set representing which cases have been covered
         args = [self] # OpTerm sees this as pairs of (case, term) occurring consecutively
         for c, term in cases.items():
             if isinstance(c, int):
-                c = BVConst(c, self.sort.bitwidth)
+                c = BVConst(c, self.c_bitwidth())
             assert c.val <= sort_max
             if (covered & (1 << c.val)) != 0:
                 # Check if the case was already set
@@ -415,14 +415,14 @@ class Term(Translatable, ABC):
         return OpTerm(Kind.BVAdd, self._binop_type_check(other))
 
     def __and__(self, other):
-        if other.is_bool_expr():
+        if isinstance(other, Term) and other.is_bool_expr():
             op = Kind.And
         else:
             op = Kind.BVAnd
         return OpTerm(op, self._binop_type_check(other))
 
     def __invert__(self):
-        if self.is_bool_expr():
+        if isinstance(other, Term) and self.is_bool_expr():
             op = Kind.Not
         else:
             op = Kind.BVNot
@@ -435,7 +435,7 @@ class Term(Translatable, ABC):
         raise NotImplementedError()
 
     def __or__(self, other):
-        if other.is_bool_expr():
+        if isinstance(other, Term) and other.is_bool_expr():
             op = Kind.Or
         else:
             op = Kind.BVOr
@@ -463,7 +463,7 @@ class Term(Translatable, ABC):
         return OpTerm(Kind.BVSub, self._binop_type_check(other))
 
     def __xor__(self, other):
-        if other.is_bool_expr():
+        if isinstance(other, Term) and other.is_bool_expr():
             op = Kind.Xor
         else:
             op = Kind.BVXor
@@ -487,16 +487,16 @@ class Term(Translatable, ABC):
             width = 1
         else:
             assert self.is_bv_expr(), "only BV terms support indexing, instead term was " + str(self)
-            width = self.sort.bitwidth
+            width = self.c_bitwidth()
         wrap = lambda i: BVConst(i, width)
         def shift_and_mask(term):
             """
             Encodes extracts of a variable index as a shift + mask.
             """
-            if term.sort.bitwidth == width:
+            if term.c_bitwidth() == width:
                 shamt = term
             else:
-                shamt = term.zpad(width - term.sort.bitwidth)
+                shamt = term.zpad(width - term.c_bitwidth())
             return OpTerm(Kind.BVAnd, (OpTerm(Kind.BVSrl, (self, shamt)), BVConst(1, width)))
         if isinstance(key, int):
             # Extracts a single bit
@@ -554,9 +554,9 @@ class Term(Translatable, ABC):
     def zero_pad(self, extra_bits: Union["BVConst", int]):
         """Zero pads this term with an addition `extra_bits` bits."""
         if isinstance(extra_bits, int):
-            extra_bits = BVConst(extra_bits, self.sort.bitwidth)
+            extra_bits = BVConst(extra_bits, self.c_bitwidth())
         if self.is_bool_expr():
-            new_width = self.sort.bitwidth + extra_bits.val
+            new_width = self.c_bitwidth() + extra_bits.val
             return self.ite(BVConst(1, new_width), BVConst(0, new_width))
         return OpTerm(Kind.BVZeroPad, (self, extra_bits))
 
@@ -566,9 +566,9 @@ class Term(Translatable, ABC):
     def sign_extend(self, extra_bits: Union["BVConst", int]):
         """Sign extends this term with an addition `extra_bits` bits."""
         if isinstance(extra_bits, int):
-            extra_bits = BVConst(extra_bits, self.sort.bitwidth)
+            extra_bits = BVConst(extra_bits, self.c_bitwidth())
         if self.is_bool_expr():
-            new_width = self.sort.bitwidth + extra_bits.val
+            new_width = self.c_bitwidth() + extra_bits.val
             return self.ite(BVSort(new_width).max_bv_const(), BVConst(0, new_width))
         return OpTerm(Kind.BVSignExtend, (self, extra_bits))
 
@@ -680,7 +680,7 @@ class Variable(Term):
     def eval(self, values):
         assert self.name in values, f"could not evaluate variable {self.name} from mapping {values}"
         if self.is_bv_expr():
-            return BVConst(values[self.name], self.sort.bitwidth)
+            return BVConst(values[self.name], self.c_bitwidth())
         elif self.is_bool_expr():
             return BoolConst(values[self.name])
         else:
@@ -726,6 +726,9 @@ class VarDecl(Translatable):
         else:
             return f"{self.name} : {self.sort} = {self.init_value}"
 
+    def c_bitwidth(self):
+        return self.get_ref().c_bitwidth()
+
     def get_ref(self):
         return Variable(self.name, self.sort)
 
@@ -749,7 +752,7 @@ class VarDecl(Translatable):
                 raise NotImplementedError("VarDecl verilog array translation not supported yet")
             is_reg = kwargs.get("is_reg", False)
             decl = "reg" if is_reg else "wire"
-            if self.sort.bitwidth != 1:
+            if self.c_bitwidth() != 1:
                 decl += " " + self.sort.to_verilog_str()
             decl += f" {self.name}"
             if self.init_value is not None:
@@ -788,9 +791,9 @@ class OpTerm(Term):
         elif self.kind in (Kind.BVZeroPad, Kind.BVSignExtend):
             assert self.args[0].is_bv_expr(), repr(self.args[0])
             assert isinstance(self.args[1], BVConst), repr(self.args[1])
-            return BVSort(self.args[0].sort.bitwidth + self.args[1].val)
+            return BVSort(self.args[0].c_bitwidth() + self.args[1].val)
         elif self.kind == Kind.BVConcat:
-            return BVSort(sum(a.sort.bitwidth for a in self.args))
+            return BVSort(sum(a.c_bitwidth() for a in self.args))
         elif self.kind == Kind.Ite:
             return self.args[1].sort
         elif self.kind == Kind.Match:
@@ -948,16 +951,30 @@ class OpTerm(Term):
                 return "{" + ",".join(wrap(a) for a in self.args) + "}"
             if v == Kind.BVExtract:
                 a0_str = wrap(self.args[0])
-                a1_str = wrap(self.args[1])
-                a2_str = wrap(self.args[2])
+                if self.args[1].is_const():
+                    a1_str = str(int(self.args[1].val))
+                else:
+                    a1_str = wrap(self.args[1])
+                if self.args[2].is_const():
+                    a2_str = str(int(self.args[2].val))
+                else:
+                    a2_str = wrap(self.args[2])
                 return f"{a0_str}[{a1_str}:{a2_str}]"
             if v == Kind.Select:
                 a0_str = wrap(self.args[0])
                 a1_str = wrap(self.args[1])
                 return f"{a0_str}[{a1_str}]"
-            # if v == Kind.BVSignExtend:
-                # TODO duplicate MSB, then concat
-                # return f"$signed({self.args[0].to_verilog_str()})"
+            if v == Kind.BVSignExtend:
+                # duplicate MSB, then concat
+                # e.g. {{8{ext[7]}}, ext} where ext is bv8
+                a0_str = self.args[0].to_verilog_str()
+                msb_i = self.args[0].c_bitwidth() - 1
+                # brace balancing:
+                # c = outermost concat curly brace
+                # r = outside repeat
+                # m = outside msb
+                #        c0r0                  m0                 m1r1          c1
+                return f"{{{{{self.args[1].val}{{{a0_str}[{msb_i}]}}}}, {a0_str}}}"
             if v == Kind.BVZeroPad:
                 return wrap(self.args[0])
             raise NotImplementedError(v)
@@ -1073,8 +1090,8 @@ class OpTerm(Term):
     def _do_const_eval(self, args):
         # unary ops
         a0 = args[0]
-        a0_bw = a0.sort.bitwidth
-        a0_mask = (1 << a0.sort.bitwidth) - 1
+        a0_bw = a0.c_bitwidth()
+        a0_mask = (1 << a0.c_bitwidth()) - 1
         if self.kind == Kind.Not:
             return BoolConst.T if a0 == BoolConst.F else BoolConst.T
         if self.kind == Kind.BVNot:
@@ -1400,6 +1417,10 @@ class BoolConst(Term, IntEnum, metaclass=_TermMeta):
 class BVConst(Term):
     val: int
     width: int
+
+    def __post_init__(self):
+        assert isinstance(self.val, int), type(self.val)
+        assert isinstance(self.width, int), type(self.width)
 
     @property
     def sort(self):

@@ -122,7 +122,7 @@ class IOOracle(OracleInterface):
     def __init__(
         self,
         name: str,
-        in_vars: smt.Variable,
+        in_vars: List[smt.Variable],
         out_width: int,
         oracle: Union[Callable, str],
         *,
@@ -149,7 +149,7 @@ class IOOracle(OracleInterface):
         """
         repeated = True
         while repeated:
-            new_inputs = tuple(self.rng.randint(0, 2 ** v.sort.bitwidth - 1) for v in self.in_vars)
+            new_inputs = tuple(self.rng.randint(0, 2 ** v.c_bitwidth() - 1) for v in self.in_vars)
             repeated = new_inputs in self.i_history
         return new_inputs
 
@@ -159,7 +159,7 @@ class IOOracle(OracleInterface):
         on previous inputs matches the correct outputs.
         """
         for call in self.calls:
-            in_consts = [smt.BVConst(i_value, i_var.sort.bitwidth) for i_var, i_value in zip(self.in_vars, call.inputs)]
+            in_consts = [smt.BVConst(i_value, i_var.c_bitwidth()) for i_var, i_value in zip(self.in_vars, call.inputs)]
             out_const = smt.BVConst(call.output, self.out_width)
             fn_apply = synthfun.to_uf().apply(*in_consts)
             slv.add_constraint(fn_apply.op_eq(out_const))
@@ -174,11 +174,15 @@ class CorrectnessOracle(OracleInterface):
     def __init__(
         self,
         name: str,
+        in_vars: List[smt.Variable],
+        out_width: int,
         oracle: Union[Callable, str],
         replay_inputs: Optional[List[Tuple[int, ...]]]=None,
         log_path: Optional[str]=None
     ):
         super().__init__(name, oracle, replay_inputs, log_path)
+        self.in_vars = in_vars
+        self.out_width = out_width
         self.cex_inputs = []
         self.cex_outputs = []
 
@@ -198,7 +202,7 @@ class CorrectnessOracle(OracleInterface):
         on previous inputs is not equal to the counterexample output.
         """
         for call in self.cexs():
-            in_consts = [smt.BVConst(i_value, i_var.sort.bitwidth) for i_var, i_value in zip(self.in_vars, call.inputs)]
+            in_consts = [smt.BVConst(i_value, i_var.c_bitwidth()) for i_var, i_value in zip(self.in_vars, call.inputs)]
             out_const = smt.BVConst(call.output, self.out_width)
             fn_apply = synthfun.to_uf().apply(*in_consts)
             slv.add_constraint(fn_apply.op_ne(out_const))
