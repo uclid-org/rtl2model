@@ -167,10 +167,10 @@ class Term(Translatable, ABC):
         if cast_int and isinstance(other, int):
             if isinstance(other, BoolConst):
                 other = other.value
-            if isinstance(self.sort, BoolSort):
+            if self.is_bool_expr():
                 assert other in (0, 1), f"cannot coerce int {other} to {self.sort}"
                 return self, (BoolConst.T if other else BoolConst.F) # type: ignore
-            elif isinstance(self.sort, BVSort):
+            elif self.is_bv_expr():
                 bitwidth = self.sort.bitwidth
                 assert other < (2 ** bitwidth), f"int constant {other} exceeds max value of bv{bitwidth}"
                 return self, BVConst(other, bitwidth)
@@ -183,20 +183,20 @@ class Term(Translatable, ABC):
             return self, other
         if sext:
             if s_bw > o_bw:
-                if isinstance(other.sort, BoolSort):
+                if other.is_bool_expr():
                     return self, other.ite(BVConst((1 << o_bw) - 1, o_bw), BVConst(0, o_bw))
                 return self, other.sign_extend(BVConst(s_bw - o_bw, o_bw))
             else:
-                if isinstance(self.sort, BoolSort):
+                if self.is_bool_expr():
                     return self.ite(BVConst((1 << o_bw) - 1, o_bw), BVConst(0, o_bw)), other
                 return self.sign_extend(BVConst(o_bw - s_bw, s_bw)), other
         if zpad:
             if s_bw > o_bw:
-                if isinstance(other.sort, BoolSort):
+                if other.is_bool_expr():
                     return self, other.ite(BVConst(1, o_bw), BVConst(0, o_bw))
                 return self, other.zero_pad(BVConst(s_bw - o_bw, o_bw))
             else:
-                if isinstance(self.sort, BoolSort):
+                if self.is_bool_expr():
                     return self.ite(BVConst(1, o_bw), BVConst(0, o_bw)), other
                 return self.zero_pad(BVConst(o_bw - s_bw, s_bw)), other
         assert self.sort == other.sort, f"cannot combine value {self} of sort {self.sort} to {other} of sort {other.sort}"
@@ -300,18 +300,30 @@ class Term(Translatable, ABC):
     def is_const(self) -> bool:
         return isinstance(self, BVConst) or isinstance(self, BoolConst)
 
+    def is_bool_expr(self) -> bool:
+        return isinstance(self.sort, BoolSort)
+
+    def is_bv_expr(self) -> bool:
+        return isinstance(self.sort, BVSort)
+
+    def is_array_expr(self) -> bool:
+        return isinstance(self.sort, ArraySort)
+
+    def is_bv_or_bool_expr(self) -> bool:
+        return isinstance(self.sort, BVSort) or isinstance(self.sort, BoolSort)
+
     def c_bitwidth(self) -> int:
         """
         Gets the bitwidth of this term's sort, erroring if the sort does not have a bitwidth.
         """
-        if not isinstance(self.sort, BVSort) and not isinstance(self.sort, BoolSort):
+        if not self.is_bv_or_bool_expr():
             raise Exception(f"cannot get bitwidth of non-bv/bool term {self}")
         return self.sort.bitwidth
 
     def _maybe_bool2bv1(self):
         if isinstance(self, BoolConst):
             return BVConst(int(self), 1)
-        elif isinstance(self.sort, BoolSort):
+        elif self.is_bool_expr():
             return self.ite(BVConst(1, 1), BVConst(0, 1))
         else:
             return self
@@ -325,11 +337,11 @@ class Term(Translatable, ABC):
         If this term is of sort BV1, then an expression is automatically added to
         check if this is equal to the constant 1bv1.
         """
-        if isinstance(self.sort, BVSort):
+        if self.is_bv_expr():
             assert self.sort.bitwidth == 1
             cond = OpTerm(Kind.Equal, (self, BVConst(1, self.sort.bitwidth)))
         else:
-            assert isinstance(self.sort, BoolSort)
+            assert self.is_bool_expr()
             cond = self
         t_term, f_term = t_term._binop_type_check(f_term)
         return OpTerm(Kind.Ite, (cond, t_term, f_term))
@@ -352,7 +364,7 @@ class Term(Translatable, ABC):
         of this sort, then `default` must be specified. An Exception is raised if the match
         is not exhaustive.
         """
-        assert isinstance(self.sort, BVSort)
+        assert self.is_bv_expr()
         sort_max = (1 << self.sort.bitwidth) - 1
         covered = 0 # Bit set representing which cases have been covered
         args = [self] # OpTerm sees this as pairs of (case, term) occurring consecutively
@@ -403,14 +415,14 @@ class Term(Translatable, ABC):
         return OpTerm(Kind.BVAdd, self._binop_type_check(other))
 
     def __and__(self, other):
-        if isinstance(other.sort, BoolSort):
+        if other.is_bool_expr():
             op = Kind.And
         else:
             op = Kind.BVAnd
         return OpTerm(op, self._binop_type_check(other))
 
     def __invert__(self):
-        if isinstance(self.sort, BoolSort):
+        if self.is_bool_expr():
             op = Kind.Not
         else:
             op = Kind.BVNot
@@ -423,7 +435,7 @@ class Term(Translatable, ABC):
         raise NotImplementedError()
 
     def __or__(self, other):
-        if isinstance(other.sort, BoolSort):
+        if other.is_bool_expr():
             op = Kind.Or
         else:
             op = Kind.BVOr
@@ -451,14 +463,14 @@ class Term(Translatable, ABC):
         return OpTerm(Kind.BVSub, self._binop_type_check(other))
 
     def __xor__(self, other):
-        if isinstance(other.sort, BoolSort):
+        if other.is_bool_expr():
             op = Kind.Xor
         else:
             op = Kind.BVXor
         return OpTerm(op, self._binop_type_check(other))
 
     def __getitem__(self, key):
-        if isinstance(self.sort, ArraySort):
+        if self.is_array_expr():
             # Array indexing
             if isinstance(key, Term):
                 if not key.sort == self.sort.idx_sort:
@@ -471,10 +483,10 @@ class Term(Translatable, ABC):
             else:
                 raise TypeError(key)
         # Bitvector indexing
-        if isinstance(self.sort, BoolSort):
+        if self.is_bool_expr():
             width = 1
         else:
-            assert isinstance(self.sort, BVSort), "only BV terms support indexing, instead term was " + str(self)
+            assert self.is_bv_expr(), "only BV terms support indexing, instead term was " + str(self)
             width = self.sort.bitwidth
         wrap = lambda i: BVConst(i, width)
         def shift_and_mask(term):
@@ -513,7 +525,7 @@ class Term(Translatable, ABC):
         raise TypeError(f"cannot index {self} with {key}")
 
     def __setitem__(self, key, value):
-        if isinstance(self.sort, ArraySort):
+        if self.is_array_expr():
             if isinstance(key, type(self.sort.idx_sort)):
                 pass
             elif isinstance(key, int):
@@ -543,7 +555,7 @@ class Term(Translatable, ABC):
         """Zero pads this term with an addition `extra_bits` bits."""
         if isinstance(extra_bits, int):
             extra_bits = BVConst(extra_bits, self.sort.bitwidth)
-        if isinstance(self.sort, BoolSort):
+        if self.is_bool_expr():
             new_width = self.sort.bitwidth + extra_bits.val
             return self.ite(BVConst(1, new_width), BVConst(0, new_width))
         return OpTerm(Kind.BVZeroPad, (self, extra_bits))
@@ -555,7 +567,7 @@ class Term(Translatable, ABC):
         """Sign extends this term with an addition `extra_bits` bits."""
         if isinstance(extra_bits, int):
             extra_bits = BVConst(extra_bits, self.sort.bitwidth)
-        if isinstance(self.sort, BoolSort):
+        if self.is_bool_expr():
             new_width = self.sort.bitwidth + extra_bits.val
             return self.ite(BVSort(new_width).max_bv_const(), BVConst(0, new_width))
         return OpTerm(Kind.BVSignExtend, (self, extra_bits))
@@ -668,9 +680,9 @@ class Variable(Term):
     def eval(self, values):
         assert self.name in values
         assert self.sort
-        if isinstance(self.sort, BVSort):
+        if self.is_bv_expr():
             return BVConst(values[self.name], self.sort.bitwidth)
-        elif isinstance(self.sort, BoolSort):
+        elif self.is_bool_expr():
             return BoolConst(values[self.name])
         else:
             raise NotImplementedError()
@@ -734,7 +746,7 @@ class VarDecl(Translatable):
         elif tgt == TargetFormat.SYGUS2:
             return f"(declare-var {self.name} {self.sort.to_sygus2()})"
         elif tgt == TargetFormat.VERILOG:
-            if isinstance(self.sort, ArraySort):
+            if self.is_array_expr():
                 raise NotImplementedError("VarDecl verilog array translation not supported yet")
             is_reg = kwargs.get("is_reg", False)
             decl = "reg" if is_reg else "wire"
@@ -775,7 +787,7 @@ class OpTerm(Term):
             assert isinstance(self.args[2], BVConst), f"extract second index must be BVConst, instead was {self.args[2]}"
             return BVSort(self.args[1].val - self.args[2].val + 1)
         elif self.kind in (Kind.BVZeroPad, Kind.BVSignExtend):
-            assert isinstance(self.args[0].sort, BVSort), repr(self.args[0])
+            assert self.args[0].is_bv_expr(), repr(self.args[0])
             assert isinstance(self.args[1], BVConst), repr(self.args[1])
             return BVSort(self.args[0].sort.bitwidth + self.args[1].val)
         elif self.kind == Kind.BVConcat:
@@ -789,7 +801,7 @@ class OpTerm(Term):
         if self.kind in bitops:
             return BoolSort()
         if self.kind == Kind.Select:
-            assert isinstance(self.args[0].sort, ArraySort)
+            assert self.args[0].is_array_expr(), ArraySort
             return self.args[0].sort.elem_sort
         raise NotImplementedError(f"Cannot get Sort for kind {self.kind}")
 

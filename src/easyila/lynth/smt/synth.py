@@ -216,7 +216,7 @@ class Solver:
         return term
 
     def add_constraint(self, term: Term) -> Term:
-        assert isinstance(term.sort, BoolSort), f"Sygus constraint must be boolean; instead got {term}"
+        assert term.is_bool_expr(), f"Sygus constraint must be boolean; instead got {term}"
         self.constraints.append(term)
         if self._cvc5_wrapper:
             self._cvc5_wrapper.add_constraint(term)

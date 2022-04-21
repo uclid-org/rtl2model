@@ -118,9 +118,9 @@ class Model:
             assert isinstance(m, Instance), f"value for instance {i} is not a Instance (was {type(m)})"
         assert isinstance(self.init_values, dict)
         for a in self.assertions:
-            assert isinstance(a.sort, smt.BoolSort)
+            assert a.is_bool_expr()
         for a in self.assumptions:
-            assert isinstance(a.sort, smt.BoolSort)
+            assert a.is_bool_expr()
 
     def copy(self):
         """
@@ -231,7 +231,7 @@ class Model:
             if v.name in next_keys:
                 report(f"input variable {v.name} has illegal declared transition relation")
         for v in self.state:
-            if not isinstance(v.sort, smt.ArraySort) and v.name not in logic_and_next:
+            if not v.is_bv_or_bool_expr() and v.name not in logic_and_next:
                 report(f"state variable {v.name} has no declared logic or transition relation")
         for v in self.outputs:
             if v.name not in logic_and_next and v.name not in uf_counts:
@@ -761,9 +761,9 @@ class Model:
             if v.name == var_name:
                 # TODO validate possible_values if provided
                 if possible_values is None:
-                    if isinstance(v.sort, smt.BoolSort):
+                    if v.is_bool_expr():
                         possible_values = (True, False)
-                    elif isinstance(v.sort, smt.BVSort):
+                    elif v.is_bv_expr():
                         possible_values = range(0, 2 ** v.sort.bitwidth)
                     else:
                         raise TypeError(f"cannot case split on input {v}: case splits can only be performed on bool/bv variables")
@@ -772,9 +772,9 @@ class Model:
             if isinstance(v, smt.Variable) and v.name == var_name:
                 # TODO validate possible_values if provided
                 if possible_values is None:
-                    if isinstance(v.sort, smt.BoolSort):
+                    if v.is_bool_expr():
                         possible_values = (True, False)
-                    elif isinstance(v.sort, smt.BVSort):
+                    elif v.is_bv_expr():
                         possible_values = range(0, 2 ** v.sort.bitwidth)
                     else:
                         raise TypeError(f"cannot case split on input {v}: case splits can only be performed on bool/bv variables")
@@ -801,7 +801,7 @@ class Model:
         instances = {}
         inst_names = [f"_{self.name}__{suffix}_inst" for suffix in suffixes]
         for i, cs_value in enumerate(possible_values):
-            if isinstance(split_var.sort, smt.BoolSort):
+            if split_var.is_bool_expr():
                 cs_value_t = smt.BoolConst.T if cs_value else smt.BoolConst.F
             else:
                 cs_value_t = smt.BVConst(cs_value, split_var.sort.bitwidth)
@@ -834,7 +834,7 @@ class Model:
             )
             new_model = new_model.eliminate_dead_code()
             instances[inst_names[i]] = Instance(new_model, bindings)
-        if isinstance(split_var.sort, smt.BoolSort):
+        if split_var.is_bool_expr():
             new_logic = {
                 o: split_var.ite(
                     smt.Variable(inst_names[0] + "." + o.name, o.sort),

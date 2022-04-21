@@ -382,7 +382,7 @@ def _verilog_model_helper(
                     expr_width = width
                     if p.msb and p.lsb:
                         # BV slice assignment
-                        assert isinstance(v.sort, smt.BVSort) or isinstance(v.sort, smt.BoolSort), v
+                        assert v.is_bv_or_bool_expr(), v
                         idx_width = v.sort.bitwidth
                         msb_expr = pv_to_smt_expr(p.msb, idx_width, terms, None, mod_depth, rename_substitutions)
                         msb_expr = msb_expr.const_fold()
@@ -399,7 +399,7 @@ def _verilog_model_helper(
                             assignee = v[msb_expr:lsb_expr]
                     elif p.ptr is not None:
                         # Array index assignment
-                        assert isinstance(v.sort, smt.ArraySort)
+                        assert v.is_array_expr()
                         idx_width = v.sort.idx_sort.bitwidth
                         assignee = v[pv_to_smt_expr(p.ptr, idx_width, terms, None, mod_depth, rename_substitutions)]
                     else:
@@ -774,7 +774,7 @@ def pv_to_smt_expr(node, width: Optional[int], terms, assignee, mod_depth, subst
     elif isinstance(node, DFPointer):
         # Array indexing
         arr = term_to_smt_var(str(node.var.name), terms, mod_depth)
-        assert isinstance(arr.sort, smt.ArraySort)
+        assert arr.is_array_expr()
         idx_width = arr.sort.idx_sort.bitwidth
         idx_term = pv_to_smt_expr(node.ptr, idx_width, terms, assignee, mod_depth, substitutions)
         return arr[idx_term]
