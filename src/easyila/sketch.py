@@ -16,7 +16,7 @@ class SketchHole:
     bitwidth: int
 
     def __post_init__(self):
-        assert self.expr.bitwidth == self.bitwidth
+        assert self.expr.c_bitwidth() == self.bitwidth
 
 @dataclass(frozen=True)
 class SketchValue:
@@ -43,8 +43,12 @@ class Inst:
     value: Tuple[_InstField, ...]
 
     def __init__(self, *args):
-        for arg in args:
-            assert isinstance(arg, SketchHole) or isinstance(arg, SketchValue), arg
+        args = list(args)
+        for i, arg in enumerate(args):
+            if isinstance(arg, smt.Term):
+                args[i] = SketchHole(arg, arg.c_bitwidth())
+            else:
+                assert isinstance(arg, SketchHole) or isinstance(arg, SketchValue), arg
         self.value = tuple(args)
 
     def __mul__(self, other):
@@ -136,6 +140,6 @@ class ProgramSketch:
             lst = list(inst.value)
             for i, field in enumerate(lst):
                 if isinstance(field, SketchHole):
-                    lst[i] = SketchValue(field.expr.eval(mappings).value, field.bitwidth)
+                    lst[i] = SketchValue(field.expr.eval(mappings).val, field.bitwidth)
             new_insts.append(Inst(*lst))
         return ConcreteProgram(*new_insts)

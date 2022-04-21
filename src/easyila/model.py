@@ -49,6 +49,13 @@ class UFPlaceholder:
             params = self.params
         return smt.UFTerm(self.name, self.sort, params)
 
+    def to_synthfun(self, grammar: Optional[smt.Grammar]) -> smt.SynthFun:
+        free_var = self.maybe_free_arg_var()
+        params = self.params
+        if free_var is not None:
+            params = params + (free_var,)
+        return smt.SynthFun(self.name, params, self.sort, grammar)
+
 
 def _get_assignee_name(term):
     if isinstance(term, smt.Variable):
@@ -147,6 +154,12 @@ class Model:
     def is_stateful(self):
         return len(self.next_ufs) != 0 or len(self.default_next) != 0
 
+    def find_uf_p(self, uf_name):
+        for uf_p in self.ufs + self.next_ufs:
+            if uf_p.name == uf_name:
+                return uf_p
+        return None
+
     def validate(self):
         """
         Checks that all expressions are well-typed, variables are declared, etc.
@@ -231,7 +244,7 @@ class Model:
             if v.name in next_keys:
                 report(f"input variable {v.name} has illegal declared transition relation")
         for v in self.state:
-            if not v.is_bv_or_bool_expr() and v.name not in logic_and_next:
+            if v.name not in logic_and_next:
                 report(f"state variable {v.name} has no declared logic or transition relation")
         for v in self.outputs:
             if v.name not in logic_and_next and v.name not in uf_counts:
@@ -399,14 +412,22 @@ class Model:
                 }}
             }}""")
 
-    def _get_submodules(self, submodel_list=None, visited_submodel_names=None):
-        if submodel_list is None:
-            submodel_list = []
-        if visited_submodel_names is None:
-            visited_submodel_names = set()
+    def get_all_defined_models(self, *, _submodel_list=None, _visited_submodel_names=None) -> List["Model"]:
+        """
+        Recursively gets a list of all `Model`s (including itself) that are subinstances of this
+        `Model`.
+
+        The resulting list will be sorted in DFS post-order, meaning the deepest submodule will be
+        the first element, and this module will be last.
+        """
+        submodel_list = [] if _submodel_list is None else _submodel_list
+        visited_submodel_names = set() if _visited_submodel_names is None else _visited_submodel_names
         for i in self.instances.values():
             if i.model.name not in visited_submodel_names:
-                i.model._get_submodules(submodel_list, visited_submodel_names)
+                i.model.get_all_defined_models(
+                    _submodel_list=submodel_list,
+                    _visited_submodel_names=visited_submodel_names
+                )
         # DFS postorder traversal
         submodel_list.append(self)
         visited_submodel_names.add(self.name)
@@ -417,7 +438,7 @@ class Model:
         Generates a uclid model, as well as a uclid model for every child instance.
         """
         # Submodules are added in DFS postorder traversal
-        submodels = self._get_submodules()
+        submodels = self.get_all_defined_models()
         return "\n\n".join(s.to_uclid() for s in submodels)
 
     # === SOLVER STUFF ===
@@ -547,7 +568,8 @@ class Model:
         Returns a new model which replaces all instances of `mod_name` with models that fill
         uninterpreted function `uf_name` with `term`.
         """
-        submodels = self._get_submodules()
+        submodels = self.get_all_defined_models()
+        new_submodel = None
         for m in submodels:
             if m.name == mod_name:
                 new_submodel = m.replace_uf_transition(uf_name, term)

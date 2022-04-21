@@ -82,10 +82,10 @@ def verilog_to_model(
     If `inline_renames` is `True` (the default), then pyverilog-generated "rename" variables
     (starting with `_rnN` for some number `N`) are replaced with their corresponding expressions.
 
-    `defined_modules` optionally provides a list of existing Model definitions. If any of those
+    `defined_modules` optionally provides a list of existing `Model` definitions. If any of those
     modules are encountered within this verilog modules, they will be replaced with these definitions
-    instead of generating new submodules.
-
+    instead of generating new submodules. Any `Model`s defined as instances of a `Model` in this list
+    will also be used.
 
     PERF NOTE: at a cursory glance, it seems like most of the runtime is spent in yacc within
     pyverilog, so algorithmic improvements here probably won't help that much. Perhaps for
@@ -125,7 +125,9 @@ def verilog_to_model(
     """Maps fully qualified INSTANCE names to the corresponding MODULE name."""
     if defined_modules is not None:
         for m in defined_modules:
-            submodules[m.name] = m
+            for sub in m.get_all_defined_models():
+                # This loop includes m
+                submodules[sub.name] = sub
     for inst_name, mod_name in analyzer.getInstances():
         if str(inst_name) == top_name:
             continue

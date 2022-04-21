@@ -12,6 +12,7 @@ from easyila.common import *
 from easyila.guidance import Guidance, AnnoType
 from easyila.lynth import smt
 from easyila.sketch import ConcreteProgram, ProgramSketch
+from easyila.model import *
 import easyila.lynth.oracleinterface as oi
 
 @dataclass
@@ -25,7 +26,10 @@ class ProjectConfig:
 
 class ModelBuilder(ABC):
     config: ProjectConfig
-    signals: List[SampledSignal]
+    sketch: ProgramSketch
+    model: Model
+    input_vars: List[smt.Variable]
+    output_width: int
     guidance: Guidance
     o_ctx: oi.OracleCtx
 
@@ -33,19 +37,29 @@ class ModelBuilder(ABC):
         self,
         config: ProjectConfig,
         sketch: ProgramSketch,
-        solver: smt.Solver,
-        signals: List[SampledSignal],
+        model: Model,
+        synthfun_grammars: Dict[Tuple[str, str], Optional[smt.Grammar]],
         guidance: Guidance
     ):
         self.config = config
         self.sketch = sketch
-        # TODO generalize for multiple synth funs
-        sf = solver.synthfuns[0]
+        self.model = model
+        submodels = model.get_all_defined_models()
+        submodel_map = {m.name: m for m in submodels}
+        for (sf_mod, sf_name), g in synthfun_grammars.items():
+            # TODO account for next_ufs
+            sf = submodel_map[sf_mod].find_uf_p(sf_name).to_synthfun(g)
+            break # TODO generalize for multiple synth funs
+        solver = sf.new_solver()
+        # sf = solver.synthfuns[0]
         self.input_vars = list(sf.bound_vars)
         self.output_width = sf.return_sort.bitwidth
-        self.signals = signals
         self.guidance = guidance
         self.o_ctx = oi.OracleCtx(solver)
+
+    @property
+    def signals(self):
+        return self.guidance.signals
 
     @property
     def cycle_count(self):
@@ -150,6 +164,8 @@ class ModelBuilder(ABC):
         ctr = smt.BVVariable("__lift_cc", ctr_width)
         ctr_values = [smt.BVConst(i, ctr_width) for i in range(guidance.num_cycles)]
         ctr_cases = [] # Each item is a tuple of (iterator condition, assumptions, assertions)
+        # Shadow variable for synthfun output to allow parsing counterexample from symbiyosys
+        out_shadow = smt.Variable("__shadow_out", func.sort.codomain)
         shadow_decls = []
         numshadow = 0
 
@@ -179,7 +195,10 @@ class ModelBuilder(ABC):
                     elif atype == AnnoType.OUTPUT:
                         # Assert output
                         # TODO allow for a more coherent mapping from synth funs to outputs
-                        asserts.append(func.body.op_eq(qp_var))
+                        # Assume __shadow_out == f(...)
+                        # Assert __shadow_out == <RTL output variable>
+                        assumes.append(out_shadow.op_eq(func.body))
+                        asserts.append(out_shadow.op_eq(qp_var))
                     else:
                         raise NotImplementedError()
             ctr_cases.append((itercond, assumes, asserts))
@@ -215,13 +234,17 @@ class ModelBuilder(ABC):
                     elif anno == AnnoType.OUTPUT:
                         # Assert output
                         # TODO allow for a more coherent mapping from synth funs to outputs
-                        s += f"    assert ({func.body.op_eq(qp_var).to_verilog_str()});\n"
+                        # Assume __shadow_out == f(...)
+                        # Assert __shadow_out == <RTL output variable>
+                        s += f"    assume ({out_shadow.op_eq(func.body).to_verilog_str()});\n"
+                        s += f"    assert ({out_shadow.op_eq(qp_var).to_verilog_str()});\n"
                     else:
                         raise NotImplementedError()
                     s += "end"
                     pred_cases_l.append(s)
 
         shadow_decls = "\n".join(s.to_verilog_str(is_reg=True, anyconst=True) for s in shadow_decls)
+        shadow_decls += "\n" + out_shadow.get_decl().to_verilog_str(is_reg=True, anyconst=True)
         ctr_cases_l = []
         for itercond, assumes, asserts in ctr_cases:
             s = f"if ({itercond.to_verilog_str()}) begin\n"
@@ -243,7 +266,7 @@ class ModelBuilder(ABC):
             "\n\n" + textwrap.indent("\n".join(pred_cases_l), "    ") + \
             "\nend"
 
-    def run_bmc(self, signal_values, signal_widths, hypothesis_func: smt.LambdaTerm):
+    def run_bmc(self, signal_values, signal_widths, hypothesis_func: smt.LambdaTerm) -> bool:
         """
         Runs BMC (for now, hardcoded to be symbiyosys) and returns true on success.
         """
@@ -257,7 +280,28 @@ class ModelBuilder(ABC):
         with open(os.path.join(self.config.sby_dir, "Formal.v"), 'w') as f:
             f.write(formalblock)
         lines = self.run_proc(["sby", "-f", "corr.sby", "taskBMC"], cwd=self.config.sby_dir, ok_rcs=(0, 1, 2))
-        return 'PASS' in lines[-1]
+        ok = 'PASS' in lines[-1]
+        if not ok:
+            self.add_cex(*self._parse_sby_cex(lines))
+        return ok
+
+    def _parse_sby_cex(self, sby_lines) -> Tuple[List[int], int]:
+        """
+        Parses a counterexample from symbiyosys output.
+        """
+        # Assume sby outputs variables in reverse order of declaration
+        # (output is first, then last input, etc.)
+        out_val = None
+        in_vals = []
+        for line in sby_lines:
+            if "Value for anyconst" in line:
+                if out_val is None:
+                    out_val = int(line.split()[-1])
+                else:
+                    in_vals.insert(0, line.split()[-1])
+            # TODO regex parse variable name
+        assert out_val is not None, "could not parse output value from sby counterexample"
+        return in_vals, out_val
 
     def verify(self, func: smt.LambdaTerm):
         # TODO make less hacky
@@ -317,24 +361,29 @@ class ModelBuilder(ABC):
         corr = oi.CorrectnessOracle("corr", self.verify)
         self.o_ctx.add_oracle(corr)
 
+    def add_cex(self, input_vals: List[int], out_val: int):
+        print("Adding counterexample: (" + ", ".join(map(str, input_vals)) + f") -> {out_val}")
+        self.o_ctx.oracles["corr"].add_cex(input_vals, out_val)
+
     def main_sygus_loop(self):
         parser = argparse.ArgumentParser(description="Run synthesis loop.")
-        parser.add_argument(
-            "--io-replay-path",
-            nargs="?",
-            type=str,
-            default=None,
-            help="Log file from which to replay inputs to the I/O oracle."
-        )
-        parser.add_argument(
-            "--io-log-path",
-            nargs="?",
-            type=str,
-            default=None,
-            help="Log file to which I/O inputs and outputs from this run are saved."
-        )
-        args = parser.parse_args()
-        self._add_io_oracle(io_replay_path=args.io_replay_path, io_log_path=args.io_log_path)
+        # parser.add_argument(
+        #     "--io-replay-path",
+        #     nargs="?",
+        #     type=str,
+        #     default=None,
+        #     help="Log file from which to replay inputs to the I/O oracle."
+        # )
+        # parser.add_argument(
+        #     "--io-log-path",
+        #     nargs="?",
+        #     type=str,
+        #     default=None,
+        #     help="Log file to which I/O inputs and outputs from this run are saved."
+        # )
+        # args = parser.parse_args()
+        # self._add_io_oracle(io_replay_path=args.io_replay_path, io_log_path=args.io_log_path)
+        self._add_io_oracle(io_replay_path=None, io_log_path=None)
         self._add_correctness_oracle()
         solver = self.solver
         sf = solver.synthfuns[0]
@@ -357,7 +406,7 @@ class ModelBuilder(ABC):
             # TODO add blocking constraint to prevent sygus from repeating guesses?
             # TODO do we still need to call this?
             solver.reinit_cvc5()
-            self.o_ctx.call_oracle("io", {v: i for v, i in zip(self.input_vars, inputs)})
+            self.o_ctx.call_oracle("io", {v.name: i for v, i in zip(self.input_vars, inputs)})
             self.o_ctx.oracles["io"].save_call_logs()
 
             self.o_ctx.apply_all_constraints(solver, {"io": sf})
@@ -370,7 +419,7 @@ class ModelBuilder(ABC):
                 # TODO generalize for multiple synthfuns
                 print(list(solution.values())[0])
                 cr = self.o_ctx.call_oracle("corr", list(solution.values())[0])
-                # TODO read counterexample back from correctness oracle (symbiyosys dumps to VCD)
+                # Counterexample is implicitly added by the oracle function
                 is_correct = cr.output
                 if is_correct:
                     print("All oracles passed. Found a solution: ")

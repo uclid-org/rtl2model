@@ -678,8 +678,7 @@ class Variable(Term):
         return self
 
     def eval(self, values):
-        assert self.name in values
-        assert self.sort
+        assert self.name in values, f"could not evaluate variable {self.name} from mapping {values}"
         if self.is_bv_expr():
             return BVConst(values[self.name], self.sort.bitwidth)
         elif self.is_bool_expr():
@@ -746,7 +745,7 @@ class VarDecl(Translatable):
         elif tgt == TargetFormat.SYGUS2:
             return f"(declare-var {self.name} {self.sort.to_sygus2()})"
         elif tgt == TargetFormat.VERILOG:
-            if self.is_array_expr():
+            if isinstance(self.sort, ArraySort):
                 raise NotImplementedError("VarDecl verilog array translation not supported yet")
             is_reg = kwargs.get("is_reg", False)
             decl = "reg" if is_reg else "wire"

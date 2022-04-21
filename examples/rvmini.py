@@ -111,9 +111,6 @@ def main():
     x = smt.Variable("__shadow_0", bv32)
     y = smt.Variable("__shadow_1", bv32)
     start = smt.Variable("start", bv32)
-    addbv = start + start
-    subbv = start - start
-    orbv = start | start
     sf = smt.SynthFun(
         "alu_add",
         (x, y),

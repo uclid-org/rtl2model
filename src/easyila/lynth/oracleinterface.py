@@ -12,7 +12,7 @@ import easyila.lynth.smt as smt
 
 @dataclass
 class CallResult:
-    inputs: Tuple[int, ...]
+    inputs: List[int]
     output: int
 
     def to_tuple(self):
@@ -85,16 +85,18 @@ class OracleInterface(ABC):
         else:
             return None
 
-    def invoke(self, args):
+    def invoke(self, args: Dict[str, int]):
+        # args is a mapping of smt var name -> value
         if self.is_external_binary:
             process = Popen([self.binpath] + args, stdout=PIPE)
             (output, _) = process.communicate()
         else:
             output = self.lfun(args)
         output = int(output)
-        self.i_history.append(args)
+        i_list = list(args.values())
+        self.i_history.append(i_list)
         self.o_history.append(output)
-        return CallResult(args, output)
+        return CallResult(i_list, output)
 
     @abstractmethod
     def apply_constraints(self, slv, fun):
@@ -147,10 +149,13 @@ class IOOracle(OracleInterface):
             repeated = new_inputs in self.i_history
         return new_inputs
 
-    # Generate the term that enforce input output pair matches with uninterpreted function
     def apply_constraints(self, slv, synthfun):
+        """
+        Applies constraints requiring that the result of calling the function
+        on previous inputs matches the correct outputs.
+        """
         for call in self.calls:
-            in_consts = [smt.BVConst(int(i_value), i_var.sort.bitwidth) for i_var, i_value in zip(self.in_vars, call.inputs)]
+            in_consts = [smt.BVConst(i_value, i_var.sort.bitwidth) for i_var, i_value in zip(self.in_vars, call.inputs)]
             out_const = smt.BVConst(call.output, self.out_width)
             fn_apply = synthfun.to_uf().apply(*in_consts)
             slv.add_constraint(fn_apply.op_eq(out_const))
@@ -162,9 +167,37 @@ class CorrectnessOracle(OracleInterface):
     of equivalence checking.
     """
 
-    # Correctness oracle does not apply any constraints
-    def apply_constraints(self, slv, fun):
-        pass
+    def __init__(
+        self,
+        name: str,
+        oracle: Union[Callable, str],
+        replay_inputs: Optional[List[Tuple[int, ...]]]=None,
+        log_path: Optional[str]=None
+    ):
+        super().__init__(name, oracle, replay_inputs, log_path)
+        self.cex_inputs = []
+        self.cex_outputs = []
+
+    def cexs(self) -> List[CallResult]:
+        """
+        Returns a list of CallResults representing counterexamples.
+        """
+        return [CallResult(i, o) for i, o in zip(self.cex_inputs, self.cex_outputs)]
+
+    def add_cex(self, input_map, output_val):
+        self.cex_inputs.append(list(input_map.values()))
+        self.cex_outputs.append(output_val)
+
+    def apply_constraints(self, slv, synthfun):
+        """
+        Applies constraints requiring that the result of calling the function
+        on previous inputs is not equal to the counterexample output.
+        """
+        for call in self.cexs():
+            in_consts = [smt.BVConst(i_value, i_var.sort.bitwidth) for i_var, i_value in zip(self.in_vars, call.inputs)]
+            out_const = smt.BVConst(call.output, self.out_width)
+            fn_apply = synthfun.to_uf().apply(*in_consts)
+            slv.add_constraint(fn_apply.op_ne(out_const))
 
 
 # class DistinguishingOracle(OracleInterface):
