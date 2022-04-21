@@ -32,9 +32,9 @@ class BVSort(Sort):
     def __post_init__(self):
         assert isinstance(self.bitwidth, int), type(self.bitwidth)
 
-    @staticmethod
     def max_bv_const(self):
-        return BVConst(2 ** self.bitwidth - 1, bitwidth)
+        from .terms import BVConst
+        return BVConst(2 ** self.bitwidth - 1, self.bitwidth)
 
     def __str__(self):
         return f"bv{self.bitwidth}"
