@@ -422,7 +422,7 @@ class Term(Translatable, ABC):
         return OpTerm(op, self._binop_type_check(other))
 
     def __invert__(self):
-        if isinstance(other, Term) and self.is_bool_expr():
+        if self.is_bool_expr():
             op = Kind.Not
         else:
             op = Kind.BVNot
@@ -592,6 +592,8 @@ class Term(Translatable, ABC):
             return QuantTerm.from_cvc5(cvc5_term)
         elif cvc5_kind == k.CONST_BITVECTOR:
             return BVConst.from_cvc5(cvc5_term)
+        elif cvc5_kind == k.CONST_BOOLEAN:
+            return BoolConst(cvc5_term.getBooleanValue())
         elif cvc5_kind in _OP_KIND_REV_MAPPING:
             return OpTerm.from_cvc5(cvc5_term)
 
@@ -828,6 +830,20 @@ class OpTerm(Term):
         if cvc5_kind not in _OP_KIND_REV_MAPPING:
             raise TypeError("OpTerm cannot be translated from " + str(cvc5_kind))
         kind = Kind.from_cvc5(cvc5_kind)
+        if kind == Kind.BVExtract:
+            op = cvc5_term.getOp()
+            base = Term.from_cvc5(cvc5_term[0])
+            assert op[0].getKind() == pycvc5.Kind.CONST_RATIONAL
+            upper = BVConst(op[0].getIntegerValue(), base.c_bitwidth())
+            assert op[1].getKind() == pycvc5.Kind.CONST_RATIONAL
+            lower = BVConst(op[1].getIntegerValue(), base.c_bitwidth())
+            return OpTerm(kind, (base, upper, lower))
+        if kind in (Kind.BVZeroPad, Kind.BVSignExtend):
+            op = cvc5_term.getOp()
+            base = Term.from_cvc5(cvc5_term[0])
+            assert op[0].getKind() == pycvc5.Kind.CONST_RATIONAL
+            padamt = BVConst(op[0].getIntegerValue(), base.c_bitwidth())
+            return OpTerm(kind, (base, padamt))
         return OpTerm(kind, tuple([Term.from_cvc5(t) for t in cvc5_term]))
 
     def to_target_format(self, tgt: TargetFormat, **kwargs):

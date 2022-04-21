@@ -153,17 +153,22 @@ class IOOracle(OracleInterface):
             repeated = new_inputs in self.i_history
         return new_inputs
 
-    def apply_constraints(self, slv, synthfun):
+    def get_constraints(self, synthfun):
         """
         Applies constraints requiring that the result of calling the function
         on previous inputs matches the correct outputs.
         """
+        constraints = []
         for call in self.calls:
             in_consts = [smt.BVConst(i_value, i_var.c_bitwidth()) for i_var, i_value in zip(self.in_vars, call.inputs)]
             out_const = smt.BVConst(call.output, self.out_width)
             fn_apply = synthfun.to_uf().apply(*in_consts)
-            slv.add_constraint(fn_apply.op_eq(out_const))
+            constraints.append(fn_apply.op_eq(out_const))
+        return constraints
 
+    def apply_constraints(self, slv, synthfun):
+        for constraint in self.get_constraints(synthfun):
+            slv.add_constraint(constraint)
 
 class CorrectnessOracle(OracleInterface):
     """
@@ -196,16 +201,22 @@ class CorrectnessOracle(OracleInterface):
         self.cex_inputs.append(input_vals)
         self.cex_outputs.append(output_val)
 
-    def apply_constraints(self, slv, synthfun):
+    def get_constraints(self, synthfun):
         """
-        Applies constraints requiring that the result of calling the function
-        on previous inputs is not equal to the counterexample output.
+        Constraints requiring that the result of calling the function
+        on previous inputs is equal to the CORRECT output.
         """
+        constraints = []
         for call in self.cexs():
             in_consts = [smt.BVConst(i_value, i_var.c_bitwidth()) for i_var, i_value in zip(self.in_vars, call.inputs)]
             out_const = smt.BVConst(call.output, self.out_width)
             fn_apply = synthfun.to_uf().apply(*in_consts)
-            slv.add_constraint(fn_apply.op_ne(out_const))
+            constraints.append(fn_apply.op_eq(out_const))
+        return constraints
+
+    def apply_constraints(self, slv, synthfun):
+        for constraint in self.get_constraints(synthfun):
+            slv.add_constraint(constraint)
 
 
 # class DistinguishingOracle(OracleInterface):

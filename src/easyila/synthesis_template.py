@@ -48,7 +48,6 @@ class ModelBuilder(ABC):
         submodels = model.get_all_defined_models()
         submodel_map = {m.name: m for m in submodels}
         for (sf_mod, sf_name), g in synthfun_grammars.items():
-            # TODO account for next_ufs
             sf = submodel_map[sf_mod].find_uf_p(sf_name).to_synthfun(g)
             break # TODO generalize for multiple synth funs
         self._uf_mod_name = sf_mod
@@ -193,7 +192,10 @@ class ModelBuilder(ABC):
                     elif atype.is_param():
                         # Add new shadow register
                         # TODO add comments to assumes somehow?
-                        assumes.append(anno.expr.replace_vars(shadow_param_map).op_eq(qp_var))
+                        lhs = atype.expr.replace_vars(shadow_param_map)
+                        if bounds:
+                            lhs = lhs[bounds[0]:bounds[1]]
+                        assumes.append(lhs.op_eq(qp_var))
                     elif atype.is_output():
                         # Assert output
                         # TODO allow for a more coherent mapping from synth funs to outputs
@@ -239,7 +241,10 @@ class ModelBuilder(ABC):
                         # Add new shadow register
                         new_shadow = smt.BVVariable(f"__shadow_{numshadow}", get_width(qp))
                         # TODO add comments to assumes somehow?
-                        s += f"    assume ({anno.expr.replace_vars(shadow_param_map).op_eq(qp_expr).to_verilog_str()});\n"
+                        lhs = anno.expr.replace_vars(shadow_param_map)
+                        if bounds:
+                            lhs = lhs[bounds[0]:bounds[1]]
+                        s += f"    assume ({lhs.op_eq(qp_expr).to_verilog_str()});\n"
                     elif anno.is_output():
                         # Assert output
                         # TODO allow for a more coherent mapping from synth funs to outputs
@@ -442,8 +447,6 @@ class ModelBuilder(ABC):
             io_o.save_call_logs()
 
             self.o_ctx.apply_all_constraints(solver, {"io": sf, "corr": sf})
-            for o_cand in prev_candidates:
-                self.solver.add_constraint(smt.OpTerm(smt.Kind.Distinct, (sf.to_uf(), o_cand)))
             print("Running synthesis...")
             sr = solver.check_synth()
             print("Synthesis done")
@@ -464,8 +467,15 @@ class ModelBuilder(ABC):
                     return self.model.replace_mod_uf_transition(
                         self._uf_mod_name,
                         self._uf_name,
-                        candidate,
+                        candidate.body,
                     )
             else:
                 print("Sorry, no solution found!")
+                print("All constraints:")
+                print("io:")
+                for constraint in io_o.get_constraints(sf):
+                    print(constraint.to_sygus2())
+                print("correctness:")
+                for constraint in corr_o.get_constraints(sf):
+                    print(constraint.to_sygus2())
                 return None

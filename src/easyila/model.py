@@ -561,7 +561,7 @@ class Model:
                 self.instances[i_name] = Instance(new_model, inst.inputs)
                 # A model cannot instantiate itself, so no need to recurse
             else:
-                inst.model._replace_submodules(name, new_model)
+                inst.model._inplace_replace_mod_uf(name, new_model)
 
     def replace_mod_uf_transition(self, mod_name, uf_name, term):
         """

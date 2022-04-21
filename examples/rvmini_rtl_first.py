@@ -52,7 +52,9 @@ class RvMiniModel(ModelBuilder):
 def main():
     v = smt.Variable
     bv32 = smt.BVSort(32)
+    bv12 = smt.BVSort(12)
     a, b = v("io_A", bv32), v("io_B", bv32)
+    short_a, short_b = v("short_A", bv12), v("short_B", bv12)
     io_out = v("io_out", bv32)
 
     picklefile = "rvmini.pickle"
@@ -60,12 +62,17 @@ def main():
         alu = Model(
             "ALUArea",
             inputs=[a, b, v("io_alu_op", smt.BVSort(4))],
+            state=[short_a, short_b],
             outputs=[io_out, v("io_sum", bv32)],
             ufs=[
-                UFPlaceholder("alu_result", bv32, (a, b), False),
+                UFPlaceholder("alu_result", bv32, (short_a, short_b), False),
                 UFPlaceholder("io_sum", bv32, (), False)
             ],
-            logic={io_out: v("alu_result", bv32)}
+            logic={
+                short_a: a[11:0],
+                short_b: b[11:0],
+                io_out: v("alu_result", bv32)
+            }
         )
         assert alu.validate()
         dpath = verilog_to_model(
@@ -115,8 +122,8 @@ def main():
     sketch = ProgramSketch(
         inst_word(0) * (31 * 4),     # @000 496 bytes of 0s
         inst_word(0x13) * 4,        # @496 through 508: nop
-        Inst(a[11:0], SketchValue(0b11000010011, 20)), # @512 addi a2, x0, ???
-        Inst(b[11:0], SketchValue(0b10110010011, 20)), # @516 addi a1, x0, ???
+        Inst(short_a, SketchValue(0b11000010011, 20)), # @512 addi a2, x0, ???
+        Inst(short_b, SketchValue(0b10110010011, 20)), # @516 addi a1, x0, ???
         inst_word(0xc586b3) * 20,   # @520 (and later) add a3, a1, a2
         # a1 is x11, a2 is x12, a3 is x13
         # remember that instructions don't commit until they reach the last stage, making
@@ -159,13 +166,13 @@ def main():
     for sig in ["reset", "lft_tile_pc", "lft_tile_fe_pc", "lft_tile_ew_pc"]:
         guidance.annotate(sig, AnnoType.ASSUME)
     # a1 (shadow var)
-    guidance.annotate("lft_tile_regs_11", {ew_pc_var.op_eq(516): AnnoType.Param(a & 0xFFF)})
+    guidance.annotate("lft_tile_regs_11", {ew_pc_var.op_eq(0x208): AnnoType.ParamIndexed((11, 0), short_a)})
     # a2 (shadow var)
-    guidance.annotate("lft_tile_regs_12", {ew_pc_var.op_eq(520): AnnoType.Param(b & 0xFFF)})
+    guidance.annotate("lft_tile_regs_12", {ew_pc_var.op_eq(0x204): AnnoType.ParamIndexed((11, 0), short_b)})
     # a3 (output)
-    guidance.annotate("lft_tile_regs_13", {ew_pc_var.op_eq(524): AnnoType.OUTPUT})
+    guidance.annotate("lft_tile_regs_13", {ew_pc_var.op_eq(0x20C): AnnoType.OUTPUT})
     guidance.annotate("lft_tile_fe_inst", {
-        (fe_pc_var > 520) & (fe_pc_var < 512): AnnoType.ASSUME,
+        (fe_pc_var > 0x204) | (fe_pc_var < 0x200): AnnoType.ASSUME,
         # For everything except the placeholder instructions, assume the whole inst
         # Otherwise, assume everything but the immediate
         smt.BoolConst.T: AnnoType.AssumeIndexed((19, 0))
@@ -175,23 +182,23 @@ def main():
     guidance.annotate("lft_tile_regFile_io_waddr", AnnoType.ASSUME)
     start = smt.BVVariable("start", 32)
     grammar = smt.Grammar(
-        bound_vars=(a, b),
+        bound_vars=(short_a, short_b),
         nonterminals=(start,),
         terms={start: (
             start + start,
             start - start,
             start | start,
-            start & smt.BVConst(0xFFF, 32),
-            a,
-            b,
+            start[11].ite(smt.BVConst(0xFFFFF000, 32), smt.BVConst(0, 32)),
+            short_a.sext(20),
+            short_b.sext(20),
         ),},
     )
     model = RvMiniModel(
         ProjectConfig(os.path.join(BASEDIR, "symbiyosys"), clock_name="clock"),
         sketch,
         tile,
-        # {("ALUArea", "alu_result"): grammar},
-        {("ALUArea", "alu_result"): None},
+        {("ALUArea", "alu_result"): grammar},
+        # {("ALUArea", "alu_result"): None},
         guidance,
     )
     import faulthandler
