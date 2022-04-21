@@ -1251,8 +1251,8 @@ class LambdaTerm(Term):
             else:
                 cvc5_kind = pycvc5.Kind.LAMBDA
                 # TODO this needs to be tested
-                vlist = cvc5_ctx.solver.mkTerm(pycvc5.Kind.VARIABLE_LIST, [p.to_cvc5(cvc5_ctx) for p in self.params])
-                t = cvc5_ctx.solver.mkTerm(cvc5_kind, vlist, [self.body.to_cvc5(cvc5_ctx)])
+                vlist = cvc5_ctx.solver.mkTerm(pycvc5.Kind.VARIABLE_LIST, *[p.to_cvc5(cvc5_ctx) for p in self.params])
+                t = cvc5_ctx.solver.mkTerm(cvc5_kind, vlist, self.body.to_cvc5(cvc5_ctx))
                 cvc5_ctx.terms[self] = t
                 return t
         elif tgt in (TargetFormat.SYGUS2, TargetFormat.UCLID):
