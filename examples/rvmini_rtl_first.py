@@ -15,18 +15,14 @@ import easyila.lynth.smt as smt
 from easyila.model import *
 from easyila.verilog import *
 
-REPO_BASE_DIR = "/home/jhshi/research/hwlifting/"
-"""
-subprocess.run(
+REPO_BASE_DIR = subprocess.run(
     "git rev-parse --show-toplevel",
     shell=True,
     capture_output=True,
     check=True
 ).stdout.decode("utf-8").strip()
-"""
 
-BASEDIR = os.path.join(REPO_BASE_DIR, "processors/riscv-mini/")
-
+BASEDIR = os.path.join(REPO_BASE_DIR, "designs/riscv-mini/")
 
 class RvMiniModel(ModelBuilder):
     def build_binary(self):

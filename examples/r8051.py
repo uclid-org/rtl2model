@@ -7,17 +7,14 @@ from easyila.sketch import *
 import easyila.gen_config as gen_config
 import easyila.lynth.smt as smt
 
-REPO_BASE_DIR = "/home/jhshi/research/hwlifting/"
-"""
-subprocess.run(
+REPO_BASE_DIR = subprocess.run(
     "git rev-parse --show-toplevel",
     shell=True,
     capture_output=True,
     check=True
 ).stdout.decode("utf-8").strip()
-"""
 
-BASEDIR = os.path.join(REPO_BASE_DIR, "processors/R8051/")
+BASEDIR = os.path.join(REPO_BASE_DIR, "designs/R8051/")
 
 class R8051Model(ModelBuilder):
     def build_binary(self):

@@ -21,4 +21,11 @@ https://github.com/PrincetonUniversity/IMDb-Archive/tree/master/tutorials/aes):
 
 import os
 
-BASEDIR = "/home/jhshi/research/hwlifting/processors/tiny_aes"
+REPO_BASE_DIR = subprocess.run(
+    "git rev-parse --show-toplevel",
+    shell=True,
+    capture_output=True,
+    check=True
+).stdout.decode("utf-8").strip()
+
+BASEDIR = os.path.join(REPO_BASE_DIR, "designs/tiny_aes/")
