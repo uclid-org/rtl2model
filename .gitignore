@@ -1,5 +1,6 @@
 # Miscellaneous
 *.swp
+*.pickle
 # pyverilog stuff
 parsetab.py
 parser.out
