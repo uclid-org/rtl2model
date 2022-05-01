@@ -10,6 +10,7 @@ class TestGuidance:
         a_sig = S("Tile", "a", 32)
         a_var = a_sig.to_variable()
         b_var = smt.BVVariable("b", 32)
+        o_var = smt.BVVariable("o", 32)
         signals = [
             S("Tile", "reset", 1),
             pc_sig,
@@ -26,7 +27,7 @@ class TestGuidance:
         guidance.annotate("b", {
             pc_sig.to_variable().op_eq(6): AnnoType.ASSUME,
             pc_sig.to_variable().op_eq(7): AnnoType.Param(b_var),
-            pc_sig.to_variable().op_eq(8): AnnoType.OUTPUT,
+            pc_sig.to_variable().op_eq(8): AnnoType.Output(o_var),
             smt.BoolConst.T: AnnoType.ASSUME,
         })
         assert guidance.get_annotation_at("a", 4) is None
@@ -35,7 +36,7 @@ class TestGuidance:
             smt.BoolConst.T: AnnoType.DONT_CARE,
         }
         assert guidance.get_outputs() == {
-            ("Tile->b", pc_sig.to_variable().op_eq(8))
+            (o_var, "Tile->b", pc_sig.to_variable().op_eq(8))
         }
 
     def test_output_annotations(self):
@@ -47,10 +48,12 @@ class TestGuidance:
             S("Tile", "c", 32),
         ]
         guidance = Guidance(signals, 10)
-        guidance.annotate("b", {8: AnnoType.OUTPUT})
-        guidance.annotate("c", {9: AnnoType.OUTPUT})
+        b_var = smt.BVVariable("b", 32)
+        c_var = smt.BVVariable("c", 32)
+        guidance.annotate("b", {8: AnnoType.Output(b_var)})
+        guidance.annotate("c", {9: AnnoType.Output(c_var)})
         outputs = guidance.get_outputs()
-        assert outputs == {("Tile->b", 8), ("Tile->c", 9)}
+        assert outputs == {(b_var, "Tile->b", 8), (c_var, "Tile->c", 9)}
 
     def test_subscript_annotations(self):
         signals = [
@@ -87,21 +90,22 @@ class TestGuidance:
         a_var = smt.BVVariable("a", 8)
         d0_var = smt.BVVariable("d0", 8)
         d1_var = smt.BVVariable("d1", 8)
+        o_var = smt.BVVariable("o", 32)
         guidance.annotate("a", {3: AnnoType.ASSUME, 7: AnnoType.Param(a_var)})
-        guidance.annotate("b", {8: AnnoType.OUTPUT})
+        guidance.annotate("b", {8: AnnoType.Output(o_var)})
         guidance.annotate("data[0]", {7: AnnoType.Param(d0_var)})
         guidance.annotate("data[3]", {3: AnnoType.Param(d1_var)})
         for cycle in range(guidance.num_cycles):
             for ind, signal in enumerate(guidance.signals):
                 for qp in signal.get_all_qp_instances():
                     atype = guidance.get_annotation_at(qp, cycle)
-                    if atype == AnnoType.DONT_CARE:
+                    if atype.is_dont_care():
                         pass
-                    elif atype == AnnoType.ASSUME:
+                    elif atype.is_assume():
                         found_assumes.add((qp, cycle))
                     elif atype.is_param():
                         found_params.add((qp, cycle))
-                    elif atype == AnnoType.OUTPUT:
+                    elif atype.is_output():
                         found_outputs.add((qp, cycle))
                     else:
                         raise TypeError("invalid AnnoType: " + str(atype))

@@ -5,7 +5,7 @@ Facilities for generating a low-level program sketch.
 """
 
 from dataclasses import dataclass
-from typing import Dict, Tuple, Union, Optional
+from typing import Dict, List, Tuple, Union, Optional
 
 import easyila.lynth.smt as smt
 
@@ -133,6 +133,14 @@ class ProgramSketch:
             else:
                 insts.append(a)
         self.insts = tuple(insts)
+
+    def get_hole_vars(self) -> List[smt.Variable]:
+        hole_vars = []
+        for inst in self.insts:
+            for field in inst.value:
+                if isinstance(field, SketchHole):
+                    hole_vars.extend(field.expr.get_vars())
+        return list(set(hole_vars))
 
     def fill(self, mappings: Optional[Dict[str, int]]=None) -> ConcreteProgram:
         new_insts = []

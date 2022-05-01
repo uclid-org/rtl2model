@@ -680,7 +680,7 @@ class Variable(Term):
         return self
 
     def eval(self, values):
-        assert self.name in values, f"could not evaluate variable {self.name} from mapping {values}"
+        assert self.name in values, f"could not evaluate variable '{self.name}' from mapping {values}"
         if self.is_bv_expr():
             return BVConst(values[self.name], self.c_bitwidth())
         elif self.is_bool_expr():

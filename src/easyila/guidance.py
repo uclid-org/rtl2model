@@ -31,9 +31,9 @@ class AnnoType:
         elif self.val == 1:
             return "ASSUME"
         elif self.val == 2:
-            return f"Param({self.var})"
+            return f"Param({self.expr}, {self.bounds})"
         elif self.val == 3:
-            return "OUTPUT"
+            return f"Output({self.expr}, {self.bounds})"
         else:
             raise TypeError(f"invalid AnnoType with val {self.val}")
 
@@ -62,16 +62,16 @@ AnnoType.Param = lambda v: AnnoType(2, expr=v)
 """This signal represents a synthesis function parameter."""
 AnnoType.ParamIndexed = lambda b, v: AnnoType(2, b, v)
 
-AnnoType.OUTPUT = AnnoType(3)
+AnnoType.Output = lambda v: AnnoType(3, expr=v)
 """This signal represents a function output."""
-AnnoType.OutputIndexed = lambda b: AnnoType(3, b)
+AnnoType.OutputIndexed = lambda b, v: AnnoType(3, b, v)
 
 
 class Guidance:
     """
     Allows the user to provide guidance for whether or not a value at a particular clock cycle
     is `DONT_CARE` ("Don't Care"), `ASSUME` ("Assumed" to be the value read during simulation),
-    `Param` ("Parameter" of a synthesis function), or `OUTPUT` ("Output" of the synthesis function).
+    `Param` ("Parameter" of a synthesis function), or `Output` ("Output" of the synthesis function).
     """
 
     def __init__(self, signals, num_cycles: int):
@@ -155,11 +155,12 @@ class Guidance:
         else:
             return {}
 
-    def get_outputs(self) -> Set[Tuple[str, Union[int, smt.Term]]]:
+    def get_outputs(self) -> Set[Tuple[smt.Variable, str, Union[int, smt.Term]]]:
         """
-        Returns (signal name | condition, cycle number) pairs representing all annotated outputs.
+        Returns (output ref, signal name | condition, cycle number) pairs
+        representing all annotated outputs.
         """
         outputs = set()
         for signal, cycles in self._guide_dict.items():
-            outputs.update({(signal, n) for n in cycles if cycles[n] == AnnoType.OUTPUT})
+            outputs.update({(cycles[n].expr, signal, n) for n in cycles if cycles[n].is_output()})
         return outputs

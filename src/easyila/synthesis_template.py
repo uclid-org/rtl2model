@@ -9,7 +9,7 @@ import textwrap
 from typing import List
 
 from easyila.common import *
-from easyila.guidance import Guidance, AnnoType
+from easyila.guidance import Guidance
 from easyila.lynth import smt
 from easyila.sketch import ConcreteProgram, ProgramSketch
 from easyila.model import *
@@ -45,15 +45,16 @@ class ModelBuilder(ABC):
         self.config = config
         self.sketch = sketch
         self.model = model
-        submodels = model.get_all_defined_models()
-        submodel_map = {m.name: m for m in submodels}
-        for (sf_mod, sf_name), g in synthfun_grammars.items():
-            sf = submodel_map[sf_mod].find_uf_p(sf_name).to_synthfun(g)
-            break # TODO generalize for multiple synth funs
+        # submodels = model.get_all_defined_models()
+        # submodel_map = {m.name: m for m in submodels}
+        # for (sf_mod, sf_name), g in synthfun_grammars.items():
+        #     sf = submodel_map[sf_mod].find_uf_p(sf_name).to_synthfun(g)
+        #     break # TODO generalize for multiple synth funs
         self._uf_mod_name = sf_mod
         self._uf_name = sf_name
-        solver = sf.new_solver()
-        self.input_vars = list(sf.bound_vars)
+        # solver = sf.new_solver()
+        # self.input_vars = list(sf.bound_vars)
+        self.input_vars = sketch.get_hole_vars()
         self.output_width = sf.return_sort.bitwidth
         self.guidance = guidance
         self.o_ctx = oi.OracleCtx(solver)
@@ -117,7 +118,8 @@ class ModelBuilder(ABC):
                 return qp[i+2:] # i is location of -, need to cut off after >
             except ValueError:
                 return qp
-        for signame, cond_or_cycle in output_sigs:
+        # TODO read sf_ref
+        for _sf_ref, signame, cond_or_cycle in output_sigs:
             # TODO less hacky way to do this
             if isinstance(cond_or_cycle, smt.Term):
                 # TODO sample each signal exactly once,
@@ -318,7 +320,7 @@ class ModelBuilder(ABC):
         )
         out_annos = self.guidance.get_outputs()
         assert len(out_annos) == 1, "multiple output annotations found"
-        sig_name, cc_or_pred = list(out_annos)[0]
+        _sf_ref, sig_name, cc_or_pred = list(out_annos)[0]
         if isinstance(cc_or_pred, smt.Term):
             cond = cc_or_pred
             all_vars = cond.get_vars()
