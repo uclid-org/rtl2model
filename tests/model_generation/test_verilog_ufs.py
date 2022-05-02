@@ -60,7 +60,7 @@ class TestVerilogUfs:
                     b_p1: b + 1,
                     result: (~a) | (~b)
                 },
-                default_next={b: should_inc.ite(b_p1, b)},
+                transition={b: should_inc.ite(b_p1, b)},
             )
         model_no_b = verilog_to_model(rtl, "top", important_signals=["should_inc", "a", "a_p1", "result"])
         assert model_no_b.validate()
@@ -77,7 +77,7 @@ class TestVerilogUfs:
                     a_p1: a + 1,
                     result: (~a) | (~b)
                 },
-                default_next={a: should_inc.ite(a_p1, a)},
+                transition={a: should_inc.ite(a_p1, a)},
             )
 
     def test_verilog_single_imp_uf_coi_logic(self):
@@ -132,7 +132,7 @@ class TestVerilogUfs:
                     b_p1: b + 1,
                     result: (~a) | (~b)
                 },
-                default_next={b: should_inc.ite(b_p1, b)},
+                transition={b: should_inc.ite(b_p1, b)},
             )
         model_no_b = verilog_to_model(
             rtl,
@@ -154,7 +154,7 @@ class TestVerilogUfs:
                     a_p1: a + 1,
                     result: (~a) | (~b)
                 },
-                default_next={a: should_inc.ite(a_p1, a)},
+                transition={a: should_inc.ite(a_p1, a)},
             )
 
     def test_verilog_single_imp_uf_coi_temporal_state(self):
@@ -253,7 +253,7 @@ class TestVerilogUfs:
             # Even though `b_p1` isn't specified as important, it's still in the COI
             state=[b, b_p1],
             logic={b_p1: b + 1},
-            default_next={b: should_inc.ite(b_p1, b)},
+            transition={b: should_inc.ite(b_p1, b)},
         )
         assert model_no_b.validate()
         assert model_no_b == Model(
@@ -263,7 +263,7 @@ class TestVerilogUfs:
             # Even though `a_p1` isn't specified as important, it's still in the COI
             state=[a, a_p1],
             logic={a_p1: a + 1},
-            default_next={a: should_inc.ite(a_p1, a)},
+            transition={a: should_inc.ite(a_p1, a)},
         )
 
     @pytest.mark.skip()
@@ -324,7 +324,7 @@ class TestVerilogUfs:
             outputs=[o],
             state=[state],
             logic={o: state ^ smt.BVConst(0b1111, 4)},
-            default_next={state: value + 1},
+            transition={state: value + 1},
         )
         exp_inner1 = Model(
             "inner1",
@@ -333,7 +333,7 @@ class TestVerilogUfs:
             state=[state, inner_s],
             instances={"inst": Instance(exp_inner2, {value: value})},
             logic={inner_s: bvar("inst.o", 4), o: state | smt.BVConst(0b0110, 4)},
-            default_next={state: inner_s ^ value},
+            transition={state: inner_s ^ value},
         )
         exp_top = Model(
             "top",
@@ -342,7 +342,7 @@ class TestVerilogUfs:
             state=[state, inner_s],
             instances={"inst": Instance(exp_inner1, {value: state})},
             logic={inner_s: bvar("inst.o", 4), o: inner_s},
-            default_next={state: inner_s & value}
+            transition={state: inner_s & value}
         )
         assert exp_inner2.validate()
         assert exp_inner1.validate()

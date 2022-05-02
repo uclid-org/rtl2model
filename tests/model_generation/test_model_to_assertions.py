@@ -29,7 +29,7 @@ class TestModelToAssertions:
                 o: s0 + 2,
                 s0: s1 & a,
             },
-            default_next={
+            transition={
                 s1: b.op_eq(1).ite(s1 + 1, s1),
             }
         )
@@ -83,7 +83,7 @@ class TestModelToAssertions:
             logic={
                 o: v("s0", bv3) + v("s2", bv3)
             },
-            default_next={
+            transition={
                 s1: b.op_eq(v("s3", bv3)).ite(s1 + 1, s1),
             },
             ufs=[
@@ -145,7 +145,7 @@ class TestModelToAssertions:
             outputs=[o],
             state=[s1],
             logic={o: s1 + 1},
-            default_next={s1: a + b},
+            transition={s1: a + b},
         )
         top = Model(
             "top",
@@ -154,7 +154,7 @@ class TestModelToAssertions:
             state=[s1],
             instances={"sub": Instance(sub, {a: a, b: s1})},
             logic={o: v("sub.o", bv3)},
-            default_next={s1: a + b},
+            transition={s1: a + b},
         )
         base_a = a.add_prefix(BASE_PREFIX)
         base_b = b.add_prefix(BASE_PREFIX)

@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import os
 import random
 from subprocess import Popen, PIPE
-from typing import Any, Dict, Callable, Iterator, List, Union, Optional, Tuple
+from typing import Any, Dict, Callable, Iterator, Iterable, List, Union, Optional, Tuple
 
 import easyila.lynth.smt as smt
 
@@ -14,7 +14,18 @@ class CallResult:
     outputs: Any
 
     def to_tuple(self):
-        return (*list(self.inputs), *list(self.outputs))
+        if isinstance(self.inputs, Dict):
+            i_list = list(self.inputs.values())
+        elif isinstance(self.inputs, Iterable):
+            i_list = list(self.inputs)
+        else:
+            i_list = [self.inputs]
+        if isinstance(self.outputs, Dict):
+            return (*i_list, *list(self.outputs.values()))
+        elif isinstance(self.outputs, Iterable):
+            return (*i_list, *list(self.outputs))
+        else:
+            return (*i_list, self.outputs)
 
     def __str__(self):
         if isinstance(self.inputs, List):
@@ -73,7 +84,7 @@ class OracleInterface(ABC):
             raise Exception("oracle function must be callable or path to external binary, instead was " + str(type(oracle)))
         self.name = name
         self.replay_inputs = replay_inputs
-        self._replay_iter: Optional[Iterator[Tuple[int, ...]]]
+        self._replay_iter: Optional[Iterator[Dict[str, int]]]
         if replay_inputs:
             self._replay_iter = iter(replay_inputs)
         else:
@@ -91,22 +102,21 @@ class OracleInterface(ABC):
         else:
             return None
 
-    def invoke(self, args):
+    def invoke(self, args: Dict[str, int]):
         # args is a mapping of smt var name -> value
+        assert isinstance(args, Dict), args
+        assert isinstance(list(args.keys())[0], str), args
+        assert isinstance(list(args.values())[0], int), args
         if self.is_external_binary:
             process = Popen([self.binpath] + args, stdout=PIPE)
             (output, _) = process.communicate()
         else:
             output = self.lfun(args)
-        output = int(output)
-        if isinstance(args, dict):
-            i_list = list(args.values())
-        else:
-            # HACK: for correctness oracle, args is the function candidate (LambdaTerm)
-            i_list = args
-        self.i_history.append(i_list)
-        self.o_history.append(output)
-        return CallResult(i_list, output)
+        i_map = {v: args[v.name] for v in self.in_vars}
+        o_map = {v: output[v.name] for v in self.out_vars}
+        self.i_history.append(i_map)
+        self.o_history.append(o_map)
+        return CallResult(args, o_map)
 
     @abstractmethod
     def apply_constraints(self, slv, fun):
@@ -132,7 +142,7 @@ class IOOracle(OracleInterface):
         out_vars: List[smt.Variable],
         oracle: Union[Callable, str],
         *,
-        replay_inputs: Optional[List[Tuple[int, ...]]]=None,
+        replay_inputs: Optional[List[Dict[str, int]]]=None,
         log_path: Optional[str]=None,
         seed: Optional[int]=None,
     ):
@@ -146,7 +156,7 @@ class IOOracle(OracleInterface):
         inputs = []
         with open(replay_log_path) as f:
             for l in f.readlines():
-                inputs.append([int(s) for s in l.split()[:-1]])
+                inputs.append({v.name: int(s) for v, s in zip(in_vars, l.split())})
         return IOOracle(name, in_vars, out_vars, oracle, replay_inputs=inputs, log_path=new_log_path)
 
     def new_random_inputs(self):

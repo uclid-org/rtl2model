@@ -43,7 +43,7 @@ class TestManualModel:
                 a_p1: a + 1,
                 var("result", bv3): ~a,
             },
-            default_next={a: should_inc.ite(a_p1, a)},
+            transition={a: should_inc.ite(a_p1, a)},
         )
         assert model.validate()
 
@@ -72,7 +72,7 @@ class TestManualModel:
             state=[s_top],
             outputs=[o_top],
             instances={"sub": Instance(submodule, {a_sub: a_top})},
-            default_next={
+            transition={
                 s_top: smt.Variable("sub.s", bv3)
             },
             logic={
@@ -97,7 +97,7 @@ class TestManualModel:
             inputs=[a],
             outputs=[out],
             state=[state, logic],
-            default_next={state: logic & smt.Variable("uf", bv3)},
+            transition={state: logic & smt.Variable("uf", bv3)},
             logic={logic: a + state_uf_var, out: state + 1},
             ufs=[UFPlaceholder("uf", bv3, (), True)],
             next_ufs=[UFPlaceholder("state_uf", bv3, (), True)],
@@ -130,7 +130,7 @@ class TestManualModel:
                     },
                 )
             },
-            default_next={
+            transition={
                 state: smt.Variable("__logic__top_inst.__next__state", bv3),
             },
             logic={
@@ -181,7 +181,7 @@ class TestManualModel:
                 s2: s0 + 2,
                 s1: s0 & b & v("uf1", bv2) & v("nuf1", bv2),
             },
-            default_next={
+            transition={
                 s0: a + 1,
                 s3: a + 1,
                 s4: a + 1,
@@ -204,7 +204,7 @@ class TestManualModel:
                 o: s2 + v("uf0", bv2) + v("nuf0", bv2),
                 s2: s0 + 2,
             },
-            default_next={
+            transition={
                 s0: a + 1,
                 s3: a + 1,
                 s4: a + 1,
@@ -230,7 +230,7 @@ class TestManualModel:
             outputs=[inner_o],
             state=[unused_s],
             logic={inner_o: smt.BVConst(1, 2)},
-            default_next={unused_s: inner_a},
+            transition={unused_s: inner_a},
         )
         top_o = v("top_o", bv2)
         s0 = v("s0", bv2)

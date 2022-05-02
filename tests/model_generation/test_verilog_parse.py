@@ -62,7 +62,7 @@ class TestVerilogParse:
                     rn_a: a_p1,
                     var("result", bv3): ~a,
                 },
-                default_next={a: should_inc.ite(rn_a, a)},
+                transition={a: should_inc.ite(rn_a, a)},
             )
 
     def test_verilog_always_star(self):
@@ -94,7 +94,7 @@ class TestVerilogParse:
                 inputs=[in_],
                 state=[r0, r1],
                 logic={r1: r1 | in_},
-                default_next={r0: r0 | in_}
+                transition={r0: r0 | in_}
             )
 
     def test_verilog_bv_int_index(self):
@@ -130,7 +130,7 @@ class TestVerilogParse:
             inputs=[rst, i_inner],
             outputs=[boolvar("o_inner")],
             state=[i_state],
-            default_next={
+            transition={
                 i_state: rst.ite(
                     smt.BVConst(0, 3),
                     # The expression i_inner | i_state should implicitly upcast
@@ -176,7 +176,7 @@ class TestVerilogParse:
                     )
                 )
             },
-            default_next={
+            transition={
                 # Encode assigning to a variable bitvector index as shift + mask
                 # op[idx] = bit is equivalent to
                 # op = (op & ~(1 << idx)) | (bit << idx)
@@ -233,7 +233,7 @@ class TestVerilogParse:
                 out: in_[3:2],
                 s0: in_[1:0],
             },
-            default_next={
+            transition={
                 s1[2]: in_[2],
                 s1[1:0]: s0[1:0],
             }
@@ -321,7 +321,7 @@ class TestVerilogParse:
             inputs=[rst, i_inner],
             outputs=[o_inner],
             state=[i_state],
-            default_next={
+            transition={
                 i_state: rst.ite(smt.BoolConst.F, i_inner | i_state)
             },
             logic={o_inner: i_state}
@@ -335,7 +335,7 @@ class TestVerilogParse:
             logic={
                 i_out_next: var("sub.o_inner", boolsort),
             },
-            default_next={i_top_last: i_top, o_top: i_out_next},
+            transition={i_top_last: i_top, o_top: i_out_next},
             instances={"sub": Instance(exp_submodel, {rst: rst, i_inner: i_top_last})},
         )
         assert exp_top.validate()
@@ -402,7 +402,7 @@ class TestVerilogParse:
             logic={
                 i_out_next: var("sub.o_inner", boolsort),
             },
-            default_next={i_top_last: i_top, o_top: i_out_next},
+            transition={i_top_last: i_top, o_top: i_out_next},
             instances={"sub": Instance(inner_def, {rst: rst, i_inner: i_top_last})},
         )
         assert exp_top.validate()
@@ -448,5 +448,5 @@ class TestVerilogParse:
             outputs=[rdata],
             state=[arr],
             logic={rdata: arr[reg]},
-            default_next={arr[reg]: wen.ite(wdata, arr[reg])},
+            transition={arr[reg]: wen.ite(wdata, arr[reg])},
         )

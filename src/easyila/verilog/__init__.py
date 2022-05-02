@@ -451,7 +451,7 @@ def _verilog_model_helper(
         ufs=ufs,
         next_ufs=next_ufs, # TODO populate next_ufs
         logic=logic,
-        default_next=next_updates,
+        transition=next_updates,
         instances=instances,
         init_values={
             # TODO read init values (may require pyverilog editing)

@@ -104,16 +104,19 @@ class TestSMT:
     def test_io_oracle_replay(self, tmpdir):
         random.seed(0)
         log_path = os.path.join(tmpdir, "log")
+        v = smt.Variable
+        bv32 = smt.BVSort(32)
+        a, b, o = v("a", bv32), v("b", bv32), v("o", bv32)
         def dummy_io_fun(_args=None):
-            return random.randint(0, 100)
-        o0 = IOOracle("io0", [32, 32], 32, dummy_io_fun, log_path=log_path)
+            return {"o": random.randint(0, 100)}
+        o0 = IOOracle("io0", [a, b], [o], dummy_io_fun, log_path=log_path)
         callcount = 10
         for _ in range(callcount):
-            o0.invoke([dummy_io_fun(), dummy_io_fun()])
+            o0.invoke({"a": random.randint(0, 100), "b": random.randint(0, 100)})
         expected_inputs = [c.inputs for c in o0.calls]
         assert len(expected_inputs) == 10
         o0.save_call_logs()
-        o1 = IOOracle.from_call_logs("io1", [32, 32], 32, dummy_io_fun, log_path)
+        o1 = IOOracle.from_call_logs("io1", [a, b], [o], dummy_io_fun, log_path)
         for _ in range(callcount):
             o1.invoke(o1.next_replay_input())
         actual_inputs = [c.inputs for c in o1.calls]

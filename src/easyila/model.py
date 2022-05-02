@@ -98,7 +98,7 @@ class Model:
     how do we distinguish between having ILA instructions to execute vs.
     having transitions? for now, just have a default "NEXT" instruction
     """
-    default_next: Instruction               = field(default_factory=dict)
+    transition: Instruction                 = field(default_factory=dict)
     init_values: Dict[str, smt.BVConst]     = field(default_factory=dict)
     assertions: List[smt.Term]              = field(default_factory=list)
     assumptions: List[smt.Term]             = field(default_factory=list)
@@ -116,8 +116,8 @@ class Model:
         assert isinstance(self.logic, dict)
         for _k, t in self.logic.items():
             assert isinstance(t, smt.Term), t
-        assert isinstance(self.default_next, dict)
-        for _k, t in self.default_next.items():
+        assert isinstance(self.transition, dict)
+        for _k, t in self.transition.items():
             assert isinstance(t, smt.Term), t
         assert isinstance(self.instances, dict)
         for i, m in self.instances.items():
@@ -143,7 +143,7 @@ class Model:
             self.next_ufs[:],
             self.instances.copy(),
             self.logic.copy(),
-            self.default_next.copy(),
+            self.transition.copy(),
             self.init_values.copy(),
             self.assertions[:],
             self.assumptions[:],
@@ -152,7 +152,7 @@ class Model:
 
     @property
     def is_stateful(self):
-        return len(self.next_ufs) != 0 or len(self.default_next) != 0
+        return len(self.next_ufs) != 0 or len(self.transition) != 0
 
     def find_uf_p(self, uf_name):
         for uf_p in self.ufs + self.next_ufs:
@@ -234,7 +234,7 @@ class Model:
         # and that inputs + UFs do NOT have declared logic
         logic_and_next = {_get_assignee_name(v) for v in self.logic}
         next_keys = set()
-        names = {_get_assignee_name(v) for v in self.default_next}
+        names = {_get_assignee_name(v) for v in self.transition}
         next_keys.update(names)
         logic_and_next.update(names)
         for v in self.inputs:
@@ -260,7 +260,7 @@ class Model:
         for v, e in self.logic.items():
             if not e.typecheck():
                 report(f"type error in logic for {v} (see above output)")
-        for v, e in self.default_next.items():
+        for v, e in self.transition.items():
             if not e.typecheck():
                 report(f"type error in transition logic for {v} (see above output)")
         return len(errs) == 0
@@ -299,8 +299,8 @@ class Model:
             logic_block = newline + c_newline.join(str(m) + ': ' + str(e) for m, e in self.logic.items())
         else:
             logic_block = ""
-        if len(self.default_next) > 0:
-            next_block = newline + c_newline.join(str(m) + ': ' + str(e) for m, e in self.default_next.items())
+        if len(self.transition) > 0:
+            next_block = newline + c_newline.join(str(m) + ': ' + str(e) for m, e in self.transition.items())
         else:
             next_block = ""
         return textwrap.indent(textwrap.dedent(f"""\
@@ -312,7 +312,7 @@ class Model:
                 next_ufs={next_uf_block}
                 instances={inst_block}
                 logic={logic_block}
-                default_next={next_block}
+                transition={next_block}
             """
         ), ' ' * indent_level)
 
@@ -331,7 +331,7 @@ class Model:
         raise Exception("need to add UF placeholder vars")
         # Generate "__next" temp vars
         next_vars = {}
-        for transitions in self.default_next:
+        for transitions in self.transition:
             for v in transitions:
                 assert isinstance(v, smt.Variable), "uclid translation only works for variable (not array) assignments"
                 next_vars[v] = smt.Variable(v.name + "__next", v.sort)
@@ -365,12 +365,12 @@ class Model:
             "\n".join(f"{lhs.to_uclid(prime_vars=True)} = {fix_var_refs(rhs, prime_vars=True)};" for lhs, rhs in self.logic.items()),
             newline + "    "
         )
-        if len(self.default_next) > 0:
+        if len(self.transition) > 0:
             init_next_s = textwrap.indent(
                 "\n".join(
                     f"{next_vars[lhs].to_uclid()} = {fix_var_refs(rhs)};\n"
                     f"{lhs.to_uclid()} = {next_vars[lhs].to_uclid()};"
-                    for lhs, rhs in self.default_next.items()
+                    for lhs, rhs in self.transition.items()
                 ),
                 newline + "    "
             )
@@ -378,7 +378,7 @@ class Model:
                 "\n".join(
                     f"{next_vars[lhs].to_uclid(prime_vars=True)} = {fix_var_refs(rhs, prime_vars=True)};\n"
                     f"{lhs.to_uclid(prime_vars=True)} = {next_vars[lhs].to_uclid(prime_vars=True)};"
-                    for lhs, rhs in self.default_next.items()
+                    for lhs, rhs in self.transition.items()
                 ),
                 newline + "    "
             )
@@ -461,7 +461,7 @@ class Model:
         # TODO deal with arrays
         next_dict = {
             v: v.add_prefix(STEP_PREFIX)
-            for v in self.outputs + self.state if v in self.default_next
+            for v in self.outputs + self.state if v in self.transition
         }
         # BMC: the approach uclid takes to modeling transitions is
         # on every cycle of simulation is to create a separate set of state vars
@@ -504,7 +504,7 @@ class Model:
         for k, term in self.logic.items():
             # TODO if LHS is an array Select, convert it to an array Store
             s.add_constraint(k.op_eq(term).replace_vars(rhs_replacements))
-        for k, term in self.default_next.items():
+        for k, term in self.transition.items():
             s.add_constraint(k.replace_vars(next_dict).op_eq(term.replace_vars(rhs_replacements)))
         # Add terms for instances
         for inst_name, instance in self.instances.items():
@@ -535,7 +535,7 @@ class Model:
                 break
         state_dict = m.logic
         if not in_curr:
-            state_dict = m.default_next
+            state_dict = m.transition
             for i, uf_p in enumerate(m.next_ufs):
                 if uf_p.name == uf_name:
                     m.next_ufs.pop(i)
@@ -588,13 +588,13 @@ class Model:
         """
         if var in self.logic:
             return self.logic[var]
-        if var in self.default_next:
-            return self.default_next[var]
+        if var in self.transition:
+            return self.transition[var]
         for k, t in self.logic.items():
             if isinstance(k, smt.OpTerm) and \
                 (k.kind == smt.Kind.Select or k.kind == smt.Kind.BVExtract) and k.args[0] == var:
                     return t
-        for k, t in self.default_next.items():
+        for k, t in self.transition.items():
             if isinstance(k, smt.OpTerm) and \
                 (k.kind == smt.Kind.Select or k.kind == smt.Kind.BVExtract) and k.args[0] == var:
                     return t
@@ -686,7 +686,7 @@ class Model:
             elif isinstance(t, smt.OpTerm) and t.kind == smt.Kind.Select:
                 return t.args[0].name
             raise Exception(f"{self.name}: cannot get name for {t}")
-        new_transitions = {v: term for v, term in self.default_next.items() if maybe_name(v) in all_parent_names}
+        new_transitions = {v: term for v, term in self.transition.items() if maybe_name(v) in all_parent_names}
         new_logic = {v: term for v, term in self.logic.items() if maybe_name(v) in all_parent_names}
         return Model(
             self.name,
@@ -694,7 +694,7 @@ class Model:
             outputs=self.outputs,
             state=new_state,
             instances=new_instances,
-            default_next=new_transitions,
+            transition=new_transitions,
             logic=new_logic,
             ufs=new_ufs,
             next_ufs=new_next_ufs,
@@ -708,11 +708,11 @@ class Model:
         """
         # The only state that should remain in the top module is state with clocked udpates
         NEXT_PREFIX = "__next__"
-        new_state = list(self.default_next.keys())
+        new_state = list(self.transition.keys())
         new_inst_name = f"__logic__{self.name}_inst"
         sub_logic = dict(self.logic)
         sub_logic.update({
-            v.add_prefix(NEXT_PREFIX): r for v, r in self.default_next.items()
+            v.add_prefix(NEXT_PREFIX): r for v, r in self.transition.items()
         })
         submodel = Model(
             f"__logic__{self.name}",
@@ -735,7 +735,7 @@ class Model:
             instances={
                 new_inst_name: Instance(submodel, inst_bindings)
             },
-            default_next={
+            transition={
                 s: s.add_prefix(new_inst_name + "." + NEXT_PREFIX)
                 for s in new_state
             },
@@ -774,7 +774,7 @@ class Model:
                 outputs=top.outputs,
                 state=top.state,
                 instances=new_instances,
-                default_next=top.default_next,
+                transition=top.transition,
                 logic=top.logic,
                 next_ufs=top.next_ufs,
                 generated_by=top.generated_by,
@@ -849,8 +849,8 @@ class Model:
                 logic={
                     k: t.replace_vars({split_var: cs_value_t}).optimize() for k, t in self.logic.items()
                 },
-                default_next={
-                    k: t.replace_vars({split_var: cs_value_t}).optimize() for k, t in self.default_next.items()
+                transition={
+                    k: t.replace_vars({split_var: cs_value_t}).optimize() for k, t in self.transition.items()
                 },
                 generated_by=GeneratedBy.CASE_SPLIT,
             )
@@ -880,7 +880,7 @@ class Model:
             ufs=self.ufs,
             instances=instances,
             logic=new_logic,
-            default_next={},
+            transition={},
             generated_by=self.generated_by | GeneratedBy.CASE_SPLIT,
         )
 

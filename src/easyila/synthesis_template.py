@@ -121,11 +121,9 @@ class ModelBuilder(ABC):
         """
         return self.sketch.fill(input_values)
 
-    def sample(self, input_values: Dict[str, int]) -> List[int]:
+    def sample(self, input_values: Dict[str, int]) -> Dict[str, int]:
         """
         Runs a simulation with the provided inputs, and returns sampled output values.
-
-        TODO name outputs instead of just ordering them
         """
         print("Beginning sample")
         tc = self.generate_program(input_values)
@@ -402,7 +400,7 @@ class ModelBuilder(ABC):
                 "io",
                 self.input_vars,
                 self.output_refs,
-                lambda *args: self.sample(*args)[0],
+                lambda *args: self.sample(*args),
                 io_replay_path,
                 new_log_path=io_log_path
             )
@@ -411,7 +409,7 @@ class ModelBuilder(ABC):
                 "io",
                 self.input_vars,
                 self.output_refs,
-                lambda *args: self.sample(*args)[0],
+                lambda *args: self.sample(*args),
                 log_path=io_log_path
             )
         self.o_ctx.add_oracle(io)
