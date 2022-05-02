@@ -9,10 +9,13 @@ The following pieces of software are used:
 
 #### Python packages
 - [cvc5 1.0.0](https://cvc5.github.io/) (`pip3 install cvc5`)
-- `pytest` (`pip3 install pytest`)
+- [optional] `pytest` (`pip3 install pytest`)
+- [optional] `pdoc` (`pip3 install pdoc`)
 This project also uses custom forks of some packages to implement bugfixes and performance improvements.
 Run `git submodule init --update --recursive` to get the source code for those forks.
 - custom build of [pyverilog](https://github.com/PyHDI/Pyverilog/) (`pip3 install -e ./Pyverilog`)
 - custom build of [pyvcd](https://github.com/westerndigitalcorporation/pyvcd) (`pip3 install -e ./pyvcd`)
 
 Finally, run `pip3 install -e .` in this directory to install the `easyila` package. You can then run examples with `python3 examples/rvmini.py`.
+
+To build documentation, run `pdoc easyila`.

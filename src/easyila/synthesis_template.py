@@ -26,11 +26,26 @@ class ProjectConfig:
         os.makedirs(self.sby_dir, exist_ok=True)
 
 class ModelBuilder(ABC):
+    """
+    An abstract class used to perform synthesis to fill in holes in a partial `Model` object.
+
+    Implement to `build_binary` and `simulate_and_read_signals` to allow usage of I/O examples
+    during synthesis.
+    """
+
     config: ProjectConfig
     sketch: ProgramSketch
     model: Model
     input_vars: List[smt.Variable]
-    output_width: int
+    output_refs: List[smt.Variable]
+    """
+    A list of function references (encoded as SMT variables) whose outputs are checked
+    against a particular RTL signal.
+
+    Note that not every single synthesis function will have its output checked directly.
+    """
+    sf_map: Dict[Tuple[str, str], smt.SynthFun]
+    """Maps pairs of `(MODEL_NAME, FUNCTION_NAME)` to `SynthFun` objects."""
     guidance: Guidance
     o_ctx: oi.OracleCtx
 
@@ -42,20 +57,30 @@ class ModelBuilder(ABC):
         synthfun_grammars: Dict[Tuple[str, str], Optional[smt.Grammar]],
         guidance: Guidance
     ):
+        """
+        Initializes a ModelBuilder object, which is used to fill in interpretations
+        for uninterpreted functions.
+
+        :param config: a `ProjectConfig` object that identifies paths to files needed during synthesis.
+        :param sketch: a `ProgramSketch` to verify the model agains.
+        :param synthfun_grammars: a map of `(MODEL_NAME, FUNCTION_NAME)` pairs to an optional `Grammar`.
+            If no grammar is provided for a particular function, then the solver default grammar is used.
+        :param guidance: a `Guidance` object that identifies when to sample signals from RTL simulation.
+        """
         self.config = config
         self.sketch = sketch
         self.model = model
-        # submodels = model.get_all_defined_models()
-        # submodel_map = {m.name: m for m in submodels}
-        # for (sf_mod, sf_name), g in synthfun_grammars.items():
-        #     sf = submodel_map[sf_mod].find_uf_p(sf_name).to_synthfun(g)
-        #     break # TODO generalize for multiple synth funs
-        self._uf_mod_name = sf_mod
-        self._uf_name = sf_name
-        # solver = sf.new_solver()
-        # self.input_vars = list(sf.bound_vars)
+        submodels = model.get_all_defined_models()
+        submodel_map = {m.name: m for m in submodels}
+        synthfuns = {}
+        for (sf_mod, sf_name), g in synthfun_grammars.items():
+            synthfuns[(sf_mod, sf_name)] = (submodel_map[sf_mod].find_uf_p(sf_name).to_synthfun(g))
+        solver = smt.Solver(list(synthfuns.values()))
         self.input_vars = sketch.get_hole_vars()
-        self.output_width = sf.return_sort.bitwidth
+        out_refs = []
+        for out_ref, _, _ in guidance.get_outputs():
+            out_refs.append(out_ref)
+        self.output_refs = out_refs
         self.guidance = guidance
         self.o_ctx = oi.OracleCtx(solver)
 
@@ -376,7 +401,7 @@ class ModelBuilder(ABC):
             io = oi.IOOracle.from_call_logs(
                 "io",
                 self.input_vars,
-                self.output_width,
+                self.output_refs,
                 lambda *args: self.sample(*args)[0],
                 io_replay_path,
                 new_log_path=io_log_path
@@ -385,19 +410,20 @@ class ModelBuilder(ABC):
             io = oi.IOOracle(
                 "io",
                 self.input_vars,
-                self.output_width,
+                self.output_refs,
                 lambda *args: self.sample(*args)[0],
                 log_path=io_log_path
             )
         self.o_ctx.add_oracle(io)
 
     def _add_correctness_oracle(self):
-        corr = oi.CorrectnessOracle("corr", self.input_vars, self.output_width, self.verify)
+        corr = oi.CorrectnessOracle("corr", self.input_vars, self.output_refsh, self.verify)
         self.o_ctx.add_oracle(corr)
 
-    def add_cex(self, input_vals: List[int], out_val: int):
-        print("Adding counterexample: (" + ", ".join(map(str, input_vals)) + f") -> {out_val}")
-        self.o_ctx.oracles["corr"].add_cex(input_vals, out_val)
+    def add_cex(self, input_vals: Dict[smt.Variable, int], output_vals: Dict[smt.Variable, int]):
+        print("Adding counterexample: (" + ", ".join(f"{k}={i}" for k, i in input_vals.items()) + \
+                f") -> " + ", ".join(f"{k}={i}" for k, i in output_vals.items()))
+        self.o_ctx.oracles["corr"].add_cex(input_vals, output_vals)
 
     def main_sygus_loop(self) -> Model:
         # parser = argparse.ArgumentParser(description="Run synthesis loop.")

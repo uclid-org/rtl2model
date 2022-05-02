@@ -59,11 +59,21 @@ AnnoType.AssumeIndexed = lambda b: AnnoType(1, b)
 """The value of this signal should be assumed to match the value during simulation."""
 
 AnnoType.Param = lambda v: AnnoType(2, expr=v)
-"""This signal represents a synthesis function parameter."""
+"""
+This signal represents a synthesis function parameter.
+The program sketch variable or index expression whose value is sampled is specified
+as argument.
+"""
 AnnoType.ParamIndexed = lambda b, v: AnnoType(2, b, v)
 
 AnnoType.Output = lambda v: AnnoType(3, expr=v)
-"""This signal represents a function output."""
+"""
+This signal represents a synthesis function output.
+A variable with the name of the synthesis function whose output is being asserted
+is passed as argument. The path of all variables here is assumed to be of the form
+"MODULE_NAME.FUNCTION_NAME"; if module name is omitted, then the function is assumed
+to exist in the top level module.
+"""
 AnnoType.OutputIndexed = lambda b, v: AnnoType(3, b, v)
 
 

@@ -1,30 +1,36 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-import logging
 import os
 import random
 from subprocess import Popen, PIPE
-import sys
-from typing import Dict, Callable, Iterator, List, Union, Optional, Tuple
+from typing import Any, Dict, Callable, Iterator, List, Union, Optional, Tuple
 
 import easyila.lynth.smt as smt
 
 
 @dataclass
 class CallResult:
-    inputs: List[int]
-    output: int
+    inputs: Any
+    outputs: Any
 
     def to_tuple(self):
-        return (*self.inputs, self.output)
+        return (*list(self.inputs), *list(self.outputs))
 
     def __str__(self):
-        if isinstance(self.output, int):
-            s = "inputs=" + ", ".join(f"{i:#x}" for i in self.inputs)
-            return s + "; output=" + f"{self.output:#x}"
+        if isinstance(self.inputs, List):
+            s = "inputs: " + ", ".join(f"{i:#x}" for i in self.inputs)
+        elif isinstance(self.inputs, Dict):
+            s = "inputs: " + ", ".join(f"{k}={i:#x}" for k, i in self.inputs.items())
         else:
             return str(self.to_tuple())
-
+        if isinstance(self.outputs, int):
+            return s + "; outputs: " + f"{self.outputs:#x}"
+        elif isinstance(self.outputs, List):
+            return s + "; outputs: " + ", ".join(f"{v:#x}" for v in self.outputs)
+        elif isinstance(self.inputs, Dict):
+            return s + "; outputs: " + ", ".join(f"{k}={i:#x}" for k, i in self.outputs.items())
+        else:
+            return str(self.to_tuple())
 
 
 class OracleInterface(ABC):
@@ -123,7 +129,7 @@ class IOOracle(OracleInterface):
         self,
         name: str,
         in_vars: List[smt.Variable],
-        out_width: int,
+        out_vars: List[smt.Variable],
         oracle: Union[Callable, str],
         *,
         replay_inputs: Optional[List[Tuple[int, ...]]]=None,
@@ -132,16 +138,16 @@ class IOOracle(OracleInterface):
     ):
         super().__init__(name, oracle, replay_inputs, log_path)
         self.in_vars = in_vars
-        self.out_width = out_width
+        self.out_vars = out_vars
         self.rng = random.Random(seed)
 
     @staticmethod
-    def from_call_logs(name, in_vars, out_width, oracle, replay_log_path, *, new_log_path=None):
+    def from_call_logs(name, in_vars, out_vars, oracle, replay_log_path, *, new_log_path=None):
         inputs = []
         with open(replay_log_path) as f:
             for l in f.readlines():
                 inputs.append([int(s) for s in l.split()[:-1]])
-        return IOOracle(name, in_vars, out_width, oracle, replay_inputs=inputs, log_path=new_log_path)
+        return IOOracle(name, in_vars, out_vars, oracle, replay_inputs=inputs, log_path=new_log_path)
 
     def new_random_inputs(self):
         """
@@ -159,10 +165,12 @@ class IOOracle(OracleInterface):
         on previous inputs matches the correct outputs.
         """
         constraints = []
+        refs = synthfun.get_refs()
+        # TODO reconcile sketch inputs with synthfun inputs
         for call in self.calls:
-            in_consts = [smt.BVConst(i_value, i_var.c_bitwidth()) for i_var, i_value in zip(self.in_vars, call.inputs)]
-            out_const = smt.BVConst(call.output, self.out_width)
-            fn_apply = synthfun.to_uf().apply(*in_consts)
+            in_consts = [smt.BVConst(i_value, i_var.c_bitwidth()) for i_var, i_value in call.inputs.items()]
+            out_consts = [smt.BVConst(o_value, o_var.c_bitwidth()) for o_var, o_value in call.outputs.items()]
+            # fn_apply = synthfun.to_uf().apply(*in_consts)
             constraints.append(fn_apply.op_eq(out_const))
         return constraints
 
@@ -180,14 +188,14 @@ class CorrectnessOracle(OracleInterface):
         self,
         name: str,
         in_vars: List[smt.Variable],
-        out_width: int,
+        out_vars: List[smt.Variable],
         oracle: Union[Callable, str],
         replay_inputs: Optional[List[Tuple[int, ...]]]=None,
         log_path: Optional[str]=None
     ):
         super().__init__(name, oracle, replay_inputs, log_path)
         self.in_vars = in_vars
-        self.out_width = out_width
+        self.out_vars = out_vars
         self.cex_inputs = []
         self.cex_outputs = []
 
@@ -197,7 +205,7 @@ class CorrectnessOracle(OracleInterface):
         """
         return [CallResult(i, o) for i, o in zip(self.cex_inputs, self.cex_outputs)]
 
-    def add_cex(self, input_vals, output_val):
+    def add_cex(self, input_vals, output_vals):
         self.cex_inputs.append(input_vals)
         self.cex_outputs.append(output_val)
 
