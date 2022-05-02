@@ -58,6 +58,9 @@ class SynthFun:
     def apply(self, *args):
         return self.to_uf().apply(*args)
 
+    def get_ref(self):
+        return Variable(self.name, self.return_sort)
+
     def to_uf(self) -> UFTerm:
         return UFTerm(self.name, self.return_sort, self.bound_vars)
 
@@ -241,6 +244,11 @@ class Solver:
         if self._cvc5_wrapper:
             self._cvc5_wrapper.add_constraint(term)
         return term
+
+    def clear_constraints(self):
+        self.constraints = []
+        if self._cvc5_wrapper:
+            self._cvc5_wrapper.constraints = []
 
     def add_synthfun(self, fn: SynthFun) -> SynthFun:
         self.synthfuns.append(fn)

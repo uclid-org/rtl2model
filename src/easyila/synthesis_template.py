@@ -29,7 +29,7 @@ class ModelBuilder(ABC):
     """
     An abstract class used to perform synthesis to fill in holes in a partial `Model` object.
 
-    Implement to `build_binary` and `simulate_and_read_signals` to allow usage of I/O examples
+    Implement `build_binary` and `simulate_and_read_signals` to allow usage of I/O examples
     during synthesis.
     """
 
@@ -84,6 +84,21 @@ class ModelBuilder(ABC):
         for out_ref, _, _ in guidance.get_outputs():
             out_refs.append(out_ref)
         self.output_refs = out_refs
+        missing = []
+        i_var_set = set(self.input_vars)
+        o_var_set = set(out_refs)
+        for sf in synthfuns.values():
+            # Ensure that all synthfuns and their inputs
+            for p in sf.bound_vars:
+                if p not in i_var_set:
+                    missing.append(f"{sf.name}: input {p} not in guidance inputs")
+            if sf.get_ref() not in o_var_set:
+                missing.append(f"{sf.name}: missing from guidance outputs")
+        if missing:
+            for m in missing:
+                print(m)
+            raise Exception("Some synth fun inputs or outputs were missing (see above).")
+        self.sf_map = synthfuns
         self.guidance = guidance
         self.o_ctx = oi.OracleCtx(solver)
 
@@ -238,9 +253,7 @@ class ModelBuilder(ABC):
                         assumes.append(lhs.op_eq(qp_var))
                     elif atype.is_output():
                         # Assert output
-                        vs = atype.expr.get_vars()
-
-                        asserts.append(func.body.replace_vars(shadow_param_map).op_eq(qp_var))
+                        asserts.append(func_anno(atype, qp_var))
                     else:
                         raise TypeError(f"invalid annotation {atype}")
             ctr_cases.append((itercond, assumes, asserts))
@@ -289,7 +302,7 @@ class ModelBuilder(ABC):
                     elif anno.is_output():
                         # Assert output
                         # TODO allow for a more coherent mapping from synth funs to outputs
-                        s += f"    assert ({func.body.replace_vars(shadow_param_map).op_eq(qp_expr).to_verilog_str()});\n"
+                        s += f"    assert ({func_anno(anno, qp_expr).to_verilog_str()});\n"
                     else:
                         raise TypeError(f"invalid annotation {anno}")
                     s += "end"
@@ -336,7 +349,7 @@ class ModelBuilder(ABC):
             self.add_cex(*self._parse_sby_cex(lines))
         return ok
 
-    def _parse_sby_cex(self, sby_lines) -> Tuple[List[int], int]:
+    def _parse_sby_cex(self, sby_lines) -> Dict[smt.Variable, int]:
         """
         Parses a counterexample from symbiyosys output.
 
@@ -346,7 +359,7 @@ class ModelBuilder(ABC):
         but this adds a significant amount of time to the solver)
         """
         # Assume sby outputs variables in reverse order of declaration
-        # (output is first, then last input, etc.)
+        # (last input is first, etc.)
         in_vals = []
         for line in sby_lines:
             if "Value for anyconst" in line:
@@ -357,24 +370,24 @@ class ModelBuilder(ABC):
             os.path.join(self.config.sby_dir, "corr_taskBMC/engine_0/trace.vcd"),
             top_prefix + self.config.clock_name
         )
+        in_map = dict(zip(self.input_vars, in_vals))
+        out_map = {}
         out_annos = self.guidance.get_outputs()
-        assert len(out_annos) == 1, "multiple output annotations found"
-        _sf_ref, sig_name, cc_or_pred = list(out_annos)[0]
-        if isinstance(cc_or_pred, smt.Term):
-            cond = cc_or_pred
-            all_vars = cond.get_vars()
-            for cc in range(self.guidance.num_cycles):
-                values = {
-                    v.name: vcd_r.get_value_at(top_prefix + v.name, cc)
-                    for v in all_vars
-                }
-                should_sample = cond.eval(values)
-                if should_sample:
-                    out_val = vcd_r.get_value_at(sig_name.replace("->", "."), cc)
-                    break
-        else:
-            out_val = vcd_r.get_value_at(sig_name, cc_or_pred)
-        return in_vals, out_val
+        for sf_ref, sig_name, cc_or_pred in out_annos:
+            if isinstance(cc_or_pred, smt.Term):
+                cond = cc_or_pred
+                all_vars = cond.get_vars()
+                for cc in range(self.guidance.num_cycles):
+                    values = {
+                        v.name: vcd_r.get_value_at(top_prefix + v.name, cc)
+                        for v in all_vars
+                    }
+                    should_sample = cond.eval(values)
+                    if should_sample:
+                        out_map[sf_ref] = vcd_r.get_value_at(sig_name.replace("->", "."), cc)
+            else:
+                out_map[sf_ref] = vcd_r.get_value_at(sig_name, cc_or_pred)
+        return in_map, out_map
 
     def verify(self, funcs: Dict[str, smt.LambdaTerm]):
         # TODO make less hacky
@@ -385,9 +398,9 @@ class ModelBuilder(ABC):
             # self.sample([random.randint(0, 2 ** v.c_bitwidth() - 1) for v in self.input_vars])
         signal_values = self.signal_values
         widths = self.widths
-        return self.run_bmc(signal_values, widths, func)
+        return self.run_bmc(signal_values, widths, funcs)
 
-    def run_proc(self, args: List[str], cwd: str, ok_rcs=(0,)) -> List[str]:
+    def run_proc(self, args: List[str], *, cwd: str, quiet=True, ok_rcs=(0,)) -> List[str]:
         """
         Runs the specified process, printing stdout live.
         Prints stderr and raises an exception if the return code is not in OK_RCS (only 0 by default).
@@ -401,10 +414,13 @@ class ModelBuilder(ABC):
         for stdout_line in iter(process.stdout.readline, b""):
             line = stdout_line.decode("utf-8")[:-1] # strip newline char
             lines.append(line)
-            print(line)
+            if not quiet:
+                print(line)
         process.stdout.close()
         rc = process.wait()
         if rc not in ok_rcs:
+            print("===STDOUT===")
+            print(lines.join("\n"))
             print("===STDERR===")
             print(process.stderr.read().decode("utf-8"))
             raise Exception(f"Process executed with exit code {rc}, see full output above.")
@@ -436,7 +452,7 @@ class ModelBuilder(ABC):
 
     def add_cex(self, input_vals: Dict[smt.Variable, int], output_vals: Dict[smt.Variable, int]):
         print("Adding counterexample: (" + ", ".join(f"{k}={i}" for k, i in input_vals.items()) + \
-                f") -> " + ", ".join(f"{k.name}={i}" for k, i in output_vals.items()))
+                f") -> (" + ", ".join(f"{k.name}={i}" for k, i in output_vals.items()) + ")")
         self.o_ctx.oracles["io"].add_cex(input_vals, output_vals)
 
     def main_sygus_loop(self) -> Model:
@@ -462,8 +478,7 @@ class ModelBuilder(ABC):
         solver = self.solver
         prev_candidates = []
         while True:
-            print("Correctness oracle returned false, please provide more constraints: ")
-            # TODO key on names instead of just by order
+            print("Correctness oracle returned false, synthesizing new candidates")
             io_o = self.o_ctx.oracles["io"]
             replayed_inputs = io_o.next_replay_input()
             if replayed_inputs is not None:
@@ -473,7 +488,7 @@ class ModelBuilder(ABC):
                     print(f"- {v.name} (input {i + 1}):", inputs[i])
             else:
                 if len(io_o.cex_inputs) != 0:
-                    inputs = io_o.cex_inputs[-1]
+                    inputs = tuple(io_o.cex_inputs[-1].values())
                 else:
                     inputs = io_o.new_random_inputs()
                 # inputs = []
@@ -481,31 +496,41 @@ class ModelBuilder(ABC):
                 #     inputs.append(input(f"{v.name} (input {i + 1}): "))
                 # inputs = tuple(inputs)
             # TODO add blocking constraint to prevent sygus from repeating guesses?
-            # TODO do we still need to call this?
             solver.reinit_cvc5()
+            self.build_binary()
             self.o_ctx.call_oracle("io", {v.name: i for v, i in zip(self.input_vars, inputs)})
             io_o.save_call_logs()
 
-            self.o_ctx.apply_all_constraints(solver, {"io": solver.synthfuns, "corr": solver.synthfuns})
+            print(solver.get_sygus2())
+
+            solver.clear_constraints()
+            self.o_ctx.apply_all_constraints(solver, {
+                "io": (self.model, solver.synthfuns), "corr": (self.model, solver.synthfuns)
+            })
             print("Running synthesis...")
             sr = solver.check_synth()
-            print("Synthesis done")
+            print("Synthesis done, candidates are:")
             if sr.is_unsat:
                 candidates = sr.solution
-                print(candidates)
+                for name, cand in candidates.items():
+                    print("   ", name, "=", cand)
                 prev_candidates.append(candidates)
                 cr = self.o_ctx.call_oracle("corr", candidates)
                 # Counterexample is implicitly added by the oracle function
-                is_correct = cr.output
+                is_correct = cr.outputs
                 if is_correct:
                     print("All oracles passed. Found a solution: ")
-                    print(candidate)
+                    for name, cand in candidates.items():
+                        print("   ", name, "=", cand)
                     io_o.save_call_logs()
-                    return self.model.replace_mod_uf_transition(
-                        self._uf_mod_name,
-                        self._uf_name,
-                        candidate.body,
-                    )
+                    model = self.model
+                    for (mod_name, uf_name) in self.sf_map:
+                        model = model.replace_mod_uf_transition(
+                            mod_name,
+                            uf_name,
+                            candidates[uf_name].body,
+                        )
+                    return model
             else:
                 print("No solution found. There is likely a bug in one of the oracles.")
                 print("I/O history:")

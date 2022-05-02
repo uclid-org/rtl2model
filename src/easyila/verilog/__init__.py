@@ -313,16 +313,21 @@ def _verilog_model_helper(
             params = tuple(
                 term_to_smt_var(p, terms, mod_depth) for p in coi[s] if p in important_signal_set
             )
-            # TODO figure out how to determine whether a degree of freedom is needed
-            ufs.append(UFPlaceholder(unqual_s, smt.BVSort(width), params, True))
+            # When the COI matches the dependency graph, a degree of freedom is not needed
+            # Since immediate parents + self are always a subset of the COI, a length comparison suffices
+            free_arg = len(coi[s]) != len(deps.curr_parents[s]) + 1
+            ufs.append(UFPlaceholder(unqual_s, smt.BVSort(width), params, free_arg))
         for s in next_uf_names:
+            # All arguments of next_uf members must either be state or another UF/next_UF, since
+            # they are preserved in order to model cross-cycle relations
+            # Thus, we examine the dependency graph rather than the cone of influence
+            # and no degree of freedom is needed
             width = get_term_width(s, terms)
             unqual_s = ".".join(s.split(".")[mod_depth:])
             params = tuple(
-                term_to_smt_var(p, terms, mod_depth) for p in coi[s] if p in important_signal_set
+                term_to_smt_var(p, terms, mod_depth) for p in deps.next_parents[s]
             )
-            # TODO figure out how to determine whether a degree of freedom is needed
-            next_ufs.append(UFPlaceholder(unqual_s, smt.BVSort(width), params, True))
+            next_ufs.append(UFPlaceholder(unqual_s, smt.BVSort(width), params, False))
     else:
         raise NotImplementedError("unimplemented COIConf " + str(coi_conf))
     # 1.5th pass: traverse AST to get expressions for _rn variables.
@@ -478,9 +483,6 @@ def _verilog_model_helper(
         logic=logic,
         transition=next_updates,
         instances=instances,
-        init_values={
-            # TODO read init values (may require pyverilog editing)
-        },
         generated_by=GeneratedBy.VERILOG_PARSE
     )
 

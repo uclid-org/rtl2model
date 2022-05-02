@@ -102,22 +102,6 @@ class OracleInterface(ABC):
         else:
             return None
 
-    def invoke(self, args: Dict[str, int]):
-        # args is a mapping of smt var name -> value
-        assert isinstance(args, Dict), args
-        assert isinstance(list(args.keys())[0], str), args
-        assert isinstance(list(args.values())[0], int), args
-        if self.is_external_binary:
-            process = Popen([self.binpath] + args, stdout=PIPE)
-            (output, _) = process.communicate()
-        else:
-            output = self.lfun(args)
-        i_map = {v: args[v.name] for v in self.in_vars}
-        o_map = {v: output[v.name] for v in self.out_vars}
-        self.i_history.append(i_map)
-        self.o_history.append(o_map)
-        return CallResult(args, o_map)
-
     @abstractmethod
     def apply_constraints(self, slv, fun):
         """
@@ -161,6 +145,22 @@ class IOOracle(OracleInterface):
                 inputs.append({v.name: int(s) for v, s in zip(in_vars, l.split())})
         return IOOracle(name, in_vars, out_vars, oracle, replay_inputs=inputs, log_path=new_log_path)
 
+    def invoke(self, args: Dict[str, int]):
+        # args is a mapping of smt var name -> value
+        assert isinstance(args, Dict), args
+        assert isinstance(list(args.keys())[0], str), args
+        assert isinstance(list(args.values())[0], int), args
+        if self.is_external_binary:
+            process = Popen([self.binpath] + args, stdout=PIPE)
+            (output, _) = process.communicate()
+        else:
+            output = self.lfun(args)
+        i_map = {v: args[v.name] for v in self.in_vars}
+        o_map = {v: output[v.name] for v in self.out_vars}
+        self.i_history.append(i_map)
+        self.o_history.append(o_map)
+        return CallResult(args, o_map)
+
     def new_random_inputs(self):
         """
         Returns a set of uniformly sampled, new random inputs.
@@ -178,21 +178,29 @@ class IOOracle(OracleInterface):
         return [CallResult(i, o) for i, o in zip(self.cex_inputs, self.cex_outputs)]
 
     def add_cex(self, input_vals, output_vals):
+        self.i_history.append(input_vals)
+        self.o_history.append(output_vals)
         self.cex_inputs.append(input_vals)
-        self.cex_outputs.append(output_val)
+        self.cex_outputs.append(output_vals)
 
-    def apply_constraints(self, slv, synthfuns):
+    def apply_constraints(self, slv, args):
         """
         Applies constraints requiring that the result of calling the function
         on previous inputs matches the correct outputs.
         """
+        model, synthfuns = args
         constraints = []
-        # TODO reconcile sketch inputs with synthfun inputs
         for call in self.calls:
-            in_consts = [smt.BVConst(i_value, i_var.c_bitwidth()) for i_var, i_value in call.inputs.items()]
-            out_consts = [smt.BVConst(o_value, o_var.c_bitwidth()) for o_var, o_value in call.outputs.items()]
-            # fn_apply = synthfun.to_uf().apply(*in_consts)
-            constraints.append(fn_apply.op_eq(out_const))
+            i_var_map = {i_var: smt.BVConst(i_val, i_var.c_bitwidth()) for i_var, i_val in call.inputs.items()}
+            # Constraints: outputs of each synth fun takes on the appropriate value
+            # when inputs correspond to these input values
+            for sf in synthfuns:
+                args = []
+                for v in sf.bound_vars:
+                    args.append(i_var_map[v])
+                o_value = call.outputs[sf.get_ref()]
+                fn_apply = sf.to_uf().apply(*args)
+                constraints.append(fn_apply.op_eq(o_value))
         for constraint in constraints:
             slv.add_constraint(constraint)
 
@@ -215,7 +223,17 @@ class CorrectnessOracle(OracleInterface):
         self.in_vars = in_vars
         self.out_vars = out_vars
 
-    def apply_constraints(self, slv, synthfuns):
+    def invoke(self, args: Dict[str, smt.LambdaTerm]):
+        # args is a mapping of synth fun name -> interpretation
+        if self.is_external_binary:
+            process = Popen([self.binpath] + args, stdout=PIPE)
+            (output, _) = process.communicate()
+        else:
+            output = self.lfun(args)
+        assert isinstance(output, bool), f"corr oracle output must be boolean, instead was {output}"
+        return CallResult(args, output)
+
+    def apply_constraints(self, slv, args):
         """
         The correctness oracle itself applies no constraints.
         Counterexamples are delegated to the I/O oracle.
