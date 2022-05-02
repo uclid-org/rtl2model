@@ -87,12 +87,12 @@ class ModelBuilder(ABC):
         missing = []
         i_var_set = set(self.input_vars)
         o_var_set = set(out_refs)
-        for sf in synthfuns.values():
+        for (mod_name, _), sf in synthfuns.items():
             # Ensure that all synthfuns and their inputs
             for p in sf.bound_vars:
                 if p not in i_var_set:
                     missing.append(f"{sf.name}: input {p} not in guidance inputs")
-            if sf.get_ref() not in o_var_set:
+            if sf.get_ref().add_prefix(mod_name + ".") not in o_var_set:
                 missing.append(f"{sf.name}: missing from guidance outputs")
         if missing:
             for m in missing:
@@ -214,7 +214,7 @@ class ModelBuilder(ABC):
             v = vs[0]
             if atype.bounds:
                 raise NotImplementedError()
-            func = funcs[v.name]
+            func = funcs[v.get_base().name]
             return func.body.replace_vars(shadow_param_map).op_eq(qp_var)
 
         ctr = smt.BVVariable("__lift_cc", ctr_width)
@@ -343,7 +343,12 @@ class ModelBuilder(ABC):
         # TODO it seems like we currently need an empty verilator.config file to be included by Tile.v
         with open(os.path.join(self.config.sby_dir, "Formal.v"), 'w') as f:
             f.write(formalblock)
-        lines = self.run_proc(["sby", "-f", "corr.sby", "taskBMC"], cwd=self.config.sby_dir, ok_rcs=(0, 1, 2))
+        lines = self.run_proc(
+            ["sby", "-f", "corr.sby", "taskBMC"],
+            cwd=self.config.sby_dir,
+            quiet=False,
+            ok_rcs=(0, 1, 2)
+        )
         ok = 'PASS' in lines[-1]
         if not ok:
             self.add_cex(*self._parse_sby_cex(lines))
@@ -501,11 +506,9 @@ class ModelBuilder(ABC):
             self.o_ctx.call_oracle("io", {v.name: i for v, i in zip(self.input_vars, inputs)})
             io_o.save_call_logs()
 
-            print(solver.get_sygus2())
-
             solver.clear_constraints()
             self.o_ctx.apply_all_constraints(solver, {
-                "io": (self.model, solver.synthfuns), "corr": (self.model, solver.synthfuns)
+                "io": (self.model, self.sf_map),
             })
             print("Running synthesis...")
             sr = solver.check_synth()

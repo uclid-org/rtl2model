@@ -656,6 +656,9 @@ class Variable(Term):
     def add_prefix(self, prefix) -> "Variable":
         return Variable(prefix + self.name, self.sort)
 
+    def get_base(self) -> "Variable":
+        return Variable(self.name[self.name.rfind(".") + 1:], self.sort)
+
     @staticmethod
     def from_cvc5(cvc5_term) -> "Variable":
         if cvc5_term.getKind() != pycvc5.Kind.VARIABLE:

@@ -194,11 +194,11 @@ class IOOracle(OracleInterface):
             i_var_map = {i_var: smt.BVConst(i_val, i_var.c_bitwidth()) for i_var, i_val in call.inputs.items()}
             # Constraints: outputs of each synth fun takes on the appropriate value
             # when inputs correspond to these input values
-            for sf in synthfuns:
+            for (mod_name, _), sf in synthfuns.items():
                 args = []
                 for v in sf.bound_vars:
                     args.append(i_var_map[v])
-                o_value = call.outputs[sf.get_ref()]
+                o_value = call.outputs[sf.get_ref().add_prefix(mod_name + ".")]
                 fn_apply = sf.to_uf().apply(*args)
                 constraints.append(fn_apply.op_eq(o_value))
         for constraint in constraints:
