@@ -249,16 +249,27 @@ def _verilog_model_helper(
     next_missing = set()
     # Set of all dependencies {b . exists a <= b}; these become modeled as UFs
     curr_missing = set()
-    for s in important_signals:
-        next_missing.update(deps.next_parents[s])
-        curr_missing.update(deps.curr_parents[s])
-    #     all_missing.update(deps.next_parents[s])
-    #     all_missing.update(deps.curr_parents[s])
-    # all_missing.difference_update(important_signals)
+    # next_missing must recursively contain all parents of signals that are parents of a currently
+    # missing signal so as to properly model cross-cycle relations
+    to_visit = important_signals[:]
+    visited = set()
+    for s in to_visit:
+        if s in visited:
+            continue
+        visited.add(s)
+        to_visit.extend(list(deps.next_parents[s]))
+        to_visit.extend(list(deps.curr_parents[s]))
+        if len(deps.next_parents[s]) != 0:
+            # If this signal has next_parents, then it belongs to next_missing
+            next_missing.add(s)
+            assert len(deps.curr_parents[s]) == 0, f"signal {s} had both next and curr parents"
+        else:
+            curr_missing.add(s)
     next_missing.difference_update(important_signals)
     curr_missing.difference_update(important_signals)
     curr_uf_names = set()
     next_uf_names = set()
+    # Filter out any signals that don't belong to this module
     for s in curr_missing:
         is_curr_scope = scope_prefix(s) == instance_name
         if is_curr_scope and (not inline_renames or not signaltype.isRename(terms[str_to_scope_chain(s)].termtype)):
@@ -357,6 +368,19 @@ def _verilog_model_helper(
     `instance_inputs` maps an instance name to a dict of
     instance port name to parent expression binding.
     """
+    # Preserve all inputs and outputs
+    all_signals_set = set(all_signals)
+    for sc in terms:
+        termtype = terms[sc].termtype
+        is_curr_scope = str(sc[:-1]) == instance_name
+        if not is_curr_scope:
+            continue
+        v = term_to_smt_var(str(sc), terms, mod_depth)
+        if signaltype.isInput(termtype) and str(sc) in all_signals_set:
+            # Ensure this isn't a clock by checking all_signals_set
+            m_inputs.append(v)
+        elif signaltype.isOutput(termtype):
+            m_outputs.append(v)
     for s in important_signals:
         sc = str_to_scope_chain(s)
         not_in_scope = not s.startswith(instance_name + ".")
@@ -369,16 +393,13 @@ def _verilog_model_helper(
         is_curr_scope = str(sc[:-1]) == instance_name
         if not inline_renames or not signaltype.isRename(termtype):
             # Only add signals belonging to this module
-            if s in important_signal_set and is_curr_scope:
-                if signaltype.isInput(termtype):
-                    m_inputs.append(v)
-                elif signaltype.isOutput(termtype):
-                    m_outputs.append(v)
-                else:
-                    m_state.append(v)
+            is_input = signaltype.isInput(termtype)
+            if s in important_signal_set and is_curr_scope \
+                    and not is_input and not signaltype.isOutput(termtype):
+                m_state.append(v)
             # Get expression tree
             # len(sc) == depth + 2 occurs when referencing an instance field
-            if sc in binddict and not signaltype.isInput(termtype) or len(sc) == mod_depth + 2:
+            if sc in binddict and not is_input or len(sc) == mod_depth + 2:
                 parents = binddict[sc]
                 for p in parents:
                     bv_index_assign = False # Special case for b[v] = expr
@@ -421,7 +442,7 @@ def _verilog_model_helper(
                             else:
                                 # Combinatorial logic
                                 logic[assignee] = expr
-                        elif signaltype.isInput(termtype):
+                        elif is_input:
                             # Instance input
                             # mod_depth + 1 removes the instance name from the variable scope
                             # - 1 when indexing because in "top.x.y" at depth 2, we want "x" at index 1
@@ -443,13 +464,17 @@ def _verilog_model_helper(
                 ufs.append(UFPlaceholder(v_name, i_v.sort, (), True))
                 instance_inputs[qual_i_name][i_v] = smt.Variable(v_name, i_v.sort)
         instances[unqual_i_name] = Instance(sub, instance_inputs[qual_i_name])
+    # Remove all UFs that are actually inputs
+    input_names = set(v.name for v in m_inputs)
+    ufs = [uf for uf in ufs if uf.name not in input_names]
+    next_ufs = [uf for uf in next_ufs if uf.name not in input_names]
     return Model(
         mod_name,
         inputs=m_inputs,
         outputs=m_outputs,
         state=m_state,
         ufs=ufs,
-        next_ufs=next_ufs, # TODO populate next_ufs
+        next_ufs=next_ufs,
         logic=logic,
         transition=next_updates,
         instances=instances,

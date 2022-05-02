@@ -150,6 +150,8 @@ class IOOracle(OracleInterface):
         self.in_vars = in_vars
         self.out_vars = out_vars
         self.rng = random.Random(seed)
+        self.cex_inputs = []
+        self.cex_outputs = []
 
     @staticmethod
     def from_call_logs(name, in_vars, out_vars, oracle, replay_log_path, *, new_log_path=None):
@@ -169,23 +171,29 @@ class IOOracle(OracleInterface):
             repeated = new_inputs in self.i_history
         return new_inputs
 
-    def get_constraints(self, synthfun):
+    def cexs(self) -> List[CallResult]:
+        """
+        Returns a list of CallResults representing counterexamples.
+        """
+        return [CallResult(i, o) for i, o in zip(self.cex_inputs, self.cex_outputs)]
+
+    def add_cex(self, input_vals, output_vals):
+        self.cex_inputs.append(input_vals)
+        self.cex_outputs.append(output_val)
+
+    def apply_constraints(self, slv, synthfuns):
         """
         Applies constraints requiring that the result of calling the function
         on previous inputs matches the correct outputs.
         """
         constraints = []
-        refs = synthfun.get_refs()
         # TODO reconcile sketch inputs with synthfun inputs
         for call in self.calls:
             in_consts = [smt.BVConst(i_value, i_var.c_bitwidth()) for i_var, i_value in call.inputs.items()]
             out_consts = [smt.BVConst(o_value, o_var.c_bitwidth()) for o_var, o_value in call.outputs.items()]
             # fn_apply = synthfun.to_uf().apply(*in_consts)
             constraints.append(fn_apply.op_eq(out_const))
-        return constraints
-
-    def apply_constraints(self, slv, synthfun):
-        for constraint in self.get_constraints(synthfun):
+        for constraint in constraints:
             slv.add_constraint(constraint)
 
 class CorrectnessOracle(OracleInterface):
@@ -206,36 +214,13 @@ class CorrectnessOracle(OracleInterface):
         super().__init__(name, oracle, replay_inputs, log_path)
         self.in_vars = in_vars
         self.out_vars = out_vars
-        self.cex_inputs = []
-        self.cex_outputs = []
 
-    def cexs(self) -> List[CallResult]:
+    def apply_constraints(self, slv, synthfuns):
         """
-        Returns a list of CallResults representing counterexamples.
+        The correctness oracle itself applies no constraints.
+        Counterexamples are delegated to the I/O oracle.
         """
-        return [CallResult(i, o) for i, o in zip(self.cex_inputs, self.cex_outputs)]
-
-    def add_cex(self, input_vals, output_vals):
-        self.cex_inputs.append(input_vals)
-        self.cex_outputs.append(output_val)
-
-    def get_constraints(self, synthfun):
-        """
-        Constraints requiring that the result of calling the function
-        on previous inputs is equal to the CORRECT output.
-        """
-        constraints = []
-        for call in self.cexs():
-            in_consts = [smt.BVConst(i_value, i_var.c_bitwidth()) for i_var, i_value in zip(self.in_vars, call.inputs)]
-            out_const = smt.BVConst(call.output, self.out_width)
-            fn_apply = synthfun.to_uf().apply(*in_consts)
-            constraints.append(fn_apply.op_eq(out_const))
-        return constraints
-
-    def apply_constraints(self, slv, synthfun):
-        for constraint in self.get_constraints(synthfun):
-            slv.add_constraint(constraint)
-
+        pass
 
 # class DistinguishingOracle(OracleInterface):
 #     """

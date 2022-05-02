@@ -154,6 +154,10 @@ class Model:
     def is_stateful(self):
         return len(self.next_ufs) != 0 or len(self.transition) != 0
 
+    @property
+    def is_partial(self):
+        return len(self.next_ufs) + len(self.ufs) != 0
+
     def find_uf_p(self, uf_name):
         for uf_p in self.ufs + self.next_ufs:
             if uf_p.name == uf_name:

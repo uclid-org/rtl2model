@@ -74,8 +74,11 @@ class ModelBuilder(ABC):
         submodel_map = {m.name: m for m in submodels}
         synthfuns = {}
         for (sf_mod, sf_name), g in synthfun_grammars.items():
-            synthfuns[(sf_mod, sf_name)] = (submodel_map[sf_mod].find_uf_p(sf_name).to_synthfun(g))
-        solver = smt.Solver(list(synthfuns.values()))
+            maybe_uf = submodel_map[sf_mod].find_uf_p(sf_name)
+            if maybe_uf is None:
+                raise Exception(f"Could not find UF {sf_name} in module {sf_mod}")
+            synthfuns[(sf_mod, sf_name)] = (maybe_uf.to_synthfun(g))
+        solver = smt.Solver(synthfuns=list(synthfuns.values()))
         self.input_vars = sketch.get_hole_vars()
         out_refs = []
         for out_ref, _, _ in guidance.get_outputs():
@@ -133,7 +136,7 @@ class ModelBuilder(ABC):
         self.signal_values = signal_values
         output_sigs = self.guidance.get_outputs()
         sampled_outputs = set()
-        output_vals = []
+        output_vals = {}
         def q2b(qp):
             """Converts qualified signal path ("top->reset") to a base path ("reset")"""
             try:
@@ -141,8 +144,7 @@ class ModelBuilder(ABC):
                 return qp[i+2:] # i is location of -, need to cut off after >
             except ValueError:
                 return qp
-        # TODO read sf_ref
-        for _sf_ref, signame, cond_or_cycle in output_sigs:
+        for sf_ref, signame, cond_or_cycle in output_sigs:
             # TODO less hacky way to do this
             if isinstance(cond_or_cycle, smt.Term):
                 # TODO sample each signal exactly once,
@@ -153,22 +155,22 @@ class ModelBuilder(ABC):
                         sampled_outputs.add(signame)
                         val = signal_values[cc][signame]
                         print(f"Sampled {signame}@{cc}={val}")
-                        output_vals.append(val)
+                        output_vals[sf_ref.name] = val
             else:
                 cc = cond_or_cycle
                 sampled_outputs.add(signame)
                 val = signal_values[cc][signame]
                 print(f"Sampled {signame}@{cc}={val}")
-                output_vals.append(val)
+                output_vals[sf_ref.name] = val
         if len(output_vals) != len(output_sigs):
             raise Exception("Failed to sample signal", sampled_outputs - {t[0] for t in output_sigs})
         return output_vals
 
-    def generate_test_block_verilog(self, signal_values, signal_widths, func: smt.LambdaTerm):
+    def generate_test_block_verilog(self, signal_values, signal_widths, funcs: Dict[str, smt.LambdaTerm]):
         """
         Creates a block of verilog code to check correctness for the function body.
 
-        func is a concrete SMT function object, representing a guess made by the synthesis loop.
+        Each element in funcs is a concrete SMT function object, representing a guess made by the synthesis loop.
         """
         guidance = self.guidance
         clock_name = self.config.clock_name
@@ -186,6 +188,19 @@ class ModelBuilder(ABC):
                 return qp[i+2:] # i is location of -, need to cut off after >
             except ValueError:
                 return qp
+
+        def func_anno(atype, qp_var):
+            """
+            Gets the expression for an output annotation.
+            """
+            assert atype.is_output(), atype
+            vs = atype.expr.get_vars()
+            assert len(vs) == 1, vs
+            v = vs[0]
+            if atype.bounds:
+                raise NotImplementedError()
+            func = funcs[v.name]
+            return func.body.replace_vars(shadow_param_map).op_eq(qp_var)
 
         ctr = smt.BVVariable("__lift_cc", ctr_width)
         ctr_values = [smt.BVConst(i, ctr_width) for i in range(guidance.num_cycles)]
@@ -223,7 +238,8 @@ class ModelBuilder(ABC):
                         assumes.append(lhs.op_eq(qp_var))
                     elif atype.is_output():
                         # Assert output
-                        # TODO allow for a more coherent mapping from synth funs to outputs
+                        vs = atype.expr.get_vars()
+
                         asserts.append(func.body.replace_vars(shadow_param_map).op_eq(qp_var))
                     else:
                         raise TypeError(f"invalid annotation {atype}")
@@ -301,14 +317,14 @@ class ModelBuilder(ABC):
             "\n\n" + textwrap.indent("\n".join(pred_cases_l), "    ") + \
             "\nend"
 
-    def run_bmc(self, signal_values, signal_widths, hypothesis_func: smt.LambdaTerm) -> bool:
+    def run_bmc(self, signal_values, signal_widths, hypothesis_funcs: Dict[str, smt.LambdaTerm]) -> bool:
         """
         Runs BMC (for now, hardcoded to be symbiyosys) and returns true on success.
         """
         formalblock = self.generate_test_block_verilog(
             signal_values,
             signal_widths,
-            hypothesis_func,
+            hypothesis_funcs,
         )
         # print(formalblock)
         # TODO it seems like we currently need an empty verilator.config file to be included by Tile.v
@@ -360,7 +376,7 @@ class ModelBuilder(ABC):
             out_val = vcd_r.get_value_at(sig_name, cc_or_pred)
         return in_vals, out_val
 
-    def verify(self, func: smt.LambdaTerm):
+    def verify(self, funcs: Dict[str, smt.LambdaTerm]):
         # TODO make less hacky
         if not hasattr(self, "signal_values"):
             # Because the signal variable width may not match the width of the ISA-level input
@@ -415,13 +431,13 @@ class ModelBuilder(ABC):
         self.o_ctx.add_oracle(io)
 
     def _add_correctness_oracle(self):
-        corr = oi.CorrectnessOracle("corr", self.input_vars, self.output_refsh, self.verify)
+        corr = oi.CorrectnessOracle("corr", self.input_vars, self.output_refs, self.verify)
         self.o_ctx.add_oracle(corr)
 
     def add_cex(self, input_vals: Dict[smt.Variable, int], output_vals: Dict[smt.Variable, int]):
         print("Adding counterexample: (" + ", ".join(f"{k}={i}" for k, i in input_vals.items()) + \
-                f") -> " + ", ".join(f"{k}={i}" for k, i in output_vals.items()))
-        self.o_ctx.oracles["corr"].add_cex(input_vals, output_vals)
+                f") -> " + ", ".join(f"{k.name}={i}" for k, i in output_vals.items()))
+        self.o_ctx.oracles["io"].add_cex(input_vals, output_vals)
 
     def main_sygus_loop(self) -> Model:
         # parser = argparse.ArgumentParser(description="Run synthesis loop.")
@@ -444,13 +460,11 @@ class ModelBuilder(ABC):
         self._add_io_oracle(io_replay_path=None, io_log_path=None)
         self._add_correctness_oracle()
         solver = self.solver
-        sf = solver.synthfuns[0]
         prev_candidates = []
         while True:
             print("Correctness oracle returned false, please provide more constraints: ")
             # TODO key on names instead of just by order
             io_o = self.o_ctx.oracles["io"]
-            corr_o = self.o_ctx.oracles["corr"]
             replayed_inputs = io_o.next_replay_input()
             if replayed_inputs is not None:
                 inputs = replayed_inputs
@@ -458,8 +472,8 @@ class ModelBuilder(ABC):
                 for i, v in enumerate(sf.bound_vars):
                     print(f"- {v.name} (input {i + 1}):", inputs[i])
             else:
-                if len(corr_o.cex_inputs) != 0:
-                    inputs = corr_o.cex_inputs[-1]
+                if len(io_o.cex_inputs) != 0:
+                    inputs = io_o.cex_inputs[-1]
                 else:
                     inputs = io_o.new_random_inputs()
                 # inputs = []
@@ -472,18 +486,15 @@ class ModelBuilder(ABC):
             self.o_ctx.call_oracle("io", {v.name: i for v, i in zip(self.input_vars, inputs)})
             io_o.save_call_logs()
 
-            self.o_ctx.apply_all_constraints(solver, {"io": sf, "corr": sf})
+            self.o_ctx.apply_all_constraints(solver, {"io": solver.synthfuns, "corr": solver.synthfuns})
             print("Running synthesis...")
             sr = solver.check_synth()
             print("Synthesis done")
             if sr.is_unsat:
-                solution = sr.solution
-                # pycvc5_utils.print_synth_solutions(terms, solution)
-                # TODO generalize for multiple synthfuns
-                candidate = list(solution.values())[0]
-                print(candidate)
-                prev_candidates.append(candidate)
-                cr = self.o_ctx.call_oracle("corr", candidate)
+                candidates = sr.solution
+                print(candidates)
+                prev_candidates.append(candidates)
+                cr = self.o_ctx.call_oracle("corr", candidates)
                 # Counterexample is implicitly added by the oracle function
                 is_correct = cr.output
                 if is_correct:
@@ -496,12 +507,8 @@ class ModelBuilder(ABC):
                         candidate.body,
                     )
             else:
-                print("Sorry, no solution found!")
-                print("All constraints:")
-                print("io:")
-                for constraint in io_o.get_constraints(sf):
-                    print(constraint.to_sygus2())
-                print("correctness:")
-                for constraint in corr_o.get_constraints(sf):
-                    print(constraint.to_sygus2())
+                print("No solution found. There is likely a bug in one of the oracles.")
+                print("I/O history:")
+                for call in io_o.calls:
+                    print(call)
                 return None

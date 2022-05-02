@@ -82,6 +82,7 @@ class Cvc5Ctx:
     terms: Dict[Term, pycvc5.Term]
     grammars: List[pycvc5.Grammar]
     synthfuns: Dict[str, pycvc5.Term]
+    assumes: List[pycvc5.Term]
     constraints: List[pycvc5.Term]
 
     def __post_init__(self):
@@ -133,6 +134,11 @@ class Cvc5Ctx:
             g
         )
 
+    def add_assume(self, assume):
+        assume_term = assume.to_cvc5(self)
+        self.solver.addSygusAssume(assume_term)
+        self.assumes.append(assume_term)
+
     def add_constraint(self, constraint):
         constraint_term = constraint.to_cvc5(self)
         self.solver.addSygusConstraint(constraint_term)
@@ -151,16 +157,19 @@ class Solver:
     sorts: Set[Sort]
     terms: List[Term]
     synthfuns: List[SynthFun]
+    assumes: List[Term]
     constraints: List[Term]
     _cvc5_wrapper: Optional[Cvc5Ctx]
 
-    def __init__(self, variables=None, sorts=None, terms=None, synthfuns=None, constraints=None, backend="cvc5"):
+    def __init__(self, variables=None, sorts=None, terms=None, synthfuns=None,
+                 assumes=None, constraints=None, backend="cvc5"):
         # can't make these default args, since the same instance of a default arg is shared
         # across every call to __init__
         variables = list(variables or [])
         sorts = set(sorts or set())
         terms = list(terms or [])
         synthfuns = list(synthfuns or [])
+        assumes = list(assumes or [])
         constraints = list(constraints or [])
         self.variables = variables
         self.sorts = sorts
@@ -169,6 +178,7 @@ class Solver:
         # The CVC5 wrapper also needs a reference to this list
         self.terms = terms
         self.synthfuns = synthfuns
+        self.assumes = assumes
         self.constraints = constraints
         if backend == "cvc5":
             self.reinit_cvc5()
@@ -182,6 +192,7 @@ class Solver:
             terms={},
             grammars=[],
             synthfuns={},
+            assumes=[],
             constraints=[],
         )
         for v in self.variables:
@@ -192,6 +203,8 @@ class Solver:
             wrapper.add_term(term)
         for sf in self.synthfuns:
             wrapper.add_synthfun(sf)
+        for assume in self.assumes:
+            wrapper.add_assume(assume)
         for constraint in self.constraints:
             wrapper.add_constraint(constraint)
         self._cvc5_wrapper = wrapper
@@ -215,8 +228,15 @@ class Solver:
             self._cvc5_wrapper.add_term(term)
         return term
 
+    def add_assume(self, term: Term) -> Term:
+        assert term.is_bool_expr(), f"SyGuS assume must be boolean; instead got {term}"
+        self.assumes.append(term)
+        if self._cvc5_wrapper:
+            self._cvc5_wrapper.add_assume(term)
+        return term
+
     def add_constraint(self, term: Term) -> Term:
-        assert term.is_bool_expr(), f"Sygus constraint must be boolean; instead got {term}"
+        assert term.is_bool_expr(), f"SyGuS constraint must be boolean; instead got {term}"
         self.constraints.append(term)
         if self._cvc5_wrapper:
             self._cvc5_wrapper.add_constraint(term)
@@ -228,7 +248,7 @@ class Solver:
             self._cvc5_wrapper.add_synthfun(fn)
         return fn
 
-    def check_synth(self):
+    def check_synth(self) -> "SynthResult":
         if self._cvc5_wrapper:
             # TODO choose specific synth functions
             c_slv = self.get_cvc5_solver()
@@ -240,7 +260,7 @@ class Solver:
                 sols = c_slv.getSynthSolutions(list(self._cvc5_wrapper.synthfuns.values()))
                 sf_names = list(self._cvc5_wrapper.synthfuns.keys())
                 return SynthResult(True, {sf_names[i]: LambdaTerm.from_cvc5(t) for i, t in enumerate(sols)})
-        raise NotImplementedError()
+        raise NotImplementedError("CVC5 backend must be initialized to perform synthesis")
 
     def get_cvc5_solver(self):
         """
@@ -270,5 +290,9 @@ class Solver:
 
 @dataclass
 class SynthResult:
+    """The result of a SyGuS call."""
+
     is_unsat: bool
+    """True if the SMT query returned, meaning interpretations for the functions were found."""
     solution: Optional[Dict[str, LambdaTerm]]
+    """A map of function names to lambdas representing their interpretations."""
