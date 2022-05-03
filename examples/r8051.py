@@ -1,6 +1,5 @@
 
 import os
-import pickle
 import subprocess
 
 from easyila.guidance import Guidance, AnnoType
@@ -43,37 +42,28 @@ def main():
     v = smt.Variable
     bv8 = smt.BVSort(8)
     x, y = v("lft_data1", bv8), v("lft_acc", bv8)
+    op = v("lft_cmd0")
 
-    picklefile = "r8051.pickle"
-    if not os.path.isfile(picklefile):
-        core = verilog_to_model(
-            os.path.join(BASEDIR, "full.v"),
-            "r8051",
-            clock_pattern="clk",
-            important_signals=[
-                "rst",
-                "lft_acc",
-                "lft_psw_c",
-                "lft_cmd0",
-                "lft_cmd1",
-                "lft_cmd2",
-                "ram_wr_byte",
-                "lft_data1",
-            ],
-            coi_conf=COIConf.UF_ARGS_COI,
-        )
-        core = core.eliminate_dead_code()
-        core.print()
-        assert core.validate()
-        print("creating pickle")
-        with open(picklefile, "wb") as f:
-            pickle.dump(core, f)
-    else:
-        print("loading pickled")
-        with open(picklefile, "rb") as f:
-            core = pickle.load(f)
-            core.print()
-            assert core.validate()
+    core = verilog_to_model(
+        os.path.join(BASEDIR, "full.v"),
+        "r8051",
+        clock_pattern="clk",
+        important_signals=[
+            "rst",
+            "lft_acc",
+            "lft_psw_c",
+            "lft_cmd0",
+            "lft_cmd1",
+            "lft_cmd2",
+            "ram_wr_byte",
+            "lft_data1",
+        ],
+        coi_conf=COIConf.UF_ARGS_COI,
+        pickle_path="r8051.pickle"
+    )
+    core = core.eliminate_dead_code()
+    core.print()
+    assert core.validate()
 
     # https://www.keil.com/support/man/docs/is51/is51_opcodes.htm
     sketch = ProgramSketch(
@@ -86,17 +76,11 @@ def main():
         inst_byte(0x00),    # NOP
         inst_byte(0x00),
         inst_byte(0x00),
-        inst_byte(0x31),    # ACALL addr11
-        inst_byte(0x31),
-        inst_byte(0x31),
-        inst_byte(0x31),
-        inst_byte(0x31),
-        inst_byte(0x31),
-        inst_byte(0x31)
     )
 
     cycle_count = 10
     pc_sig = S("tb", "lft_pc", 16)
+    pc_var = pc_sig.to_variable()
     SIGNALS = [
         S("tb", "clk", 1),
         S("tb", "rst", 1),
@@ -113,12 +97,12 @@ def main():
     for sig in ("rst", "lft_pc"):
         guidance.annotate(sig, AnnoType.ASSUME)
     guidance.annotate("lft_cmd0", {
-        pc_sig.to_variable().op_eq(3): AnnoType.Param(x),
-        pc_sig.to_variable().op_eq(5): AnnoType.Param(y),
+        pc_var.op_eq(3): AnnoType.Param(x),
+        pc_var.op_eq(5): AnnoType.Param(y),
         smt.BoolConst.T: AnnoType.ASSUME,
     })
     guidance.annotate("lft_acc", {
-        pc_sig.to_variable().op_eq(8): AnnoType.Output(v("r8051.acc", bv8)),
+        pc_var.op_eq(8): AnnoType.Output(v("r8051.acc", bv8)),
         smt.BoolConst.T: AnnoType.ASSUME,
     })
 

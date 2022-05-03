@@ -1,6 +1,5 @@
 
 import os
-import pickle
 import subprocess
 
 from easyila.guidance import Guidance, AnnoType

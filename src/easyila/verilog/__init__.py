@@ -10,6 +10,8 @@ from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum, auto
 import math
+import os
+import pickle
 import re
 import textwrap
 from typing import Dict, List, Optional, Set
@@ -37,67 +39,85 @@ from .vcd_wrapper import VcdWrapper
 
 class COIConf(Enum):
     """
-    Configuration for how to treat cone-of-influence behavior for model generation from Verilog.
+    Configuration for how to treat cone-of-influence (COI) behavior for model generation from Verilog.
     """
 
     NO_COI = auto()
     """
-    No cone-of-influence check is performed. Any non-important signals are omitted entirely, and
-    replaced with 0-arity uninterpreted functions.
+    No COI check is performed. Any non-important signals are omitted entirely, and
+    replaced with 1-arity uninterpreted functions.
     """
 
     KEEP_COI = auto()
     """
-    Any signals found to be within the cone-of-influence of an important signal (i.e. the parent
+    Any signals found to be within the COI of an important signal (i.e. the parent
     of an important signal in the dataflow graph) is kept in the resulting model.
     """
 
     UF_ARGS_COI = auto()
     """
-    Signals found to be within the cone-of-influence of an important signal are replaced with
+    Signals found to be within the COI of an important signal are replaced with
     uninterpreted functions, but the important signals that are its parents in the dependency
-    graph are kept as arguments to them.
-
-    TODO just list vars instead of making them args?
+    graph are kept as arguments to them. If for a signal `s`, the only signals in the COI are
+    `s` itself and `s`'s immediate parents, then no free argument is necessary.
     """
 
 def verilog_to_model(
-    verilog_file: str,
+    verilog_path: str,
     top_name: str,
     clock_pattern: str="clk",
     important_signals: Optional[List[str]]=None,
     coi_conf=COIConf.NO_COI,
     inline_renames=True,
     defined_modules: Optional[List[Model]]=None,
+    pickle_path=None,
 ) -> Model:
     """
     Given a verilog modules and a list of important_signals, returns a list of
     partitions for those signals. The returned value is a Model object.
 
-    If `important_signals` is not specified, or is empty, then all signals in the
-    design are preserved. References to signals that are not not included in
-    `important_signals` are turned into uninterpreted functions
-    TODO with arguments based on their parents in the dependency graph.
+    :param verilog_path: The path to the Verilog file containing all needed modules. If the design
+    is split across multiple RTL files, they should be concatenated into a single file.
 
-    `coi_conf` determines how cone of influence calculations are used (see `COIConf` docstring).
+    :param top_name: The name of the top-level Verilog module to produce a model for.
 
-    If `inline_renames` is `True` (the default), then pyverilog-generated "rename" variables
-    (starting with `_rnN` for some number `N`) are replaced with their corresponding expressions.
+    :param clock_pattern: A regex that matches the name of clocks in the design.
 
-    `defined_modules` optionally provides a list of existing `Model` definitions. If any of those
+    :param important_signals: A list of "important" signals in the design that must be preserved as
+    state variables. If left unspecified or is empty, then all signals in the design are preserved.
+    References to signals that are not not included in `important_signals` are turned into
+    uninterpreted functions with arguments based on their parents in the dependency graph. Note that
+    all module inputs and outputs are preserved no matter what, so as to maintain the same I/O
+    interface.
+
+    :param coi_conf: Determines how cone of influence calculations are used (see `COIConf` docstring).
+
+    :param inline_renames: If `True` (the default), then pyverilog-generated
+    "rename" variables (starting with `_rnN` with some integer `N`) are replaced with their
+    corresponding expressions.
+
+    :param defined_modules: Optionally provides a list of existing `Model` definitions. If any of those
     modules are encountered within this verilog modules, they will be replaced with these definitions
     instead of generating new submodules. Any `Model`s defined as instances of a `Model` in this list
     will also be used.
+
+    :param pickle: If specified, the resulting model will be serialized to this file. If this file
+    already exists, then the model is read from this path instead of re-parsed from Verilog.
 
     PERF NOTE: at a cursory glance, it seems like most of the runtime is spent in yacc within
     pyverilog, so algorithmic improvements here probably won't help that much. Perhaps for
     models of multiple RTL modules, the same VerilogDataflowAnalyzer can be reused?
     """
     # === ARGUMENT PROCESSING ===
+    if pickle_path is not None and os.path.isfile(pickle_path):
+        print("Loading pickled model from", pickle_path)
+        with open(pickle_path, "rb") as f:
+            return pickle.load(f)
+
     if important_signals is None:
         important_signals = []
     preserve_all_signals = len(important_signals) == 0
-    analyzer = VerilogDataflowAnalyzer(verilog_file, top_name, noreorder=True)
+    analyzer = VerilogDataflowAnalyzer(verilog_path, top_name, noreorder=True)
     analyzer.generate()
 
     terms = analyzer.getTerms()
@@ -162,7 +182,7 @@ def verilog_to_model(
             submodules,
             inline_renames
         )
-    return _verilog_model_helper(
+    top_model = _verilog_model_helper(
         top_name,
         top_name,
         terms,
@@ -175,6 +195,12 @@ def verilog_to_model(
         submodules,
         inline_renames,
     )
+    if pickle_path is not None:
+        print("Creating pickle at", pickle_path)
+        with open(pickle_path, "wb") as f:
+            pickle.dump(top_model, f)
+    return top_model
+
 
 def _verilog_model_helper(
     mod_name: str,

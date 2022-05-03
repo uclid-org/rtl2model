@@ -3,7 +3,6 @@ Synthesizes a model for riscv-mini from RTL.
 """
 
 import os
-import pickle
 import subprocess
 import sys
 
@@ -53,55 +52,47 @@ def main():
     short_a, short_b = v("short_A", bv12), v("short_B", bv12)
     io_out = v("io_out", bv32)
 
-    picklefile = "rvmini.pickle"
-    if not os.path.isfile(picklefile):
-        alu = Model(
-            "ALUArea",
-            inputs=[a, b, v("io_alu_op", smt.BVSort(4))],
-            state=[short_a, short_b],
-            outputs=[io_out, v("io_sum", bv32)],
-            ufs=[
-                UFPlaceholder("alu_result", bv32, (short_a, short_b), False),
-                UFPlaceholder("io_sum", bv32, (), False)
-            ],
-            logic={
-                short_a: a[11:0],
-                short_b: b[11:0],
-                io_out: v("alu_result", bv32)
-            }
-        )
-        assert alu.validate()
-        dpath = verilog_to_model(
-            os.path.join(BASEDIR, "full.v"),
-            "Datapath",
-            clock_pattern=".*clock",
-            defined_modules=[alu],
-            # important_signals=[
-            #     "io_lft_dpath__pc",
-            #     "io_lft_dpath__fe_pc",
-            #     "io_lft_dpath__ew_pc",
-            #     "io_lft_dpath__fe_inst",
-            #     "io_lft_dpath__regs_11",
-            #     "io_lft_dpath__regs_12",
-            #     "io_lft_dpath__regs_13",
-            # ],
-            # coi_conf=COIConf.NO_COI,
-        )
-        dpath = dpath.eliminate_dead_code()
-        dpath.validate()
-        tile = verilog_to_model(
-            os.path.join(BASEDIR, "full.v"),
-            "Tile",
-            clock_pattern=".*clock",
-            defined_modules=[dpath],
-        )
-        print("creating pickle")
-        with open(picklefile, "wb") as f:
-            pickle.dump(tile, f)
-    else:
-        print("loading pickled")
-        with open(picklefile, "rb") as f:
-            tile = pickle.load(f)
+    alu = Model(
+        "ALUArea",
+        inputs=[a, b, v("io_alu_op", smt.BVSort(4))],
+        state=[short_a, short_b],
+        outputs=[io_out, v("io_sum", bv32)],
+        ufs=[
+            UFPlaceholder("alu_result", bv32, (short_a, short_b), False),
+            UFPlaceholder("io_sum", bv32, (), False)
+        ],
+        logic={
+            short_a: a[11:0],
+            short_b: b[11:0],
+            io_out: v("alu_result", bv32)
+        }
+    )
+    assert alu.validate()
+    dpath = verilog_to_model(
+        os.path.join(BASEDIR, "full.v"),
+        "Datapath",
+        clock_pattern=".*clock",
+        defined_modules=[alu],
+        # important_signals=[
+        #     "io_lft_dpath__pc",
+        #     "io_lft_dpath__fe_pc",
+        #     "io_lft_dpath__ew_pc",
+        #     "io_lft_dpath__fe_inst",
+        #     "io_lft_dpath__regs_11",
+        #     "io_lft_dpath__regs_12",
+        #     "io_lft_dpath__regs_13",
+        # ],
+        # coi_conf=COIConf.NO_COI,
+    )
+    dpath = dpath.eliminate_dead_code()
+    assert dpath.validate()
+    tile = verilog_to_model(
+        os.path.join(BASEDIR, "full.v"),
+        "Tile",
+        clock_pattern=".*clock",
+        defined_modules=[dpath],
+        pickle_path="rvmini.pickle",
+    )
     # TODO
     # Synthesis loop for filling in UFs:
     # - (user provides oracles, refinement relation)

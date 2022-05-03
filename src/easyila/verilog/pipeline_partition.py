@@ -1,4 +1,7 @@
 """
+## INCOMPLETE -- PLEASE IGNORE THIS FILE
+
+
 Automatically derives pipeline partitions from a verilog design.
 
 For example, consider the following design:

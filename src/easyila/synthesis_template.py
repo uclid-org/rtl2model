@@ -25,6 +25,9 @@ class ProjectConfig:
     def __post_init__(self):
         os.makedirs(self.sby_dir, exist_ok=True)
 
+def _typecheck_arg(v, exp_type):
+    assert isinstance(v, exp_type), f"argument expected {exp_type}, got {type(v)}"
+
 class ModelBuilder(ABC):
     """
     An abstract class used to perform synthesis to fill in holes in a partial `Model` object.
@@ -55,7 +58,7 @@ class ModelBuilder(ABC):
         sketch: ProgramSketch,
         model: Model,
         synthfun_grammars: Dict[Tuple[str, str], Optional[smt.Grammar]],
-        guidance: Guidance
+        guidance: Guidance,
     ):
         """
         Initializes a ModelBuilder object, which is used to fill in interpretations
@@ -67,6 +70,11 @@ class ModelBuilder(ABC):
             If no grammar is provided for a particular function, then the solver default grammar is used.
         :param guidance: a `Guidance` object that identifies when to sample signals from RTL simulation.
         """
+        _typecheck_arg(config, ProjectConfig)
+        _typecheck_arg(sketch, ProgramSketch)
+        _typecheck_arg(model, Model)
+        _typecheck_arg(synthfun_grammars, Dict)
+        _typecheck_arg(guidance, Guidance)
         self.config = config
         self.sketch = sketch
         self.model = model
