@@ -33,7 +33,7 @@ class TestManualModel:
         var = smt.Variable
         a = var("a", bv3)
         a_p1 = var("a_p1", bv3)
-        should_inc = smt.BoolVariable("should_inc")
+        should_inc = smt.bool_variable("should_inc")
         model = Model(
             "top",
             inputs=[should_inc],

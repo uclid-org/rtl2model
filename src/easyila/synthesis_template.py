@@ -217,7 +217,7 @@ class ModelBuilder(ABC):
             func = funcs[v.get_base().name]
             return func.body.replace_vars(shadow_param_map).op_eq(qp_var)
 
-        ctr = smt.BVVariable("__lift_cc", ctr_width)
+        ctr = smt.bv_variable("__lift_cc", ctr_width)
         ctr_values = [smt.BVConst(i, ctr_width) for i in range(guidance.num_cycles)]
         ctr_cases = [] # Each item is a tuple of (iterator condition, assumptions, assertions)
         # Maps input variable to shadow
@@ -231,7 +231,7 @@ class ModelBuilder(ABC):
                 # Iterate over all indices for vectors
                 for qp in signal.get_all_qp_instances():
                     # TODO convert this into an index expression if necessary
-                    qp_var = smt.BVVariable(q2b(qp), get_width(qp))
+                    qp_var = smt.bv_variable(q2b(qp), get_width(qp))
                     atype = guidance.get_annotation_at(qp, stepnum)
                     if atype is None or atype.is_dont_care():
                         continue
@@ -263,7 +263,7 @@ class ModelBuilder(ABC):
             for qp in signal.get_all_qp_instances():
                 first = True
                 # TODO convert this into an index expression if necessary
-                qp_var = smt.BVVariable(q2b(qp), get_width(qp))
+                qp_var = smt.bv_variable(q2b(qp), get_width(qp))
                 for cond, anno in guidance.get_predicated_annotations(qp).items():
                     if anno.is_dont_care():
                         continue
@@ -293,7 +293,7 @@ class ModelBuilder(ABC):
                         s += f"    endcase\n"
                     elif anno.is_param():
                         # Add new shadow register
-                        new_shadow = smt.BVVariable(f"__shadow_{numshadow}", get_width(qp))
+                        new_shadow = smt.bv_variable(f"__shadow_{numshadow}", get_width(qp))
                         # TODO add comments to assumes somehow?
                         lhs = anno.expr.replace_vars(shadow_param_map)
                         if bounds:

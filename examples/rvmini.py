@@ -178,7 +178,7 @@ def main():
     guidance.annotate("lft_tile_regFile_io_raddr1", AnnoType.ASSUME)
     guidance.annotate("lft_tile_regFile_io_raddr2", AnnoType.ASSUME)
     guidance.annotate("lft_tile_regFile_io_waddr", AnnoType.ASSUME)
-    start = smt.BVVariable("start", 32)
+    start = smt.bv_variable("start", 32)
     grammar = smt.Grammar(
         bound_vars=(short_a, short_b),
         nonterminals=(start,),

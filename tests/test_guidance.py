@@ -9,8 +9,8 @@ class TestGuidance:
         pc_sig = S("Tile","pc", 32)
         a_sig = S("Tile", "a", 32)
         a_var = a_sig.to_variable()
-        b_var = smt.BVVariable("b", 32)
-        o_var = smt.BVVariable("o", 32)
+        b_var = smt.bv_variable("b", 32)
+        o_var = smt.bv_variable("o", 32)
         signals = [
             S("Tile", "reset", 1),
             pc_sig,
@@ -48,8 +48,8 @@ class TestGuidance:
             S("Tile", "c", 32),
         ]
         guidance = Guidance(signals, 10)
-        b_var = smt.BVVariable("b", 32)
-        c_var = smt.BVVariable("c", 32)
+        b_var = smt.bv_variable("b", 32)
+        c_var = smt.bv_variable("c", 32)
         guidance.annotate("b", {8: AnnoType.Output(b_var)})
         guidance.annotate("c", {9: AnnoType.Output(c_var)})
         outputs = guidance.get_outputs()
@@ -61,8 +61,8 @@ class TestGuidance:
             S("tb", "clk", 1),
             S("tb", "data", 8, bounds=(0, 7)),
         ]
-        d0 = smt.BVVariable("d0", 8)
-        d1 = smt.BVVariable("d1", 8)
+        d0 = smt.bv_variable("d0", 8)
+        d1 = smt.bv_variable("d1", 8)
         guidance = Guidance(signals, 10)
         guidance.annotate("data[0]", {7: AnnoType.Param(d0)})
         guidance.annotate("data[3]", {3: AnnoType.Param(d1)})
@@ -87,10 +87,10 @@ class TestGuidance:
         found_assumes = set()
         found_outputs = set()
         guidance.annotate("reset", {0: AnnoType.ASSUME})
-        a_var = smt.BVVariable("a", 8)
-        d0_var = smt.BVVariable("d0", 8)
-        d1_var = smt.BVVariable("d1", 8)
-        o_var = smt.BVVariable("o", 32)
+        a_var = smt.bv_variable("a", 8)
+        d0_var = smt.bv_variable("d0", 8)
+        d1_var = smt.bv_variable("d1", 8)
+        o_var = smt.bv_variable("o", 32)
         guidance.annotate("a", {3: AnnoType.ASSUME, 7: AnnoType.Param(a_var)})
         guidance.annotate("b", {8: AnnoType.Output(o_var)})
         guidance.annotate("data[0]", {7: AnnoType.Param(d0_var)})

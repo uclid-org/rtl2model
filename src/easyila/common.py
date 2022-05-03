@@ -31,7 +31,7 @@ class SampledSignal:
         """
         # TODO deal with arrays/bounds
         # and also booleans
-        return smt.BVVariable(self.signal_name, self.width)
+        return smt.bv_variable(self.signal_name, self.width)
 
     def get_qualified_path(self):
         return "->".join(self.hierarchy) + "->" + self.signal_name

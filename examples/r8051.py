@@ -96,16 +96,6 @@ def main():
     )
 
     cycle_count = 10
-    # TODO allow hierarchical specification
-    """
-    SIGNALS = {
-        "tb": {
-            "clk": 1,
-            "rst": 1,
-            etc.
-        }
-    }
-    """
     pc_sig = S("tb", "lft_pc", 16)
     SIGNALS = [
         S("tb", "clk", 1),
@@ -134,24 +124,27 @@ def main():
 
     start = smt.Variable("Start", bv8)
     substart = smt.Variable("BV8", bv8)
-    boolterm = smt.Variable("B", smt.BoolSort())
-    addbv = start + start
-    subbv = start - start
-    orbv = start | start
-    andbool = boolterm & boolterm
-    orbool = boolterm | boolterm
-    xorbool = boolterm ^ boolterm
-    notbool = ~boolterm
-    impliesbool = boolterm.implies(boolterm)
-    itebv = boolterm.ite(substart, substart)
+    boolterm = smt.bool_variable("B")
     grammar = smt.Grammar(
         (x, y),
         (start, boolterm, substart),
         # Order of these terms matters
         # Python dicts preserve insertion/declaration order
         {
-            start: (addbv, subbv, orbv, itebv),
-            boolterm: (andbool, orbool, notbool, impliesbool, xorbool, smt.BoolConst.T),
+            start: (
+                start + start,
+                start - start,
+                start | start,
+                boolterm.ite(substart, substart),
+            ),
+            boolterm: (
+                boolterm & boolterm,
+                boolterm | boolterm,
+                ~boolterm,
+                boolterm.implies(boolterm),
+                boolterm ^ boolterm,
+                smt.BoolConst.T,
+            ),
             substart: (x, y),
         }
     )
@@ -163,11 +156,9 @@ def main():
         {("r8051", "acc"): grammar},
         guidance,
     )
-    # model.build_binary()
     import faulthandler
     faulthandler.enable()
     model.main_sygus_loop()
 
 if __name__ == "__main__":
     main()
-

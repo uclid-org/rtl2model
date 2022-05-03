@@ -712,10 +712,10 @@ class Variable(Term):
         raise NotImplementedError("cannot convert Variable to " + str(tgt))
 
 
-BoolVariable = lambda s, **kwargs: Variable(s, BoolSort(), **kwargs)
+bool_variable = lambda s, **kwargs: Variable(s, BoolSort(), **kwargs)
 """Constructs a variable of boolean sort with the given name."""
 
-BVVariable = lambda s, w, **kwargs: Variable(s, BVSort(w), **kwargs)
+bv_variable = lambda s, w, **kwargs: Variable(s, BVSort(w), **kwargs)
 """Constructs a variable of a bitvector sort with the given name and width."""
 
 

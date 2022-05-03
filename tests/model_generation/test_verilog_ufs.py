@@ -313,7 +313,7 @@ class TestVerilogUfs:
                 assign o = inner_s;
             endmodule
             """)
-        bvar = smt.BVVariable
+        bvar = smt.bv_variable
         value = bvar("value", 4)
         o = bvar("o", 4)
         state = bvar("state", 4)

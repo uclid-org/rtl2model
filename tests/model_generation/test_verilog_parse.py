@@ -50,7 +50,7 @@ class TestVerilogParse:
         a = var("a", bv3)
         rn_a = var("_rn0_a", bv3)
         a_p1 = var("a_p1", bv3)
-        should_inc = smt.BoolVariable("should_inc")
+        should_inc = smt.bool_variable("should_inc")
         assert model == \
             Model(
                 "top",
@@ -85,9 +85,9 @@ class TestVerilogParse:
             """)
         model = verilog_to_model(rtl, "top", inline_renames=True)
         model.print()
-        in_ = smt.BoolVariable("in")
-        r0 = smt.BoolVariable("r0")
-        r1 = smt.BoolVariable("r1")
+        in_ = smt.bool_variable("in")
+        r0 = smt.bool_variable("r0")
+        r1 = smt.bool_variable("r1")
         assert model == \
             Model(
                 "top",
@@ -119,9 +119,9 @@ class TestVerilogParse:
         model = verilog_to_model(rtl, "top")
         model.print()
         boolsort = smt.BoolSort()
-        boolvar = smt.BoolVariable
+        boolvar = smt.bool_variable
         rst = boolvar("rst")
-        i_state = smt.BVVariable("i_state", 3)
+        i_state = smt.bv_variable("i_state", 3)
         i_inner = boolvar("i_inner")
         o_inner = boolvar("o_inner")
         assert model.validate()
