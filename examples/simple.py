@@ -38,7 +38,7 @@ class SimpleModel(ModelBuilder):
 def main():
     v = smt.Variable
     bv8 = smt.BVSort(8)
-    s0 = v("s0", bv8)
+    s0 = v("top.s0", bv8)
     i1 = v("i1", bv8)
     i2 = v("i2", bv8)
     out = v("out", bv8)

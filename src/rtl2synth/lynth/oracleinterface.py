@@ -6,7 +6,7 @@ from subprocess import Popen, PIPE
 from typing import *
 
 import rtl2synth.lynth.smt as smt
-
+from rtl2synth.profile import PROFILE, Segment
 
 @dataclass
 class CallResult:
@@ -148,6 +148,7 @@ class IOOracle(OracleInterface):
         return IOOracle(name, in_vars, out_vars, oracle, replay_inputs=inputs, log_path=new_log_path)
 
     def invoke(self, args: Mapping[str, int]):
+        PROFILE.push(Segment.IO_ORACLE)
         # args is a mapping of smt var name -> value
         assert isinstance(args, Mapping), args
         assert isinstance(list(args.keys())[0], str), args
@@ -161,6 +162,7 @@ class IOOracle(OracleInterface):
         o_map = {v: output[v.name] for v in self.out_vars}
         self.i_history.append(i_map)
         self.o_history.append(o_map)
+        PROFILE.pop()
         return CallResult(args, o_map)
 
     def new_random_inputs(self):
@@ -233,12 +235,14 @@ class CorrectnessOracle(OracleInterface):
 
     def invoke(self, args: Mapping[str, smt.LambdaTerm]):
         # args is a mapping of synth fun name -> interpretation
+        PROFILE.push(Segment.CORR_ORACLE)
         if self.is_external_binary:
             process = Popen([self.binpath] + args, stdout=PIPE)
             (output, _) = process.communicate()
         else:
             output = self.lfun(args)
         assert isinstance(output, bool), f"corr oracle output must be boolean, instead was {output}"
+        PROFILE.pop()
         return CallResult(args, output)
 
     def apply_constraints(self, slv, args):

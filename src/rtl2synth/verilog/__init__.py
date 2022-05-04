@@ -32,6 +32,7 @@ from pyverilog.dataflow.dataflow import (
 from pyverilog.utils.scope import ScopeChain, ScopeLabel
 from pyverilog.utils import signaltype
 
+from rtl2synth.profile import PROFILE, Segment
 from rtl2synth.model import Model, Instance, GeneratedBy, UFPlaceholder
 import rtl2synth.lynth.smt as smt
 
@@ -118,11 +119,15 @@ def verilog_to_model(
     if important_signals is None:
         important_signals = []
     preserve_all_signals = len(important_signals) == 0
+
+    PROFILE.push(Segment.PV_PARSE)
     analyzer = VerilogDataflowAnalyzer(verilog_path, top_name, noreorder=True)
     analyzer.generate()
 
     terms = analyzer.getTerms()
     binddict = analyzer.getBinddict()
+    PROFILE.pop()
+    PROFILE.push(Segment.DF_TRAVERSE)
     all_signals = [str(t) for t in terms]
     clock_regex = re.compile(clock_pattern)
     all_signals = [s for s in all_signals if not clock_regex.search(unqual_name(s))]
@@ -196,6 +201,7 @@ def verilog_to_model(
         submodules,
         inline_renames,
     )
+    PROFILE.pop()
     if pickle_path is not None:
         print("Creating pickle at", pickle_path)
         with open(pickle_path, "wb") as f:

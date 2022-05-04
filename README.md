@@ -9,6 +9,7 @@ The following pieces of software are used:
 
 #### Python packages
 - [cvc5 1.0.0](https://cvc5.github.io/) (`pip3 install cvc5`)
+- `prettytable` (`pip3 install prettytable`)
 - [optional] `pytest` (`pip3 install pytest`)
 - [optional] `pdoc` (`pip3 install pdoc`)
 This project also uses custom forks of some packages to implement bugfixes and performance improvements.

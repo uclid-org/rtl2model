@@ -11,9 +11,10 @@ from typing import List, Mapping, Set
 from rtl2synth.common import *
 from rtl2synth.guidance import Guidance
 from rtl2synth.lynth import smt
-from rtl2synth.sketch import ConcreteProgram, ProgramSketch
-from rtl2synth.model import *
 import rtl2synth.lynth.oracleinterface as oi
+from rtl2synth.model import *
+from rtl2synth.profile import PROFILE, Segment
+from rtl2synth.sketch import ConcreteProgram, ProgramSketch
 from rtl2synth.verilog import VcdWrapper
 
 @dataclass
@@ -537,7 +538,9 @@ class ModelBuilder(ABC):
                 "io": (self.model, self.sf_map),
             })
             print("Running synthesis...")
+            PROFILE.push(Segment.SYNTH_ENGINE)
             sr = solver.check_synth()
+            PROFILE.pop()
             print("Synthesis done, candidates are:")
             if sr.is_unsat:
                 candidates = sr.solution
