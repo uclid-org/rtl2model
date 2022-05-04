@@ -30,6 +30,14 @@ class UFPlaceholder:
     params: Tuple[smt.Variable, ...]
     free_arg: bool
 
+    def __str__(self):
+        free_var = self.maybe_free_arg_var()
+        if free_var is not None:
+            params = self.params + (free_var,)
+        else:
+            params = self.params
+        return self.name + "(" + ", ".join(str(p) for p in params) + ")"
+
     def maybe_free_arg_var(self) -> Optional[smt.Variable]:
         if not self.free_arg:
             return None
@@ -164,6 +172,10 @@ class Model:
                 return uf_p
         return None
 
+    def add_assumption(self, assumption):
+        assert isinstance(assumption, smt.Term) and assumption.is_bool_expr()
+        self.assumptions.append(assumption)
+
     def validate(self):
         """
         Checks that all expressions are well-typed, variables are declared, etc.
@@ -183,7 +195,7 @@ class Model:
         in_counts = get_var_counts(self.inputs)
         out_counts = get_var_counts(self.outputs)
         state_counts = get_var_counts(self.state)
-        uf_counts = get_var_counts(self.ufs)
+        uf_counts = get_var_counts(self.ufs + self.next_ufs)
         # Zeroth pass: validate all instances and port bindings
         for subname, inst in self.instances.items():
             if not inst.model.validate():
@@ -227,7 +239,7 @@ class Model:
             if count > 1:
                 report(f"state variable {s} was declared multiple times")
             if s in uf_counts:
-                report(f"output {s} was also declared as an uninterpreted function") 
+                report(f"state variable {s} was also declared as an uninterpreted function")
         for s, count in uf_counts.items():
             if "." in s:
                 report(f"uninterpreted function {s} cannot have . in its name")
@@ -252,8 +264,8 @@ class Model:
                 report(f"state variable {v.name} has no declared logic or transition relation")
         for v in self.outputs:
             if v.name not in logic_and_next and v.name not in uf_counts:
-                report(f"output variable {v.name} has no declared logic or transition relation")
-        for v in self.ufs:
+                report(f"output variable {v.name} has no declared logic, transition relation, or UF")
+        for v in self.ufs + self.next_ufs:
             if v.name in self.logic:
                 report(f"uninterpreted function {v.name} has illegal declared logic")
             if v.name in next_keys:
@@ -643,7 +655,7 @@ class Model:
             visited.add(v.name)
             term = self._get_logic_or_transition(v)
             if term is None:
-                raise Exception(f"{self.name}: signal {v} has no transition relation or logic")
+                raise Exception(f"{self.name}: signal {v} has no transition relation, logic, or UF")
             parent_vars = term.get_vars()
             parents = normalize(parent_vars)
             dependencies[v.name].update(set(parents))

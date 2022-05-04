@@ -6,7 +6,7 @@ import math
 import os
 from subprocess import Popen, PIPE
 import textwrap
-from typing import List
+from typing import List, Mapping, Set
 
 from easyila.common import *
 from easyila.guidance import Guidance
@@ -47,18 +47,27 @@ class ModelBuilder(ABC):
 
     Note that not every single synthesis function will have its output checked directly.
     """
-    sf_map: Dict[Tuple[str, str], smt.SynthFun]
+    sf_map: Mapping[Tuple[str, str], smt.SynthFun]
     """Maps pairs of `(MODEL_NAME, FUNCTION_NAME)` to `SynthFun` objects."""
     guidance: Guidance
     o_ctx: oi.OracleCtx
+    value_sets: Mapping[smt.Variable, Set[int]]
+    """
+    Maps input variables to a set of possible values. These constraints are
+    applied when the I/O oracle generates values, and generated as assumptions
+    when BMC is run.
+
+    If an input variable is not in this set, its value is not constrained.
+    """
 
     def __init__(
         self,
         config: ProjectConfig,
         sketch: ProgramSketch,
         model: Model,
-        synthfun_grammars: Dict[Tuple[str, str], Optional[smt.Grammar]],
+        synthfun_grammars: Mapping[Tuple[str, str], Optional[smt.Grammar]],
         guidance: Guidance,
+        value_sets: Optional[Mapping[smt.Variable, Set[int]]]=None,
     ):
         """
         Initializes a ModelBuilder object, which is used to fill in interpretations
@@ -73,8 +82,10 @@ class ModelBuilder(ABC):
         _typecheck_arg(config, ProjectConfig)
         _typecheck_arg(sketch, ProgramSketch)
         _typecheck_arg(model, Model)
-        _typecheck_arg(synthfun_grammars, Dict)
+        _typecheck_arg(synthfun_grammars, Mapping)
         _typecheck_arg(guidance, Guidance)
+        if value_sets is not None:
+            _typecheck_arg(value_sets, Mapping)
         self.config = config
         self.sketch = sketch
         self.model = model
@@ -109,6 +120,7 @@ class ModelBuilder(ABC):
         self.sf_map = synthfuns
         self.guidance = guidance
         self.o_ctx = oi.OracleCtx(solver)
+        self.value_sets = value_sets or {}
 
     @property
     def signals(self):
@@ -130,7 +142,7 @@ class ModelBuilder(ABC):
         pass
 
     @abstractmethod
-    def simulate_and_read_signals(self, program: ConcreteProgram) -> Tuple[Dict[str, int], List[Dict[str, int]]]:
+    def simulate_and_read_signals(self, program: ConcreteProgram) -> Tuple[Mapping[str, int], List[Mapping[str, int]]]:
         """
         Invokes the simulation binary and reads the resulting signals.
 
@@ -140,14 +152,14 @@ class ModelBuilder(ABC):
         """
         pass
 
-    def generate_program(self, input_values: Dict[str, int]) -> ConcreteProgram:
+    def generate_program(self, input_values: Mapping[str, int]) -> ConcreteProgram:
         """
         Generates a concrete program from this instance's `ProgramSketch`, with variables
         replaced by the specified `input_values`.
         """
         return self.sketch.fill(input_values)
 
-    def sample(self, input_values: Dict[str, int]) -> Dict[str, int]:
+    def sample(self, input_values: Mapping[str, int]) -> Mapping[str, int]:
         """
         Runs a simulation with the provided inputs, and returns sampled output values.
         """
@@ -189,7 +201,7 @@ class ModelBuilder(ABC):
             raise Exception("Failed to sample signal", sampled_outputs - {t[0] for t in output_sigs})
         return output_vals
 
-    def generate_test_block_verilog(self, signal_values, signal_widths, funcs: Dict[str, smt.LambdaTerm]):
+    def generate_test_block_verilog(self, signal_values, signal_widths, funcs: Mapping[str, smt.LambdaTerm]):
         """
         Creates a block of verilog code to check correctness for the function body.
 
@@ -327,7 +339,13 @@ class ModelBuilder(ABC):
                 asserts_s = ""
             ctr_cases_l.append(s + assumes_s + asserts_s + "\nend")
 
-        return shadow_decls + textwrap.dedent(f"""\
+        set_assumes = "\n".join("    assume(" + \
+            " || ".join(f"{shadow_param_map[v].to_verilog_str()} == {i}" for i in vals) + \
+            ");"
+            for v, vals in self.value_sets.items()
+        )
+
+        return shadow_decls + "\n" + set_assumes + "\n" + textwrap.dedent(f"""\
 
             {ctr.get_decl(smt.BVConst(0, ctr_width)).to_verilog_str(is_reg=True)}
             always @(posedge {clock_name}) begin
@@ -338,9 +356,9 @@ class ModelBuilder(ABC):
             "\n\n" + textwrap.indent("\n".join(pred_cases_l), "    ") + \
             "\nend"
 
-    def run_bmc(self, signal_values, signal_widths, hypothesis_funcs: Dict[str, smt.LambdaTerm]) -> bool:
+    def run_bmc(self, signal_values, signal_widths, hypothesis_funcs: Mapping[str, smt.LambdaTerm]) -> bool:
         """
-        Runs BMC (for now, hardcoded to be symbiyosys) and returns true on success.
+        Runs BMC (hardcoded to be symbiyosys) and returns true on success.
         """
         formalblock = self.generate_test_block_verilog(
             signal_values,
@@ -362,7 +380,7 @@ class ModelBuilder(ABC):
             self.add_cex(*self._parse_sby_cex(lines))
         return ok
 
-    def _parse_sby_cex(self, sby_lines) -> Dict[smt.Variable, int]:
+    def _parse_sby_cex(self, sby_lines) -> Mapping[smt.Variable, int]:
         """
         Parses a counterexample from symbiyosys output.
 
@@ -402,7 +420,7 @@ class ModelBuilder(ABC):
                 out_map[sf_ref] = vcd_r.get_value_at(sig_name, cc_or_pred)
         return in_map, out_map
 
-    def verify(self, funcs: Dict[str, smt.LambdaTerm]):
+    def verify(self, funcs: Mapping[str, smt.LambdaTerm]):
         # TODO make less hacky
         if not hasattr(self, "signal_values"):
             # Because the signal variable width may not match the width of the ISA-level input
@@ -463,7 +481,7 @@ class ModelBuilder(ABC):
         corr = oi.CorrectnessOracle("corr", self.input_vars, self.output_refs, self.verify)
         self.o_ctx.add_oracle(corr)
 
-    def add_cex(self, input_vals: Dict[smt.Variable, int], output_vals: Dict[smt.Variable, int]):
+    def add_cex(self, input_vals: Mapping[smt.Variable, int], output_vals: Mapping[smt.Variable, int]):
         print("Adding counterexample: (" + ", ".join(f"{k}={i}" for k, i in input_vals.items()) + \
                 f") -> (" + ", ".join(f"{k.name}={i}" for k, i in output_vals.items()) + ")")
         self.o_ctx.oracles["io"].add_cex(input_vals, output_vals)

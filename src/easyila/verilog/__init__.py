@@ -77,7 +77,8 @@ def verilog_to_model(
     partitions for those signals. The returned value is a Model object.
 
     :param verilog_path: The path to the Verilog file containing all needed modules. If the design
-    is split across multiple RTL files, they should be concatenated into a single file.
+    is split across multiple RTL files, they should be concatenated into a single file. Because of
+    quirks in Pyverilog, this file CANNOT have any `include` directives in it.
 
     :param top_name: The name of the top-level Verilog module to produce a model for.
 
@@ -245,13 +246,37 @@ def _verilog_model_helper(
 
     # === DEPENDENCY GRAPH STUFF ===
 
+    # 0.5th pass: traverse AST to get expressions for _rn variables.
+    rename_substitutions = {}
+    """
+    Unlike the dicts passed to the model constructor, `rename_substitutions` is keyed on
+    fully-qualified variable names.
+    """
+    if inline_renames:
+        for sc, term in terms.items():
+            is_curr_scope = str(sc[:-1]) == instance_name
+            if not is_curr_scope:
+                continue
+            assert isinstance(term.msb, DFIntConst), term
+            assert isinstance(term.lsb, DFIntConst), term
+            # TODO deal with `dims` for arrays?
+            width = term.msb.eval() - term.lsb.eval() + 1
+            s = str(sc)
+            if signaltype.isRename(term.termtype):
+                for p in binddict[sc]:
+                    # In this context, there should never be an empty else branch, so we
+                    # make the default branch field None to loudly error
+                    rename_substitutions[s] = pv_to_smt_expr(p.tree, width, terms, None, mod_depth)
+        # TODO replace renames with other renames (may require modifying SMT tree,
+        # or using dependency graph info to topo sort)
+
     # TODO for restricting important signals, look into fast COI computation
     # "Fast Cone-Of-Influence computation and estimation in problems with multiple properties"
     # https://ieeexplore.ieee.org/document/6513616
     # First pass: compute dependency graph to get cones of influence for each variable
     # this requires looking at all signals in the design
     # TODO how to handle dependencies going through submodules?
-    deps = DependencyGraph(important_signals, terms, binddict)
+    deps = DependencyGraph(important_signals, terms, binddict, instance_name, rename_substitutions)
     ufs = []
     """
     `ufs` is a list of non-important variables that are modeled as a an uninterpreted fn with arguments based
@@ -356,29 +381,6 @@ def _verilog_model_helper(
             next_ufs.append(UFPlaceholder(unqual_s, smt.BVSort(width), params, False))
     else:
         raise NotImplementedError("unimplemented COIConf " + str(coi_conf))
-    # 1.5th pass: traverse AST to get expressions for _rn variables.
-    rename_substitutions = {}
-    """
-    Unlike the dicts passed to the model constructor, `rename_substitutions` is keyed on
-    fully-qualified variable names.
-    """
-    if inline_renames:
-        for sc, term in terms.items():
-            is_curr_scope = str(sc[:-1]) == instance_name
-            if not is_curr_scope:
-                continue
-            assert isinstance(term.msb, DFIntConst), term
-            assert isinstance(term.lsb, DFIntConst), term
-            # TODO deal with `dims` for arrays?
-            width = term.msb.eval() - term.lsb.eval() + 1
-            s = str(sc)
-            if signaltype.isRename(term.termtype):
-                for p in binddict[sc]:
-                    # In this context, there should never be an empty else branch, so we
-                    # make the default branch field None to loudly error
-                    rename_substitutions[s] = pv_to_smt_expr(p.tree, width, terms, None, mod_depth)
-        # TODO replace renames with other renames (may require modifying SMT tree,
-        # or using dependency graph info to topo sort)
 
     # Second pass: traverse AST to get expressions, and replace missing variables with UFs
     # Sadly, the only way we can distinguish between next cycle and combinatorial udpates is
@@ -499,6 +501,11 @@ def _verilog_model_helper(
     input_names = set(v.name for v in m_inputs)
     ufs = [uf for uf in ufs if uf.name not in input_names]
     next_ufs = [uf for uf in next_ufs if uf.name not in input_names]
+    # For any outputs that were not important, give them dummy UFs
+    defined_uf_names = set(uf.name for uf in ufs) | set(uf.name for uf in next_ufs)
+    for o in m_outputs:
+        if o.name not in defined_uf_names and o not in logic and o not in next_updates:
+            ufs.append(UFPlaceholder(o.name, o.sort, (), True))
     return Model(
         mod_name,
         inputs=m_inputs,
@@ -576,7 +583,7 @@ class DependencyGraph:
     entries `{"a": {"r"}, "b": {"r"}}`.
     """
 
-    def __init__(self, important_signals, termdict, binddict):
+    def __init__(self, important_signals, termdict, binddict, instance_name, rename_substitutions):
         """
         Computes a dependency graph from design information parsed by pyverilog.
 
@@ -589,6 +596,8 @@ class DependencyGraph:
         from the dependency graph, this would be undiscoverable.
 
         `termdict` and `binddict` are generated from pyverilog.
+
+        `rename_subsitutions` maps "rename" signals to their constituent expressions.
         """
         self.curr_parents = defaultdict(list)
         self.curr_children = defaultdict(set)
@@ -607,7 +616,13 @@ class DependencyGraph:
             bind = binddict[sc]
             for p in bind:
                 if p.tree is not None:
-                    parents = find_direct_parent_nodes(p.tree)
+                    direct_parents = find_direct_parent_nodes(p.tree)
+                    parents = []
+                    for parent in direct_parents:
+                        if parent in rename_substitutions:
+                            parents.extend(instance_name + "." + v.name for v in rename_substitutions[parent].get_vars())
+                        else:
+                            parents.append(parent)
                     if signaltype.isReg(termdict[sc].termtype):
                         p_map = self.next_parents
                         c_map = self.next_children

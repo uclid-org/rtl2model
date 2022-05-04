@@ -42,7 +42,7 @@ def main():
     v = smt.Variable
     bv8 = smt.BVSort(8)
     x, y = v("lft_data1", bv8), v("lft_acc", bv8)
-    op = v("lft_cmd0")
+    op = v("lft_cmd0", bv8)
 
     core = verilog_to_model(
         os.path.join(BASEDIR, "full.v"),
@@ -50,7 +50,10 @@ def main():
         clock_pattern="clk",
         important_signals=[
             "rst",
+            "lft_pc",
             "lft_acc",
+            # "next_acc",
+            "acc",
             "lft_psw_c",
             "lft_cmd0",
             "lft_cmd1",
@@ -72,7 +75,7 @@ def main():
         Inst(x),            # (imm)
         inst_byte(0x74),    # MOV A, imm
         Inst(y),            # (imm)
-        inst_byte(0x28),    # ADD A, R0
+        Inst(op),           # ??? A, R0 (constrained)
         inst_byte(0x00),    # NOP
         inst_byte(0x00),
         inst_byte(0x00),
@@ -85,6 +88,7 @@ def main():
         S("tb", "clk", 1),
         S("tb", "rst", 1),
         pc_sig,
+        S("tb", "next_acc", 8),
         S("tb", "lft_acc", 8),
         S("tb", "lft_psw_c", 1),
         S("tb", "lft_cmd0", 8),
@@ -99,11 +103,11 @@ def main():
     guidance.annotate("lft_cmd0", {
         pc_var.op_eq(3): AnnoType.Param(x),
         pc_var.op_eq(5): AnnoType.Param(y),
+        pc_var.op_eq(7): AnnoType.Param(op),
         smt.BoolConst.T: AnnoType.ASSUME,
     })
     guidance.annotate("lft_acc", {
-        pc_var.op_eq(8): AnnoType.Output(v("r8051.acc", bv8)),
-        smt.BoolConst.T: AnnoType.ASSUME,
+        pc_var.op_eq(8): AnnoType.Output(v("r8051.next_acc", bv8)),
     })
 
     start = smt.Variable("Start", bv8)
@@ -137,8 +141,14 @@ def main():
         ProjectConfig(os.path.join(BASEDIR, "symbiyosys")),
         sketch,
         core,
-        {("r8051", "acc"): grammar},
+        {("r8051", "next_acc"): grammar},
         guidance,
+        value_sets={op: {
+            0x28, # ADD A, R0
+            0x48, # ORL A, R0
+            0x58, # ANL A, R0
+            0xE8, # MOV A, R0
+        }}
     )
     import faulthandler
     faulthandler.enable()

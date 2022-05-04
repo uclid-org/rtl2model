@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import os
 import random
 from subprocess import Popen, PIPE
-from typing import Any, Dict, Callable, Iterator, Iterable, List, Union, Optional, Tuple
+from typing import *
 
 import easyila.lynth.smt as smt
 
@@ -14,13 +14,13 @@ class CallResult:
     outputs: Any
 
     def to_tuple(self):
-        if isinstance(self.inputs, Dict):
+        if isinstance(self.inputs, Mapping):
             i_list = list(self.inputs.values())
         elif isinstance(self.inputs, Iterable):
             i_list = list(self.inputs)
         else:
             i_list = [self.inputs]
-        if isinstance(self.outputs, Dict):
+        if isinstance(self.outputs, Mapping):
             return (*i_list, *list(self.outputs.values()))
         elif isinstance(self.outputs, Iterable):
             return (*i_list, *list(self.outputs))
@@ -30,7 +30,7 @@ class CallResult:
     def __str__(self):
         if isinstance(self.inputs, List):
             s = "inputs: " + ", ".join(f"{i:#x}" for i in self.inputs)
-        elif isinstance(self.inputs, Dict):
+        elif isinstance(self.inputs, Mapping):
             s = "inputs: " + ", ".join(f"{k}={i:#x}" for k, i in self.inputs.items())
         else:
             return str(self.to_tuple())
@@ -38,7 +38,7 @@ class CallResult:
             return s + "; outputs: " + f"{self.outputs:#x}"
         elif isinstance(self.outputs, List):
             return s + "; outputs: " + ", ".join(f"{v:#x}" for v in self.outputs)
-        elif isinstance(self.inputs, Dict):
+        elif isinstance(self.inputs, Mapping):
             return s + "; outputs: " + ", ".join(f"{k}={i:#x}" for k, i in self.outputs.items())
         else:
             return str(self.to_tuple())
@@ -84,7 +84,7 @@ class OracleInterface(ABC):
             raise Exception("oracle function must be callable or path to external binary, instead was " + str(type(oracle)))
         self.name = name
         self.replay_inputs = replay_inputs
-        self._replay_iter: Optional[Iterator[Dict[str, int]]]
+        self._replay_iter: Optional[Iterator[Mapping[str, int]]]
         if replay_inputs:
             self._replay_iter = iter(replay_inputs)
         else:
@@ -126,14 +126,16 @@ class IOOracle(OracleInterface):
         out_vars: List[smt.Variable],
         oracle: Union[Callable, str],
         *,
-        replay_inputs: Optional[List[Dict[str, int]]]=None,
+        replay_inputs: Optional[List[Mapping[str, int]]]=None,
         log_path: Optional[str]=None,
+        value_sets: Optional[Mapping[smt.Variable, int]]=None,
         seed: Optional[int]=None,
     ):
         super().__init__(name, oracle, replay_inputs, log_path)
         self.in_vars = in_vars
         self.out_vars = out_vars
         self.rng = random.Random(seed)
+        self.value_sets = value_sets or {}
         self.cex_inputs = []
         self.cex_outputs = []
 
@@ -145,9 +147,9 @@ class IOOracle(OracleInterface):
                 inputs.append({v.name: int(s) for v, s in zip(in_vars, l.split())})
         return IOOracle(name, in_vars, out_vars, oracle, replay_inputs=inputs, log_path=new_log_path)
 
-    def invoke(self, args: Dict[str, int]):
+    def invoke(self, args: Mapping[str, int]):
         # args is a mapping of smt var name -> value
-        assert isinstance(args, Dict), args
+        assert isinstance(args, Mapping), args
         assert isinstance(list(args.keys())[0], str), args
         assert isinstance(list(args.values())[0], int), args
         if self.is_external_binary:
@@ -163,13 +165,19 @@ class IOOracle(OracleInterface):
 
     def new_random_inputs(self):
         """
-        Returns a set of uniformly sampled, new random inputs.
+        Returns a tuple of uniformly sampled, new random inputs, in the order which `input_vars`
+        is in.
         """
-        repeated = True
-        while repeated:
-            new_inputs = tuple(self.rng.randint(0, 2 ** v.c_bitwidth() - 1) for v in self.in_vars)
-            repeated = new_inputs in self.i_history
-        return new_inputs
+        # There is a chance this procedure generates repeat inputs, which can be dealth with
+        # by checking against `i_history` -- however, if variables have constraints, then it may
+        # not be possible to generate any new values
+        new_inputs = []
+        for var in self.in_vars:
+            if var in self.value_sets:
+                new_inputs.append(self.rng.choice(self.value_sets[var]))
+            else:
+                new_inputs.append(self.rng.randint(0, 2 ** var.c_bitwidth() - 1))
+        return tuple(new_inputs)
 
     def cexs(self) -> List[CallResult]:
         """
@@ -223,7 +231,7 @@ class CorrectnessOracle(OracleInterface):
         self.in_vars = in_vars
         self.out_vars = out_vars
 
-    def invoke(self, args: Dict[str, smt.LambdaTerm]):
+    def invoke(self, args: Mapping[str, smt.LambdaTerm]):
         # args is a mapping of synth fun name -> interpretation
         if self.is_external_binary:
             process = Popen([self.binpath] + args, stdout=PIPE)
@@ -303,7 +311,7 @@ class OracleCtx:
     """
 
     def __init__(self, solver):
-        self.oracles: Dict[str, OracleInterface] = {}
+        self.oracles: Mapping[str, OracleInterface] = {}
         self.solver = solver
         # self.call_logs = []
 

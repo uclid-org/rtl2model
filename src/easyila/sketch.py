@@ -26,12 +26,12 @@ class SketchValue:
 
 
 def inst_word(value):
-    assert value <= 0xFFFFFFFF
+    assert isinstance(value, int) and value <= 0xFFFFFFFF
     return Inst(SketchValue(value, 32))
 
 
 def inst_byte(value):
-    assert value <= 0xFF
+    assert isinstance(value, int) and value <= 0xFF
     return Inst(SketchValue(value, 8))
 
 
