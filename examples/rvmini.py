@@ -9,7 +9,6 @@ import sys
 from rtl2synth.guidance import Guidance, AnnoType
 from rtl2synth.synthesis_template import *
 from rtl2synth.sketch import *
-import rtl2synth.gen_config as gen_config
 import rtl2synth.lynth.smt as smt
 from rtl2synth.model import *
 from rtl2synth.verilog import *
