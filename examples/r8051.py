@@ -48,22 +48,23 @@ def main():
         os.path.join(BASEDIR, "full.v"),
         "r8051",
         clock_pattern="clk",
-        important_signals=[
-            "rst",
-            "lft_pc",
-            "lft_acc",
-            # "next_acc",
-            "acc",
-            "lft_psw_c",
-            "lft_cmd0",
-            "lft_cmd1",
-            "lft_cmd2",
-            "ram_wr_byte",
-            "lft_data1",
-        ],
+        # important_signals=[
+        #     "rst",
+        #     "lft_pc",
+        #     "lft_acc",
+        #     # "next_acc",
+        #     "acc",
+        #     "lft_psw_c",
+        #     "lft_cmd0",
+        #     "lft_cmd1",
+        #     "lft_cmd2",
+        #     "ram_wr_byte",
+        #     "lft_data1",
+        # ],
         coi_conf=COIConf.UF_ARGS_COI,
         pickle_path="r8051.pickle"
     )
+    core.print()
     core = core.eliminate_dead_code()
     core.print()
     assert core.validate()

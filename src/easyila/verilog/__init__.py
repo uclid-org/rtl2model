@@ -244,6 +244,16 @@ def _verilog_model_helper(
     if mod_depth == 1:
         assert mod_name == instance_name
 
+    def should_inline(term):
+        """
+        Returns true if the term is a rename signal or other intermediate thing.
+        Not perfect.
+        """
+        if signaltype.isRename(term.termtype):
+            return True
+        s = str(term.name)
+        return ".md_" in s or ".al_" in s or ".fc_" in s
+
     # === DEPENDENCY GRAPH STUFF ===
 
     # 0.5th pass: traverse AST to get expressions for _rn variables.
@@ -254,15 +264,15 @@ def _verilog_model_helper(
     """
     if inline_renames:
         for sc, term in terms.items():
-            is_curr_scope = str(sc[:-1]) == instance_name
+            s = str(sc)
+            is_curr_scope = scope_prefix(s) == instance_name
             if not is_curr_scope:
                 continue
             assert isinstance(term.msb, DFIntConst), term
             assert isinstance(term.lsb, DFIntConst), term
             # TODO deal with `dims` for arrays?
             width = term.msb.eval() - term.lsb.eval() + 1
-            s = str(sc)
-            if signaltype.isRename(term.termtype):
+            if should_inline(term):
                 for p in binddict[sc]:
                     # In this context, there should never be an empty else branch, so we
                     # make the default branch field None to loudly error
@@ -275,7 +285,6 @@ def _verilog_model_helper(
     # https://ieeexplore.ieee.org/document/6513616
     # First pass: compute dependency graph to get cones of influence for each variable
     # this requires looking at all signals in the design
-    # TODO how to handle dependencies going through submodules?
     deps = DependencyGraph(important_signals, terms, binddict, instance_name, rename_substitutions)
     ufs = []
     """
@@ -323,11 +332,11 @@ def _verilog_model_helper(
     # Filter out any signals that don't belong to this module
     for s in curr_missing:
         is_curr_scope = scope_prefix(s) == instance_name
-        if is_curr_scope and (not inline_renames or not signaltype.isRename(terms[str_to_scope_chain(s)].termtype)):
+        if is_curr_scope and (not inline_renames or not should_inline(terms[str_to_scope_chain(s)])):
             curr_uf_names.add(s)
     for s in next_missing:
         is_curr_scope = scope_prefix(s) == instance_name
-        if is_curr_scope and (not inline_renames or not signaltype.isRename(terms[str_to_scope_chain(s)].termtype)):
+        if is_curr_scope and (not inline_renames or not should_inline(terms[str_to_scope_chain(s)])):
             next_uf_names.add(s)
     if coi_conf == COIConf.NO_COI:
         # Model missing variables (all 1 edge away from important signal in dep graph)
@@ -424,7 +433,7 @@ def _verilog_model_helper(
         # Categorize input, output, or state
         termtype = terms[sc].termtype
         is_curr_scope = str(sc[:-1]) == instance_name
-        if not inline_renames or not signaltype.isRename(termtype):
+        if not inline_renames or not should_inline(terms[sc]):
             # Only add signals belonging to this module
             is_input = signaltype.isInput(termtype)
             if s in important_signal_set and is_curr_scope \
