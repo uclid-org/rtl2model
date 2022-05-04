@@ -3,9 +3,9 @@ import textwrap
 
 import pytest
 
-import easyila.lynth.smt as smt
-from easyila.verilog import verilog_to_model
-from easyila.model import *
+import rtl2synth.lynth.smt as smt
+from rtl2synth.verilog import verilog_to_model
+from rtl2synth.model import *
 
 class TestCaseSplit:
     """

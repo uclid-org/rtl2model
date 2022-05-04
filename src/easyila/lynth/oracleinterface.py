@@ -5,7 +5,7 @@ import random
 from subprocess import Popen, PIPE
 from typing import *
 
-import easyila.lynth.smt as smt
+import rtl2synth.lynth.smt as smt
 
 
 @dataclass

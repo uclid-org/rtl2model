@@ -1,4 +1,4 @@
-from easyila.sketch import *
+from rtl2synth.sketch import *
 
 class TestSketch:
 

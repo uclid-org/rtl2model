@@ -39,7 +39,7 @@ from pyverilog.utils import signaltype
 # import pydot
 
 # from vcd_wrapper import VcdWrapper
-from easyila.verilog import *
+from rtl2synth.verilog import *
 
 @dataclass
 class ModuleSkeleton:

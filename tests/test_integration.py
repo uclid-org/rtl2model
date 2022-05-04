@@ -9,11 +9,11 @@ from subprocess import Popen, PIPE
 
 import pytest
 
-import easyila
-from easyila.guidance import Guidance, AnnoType
-from easyila.synthesis_template import *
-import easyila.gen_config as gen_config
-import easyila.lynth.smt as smt
+import rtl2synth
+from rtl2synth.guidance import Guidance, AnnoType
+from rtl2synth.synthesis_template import *
+import rtl2synth.gen_config as gen_config
+import rtl2synth.lynth.smt as smt
 
 REPO_BASE_DIR = subprocess.run(
         "git rev-parse --show-toplevel",

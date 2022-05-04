@@ -8,13 +8,13 @@ from subprocess import Popen, PIPE
 import textwrap
 from typing import List, Mapping, Set
 
-from easyila.common import *
-from easyila.guidance import Guidance
-from easyila.lynth import smt
-from easyila.sketch import ConcreteProgram, ProgramSketch
-from easyila.model import *
-import easyila.lynth.oracleinterface as oi
-from easyila.verilog import VcdWrapper
+from rtl2synth.common import *
+from rtl2synth.guidance import Guidance
+from rtl2synth.lynth import smt
+from rtl2synth.sketch import ConcreteProgram, ProgramSketch
+from rtl2synth.model import *
+import rtl2synth.lynth.oracleinterface as oi
+from rtl2synth.verilog import VcdWrapper
 
 @dataclass
 class ProjectConfig:

@@ -740,7 +740,7 @@ class VarDecl(Translatable):
     def to_target_format(self, tgt: TargetFormat, **kwargs):
         """
         Possible kwargs:
-        - `cvc5_ctx`: a `easyila.lynth.Cvc5Ctx` object used to get a reference to a cvc5 solver
+        - `cvc5_ctx`: a `rtl2synth.lynth.Cvc5Ctx` object used to get a reference to a cvc5 solver
         - `is_reg`: a boolean used by verilog conversion to determine if this should be declared
                     as a reg (if false or not specified, the variable will be a wire)
         - `anyconst`: a boolean used by verilog conversion; when specified, it will add the

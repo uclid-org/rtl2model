@@ -1,4 +1,4 @@
-`easyila` (name WIP) is a Python framework for modeling, synthesis, and verification of hardware designs.
+`rtl2synth` is a Python framework for modeling, synthesis, and verification of hardware designs.
 It is an offshoot of a larger hardware lifting project: https://github.com/adwait/hwlifting/
 
 ## Installation
@@ -16,6 +16,6 @@ Run `git submodule init --update --recursive` to get the source code for those f
 - custom build of [pyverilog](https://github.com/PyHDI/Pyverilog/) (`pip3 install -e ./Pyverilog`)
 - custom build of [pyvcd](https://github.com/westerndigitalcorporation/pyvcd) (`pip3 install -e ./pyvcd`)
 
-Finally, run `pip3 install -e .` in this directory to install the `easyila` package. You can then run examples with `python3 examples/rvmini.py`.
+Finally, run `pip3 install -e .` in this directory to install the `rtl2synth` package. You can then run examples with `python3 examples/rvmini.py`.
 
-To build documentation, run `pdoc easyila`.
+To build documentation, run `pdoc rtl2synth`.

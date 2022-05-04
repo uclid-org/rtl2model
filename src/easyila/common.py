@@ -7,7 +7,7 @@ from dataclasses import dataclass
 # import getpass
 from typing import *
 
-import easyila.lynth.smt as smt
+import rtl2synth.lynth.smt as smt
 
 @dataclass
 class SampledSignal:

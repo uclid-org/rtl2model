@@ -1,8 +1,8 @@
 
 import pytest
 
-import easyila.lynth.smt as smt
-from easyila.model import *
+import rtl2synth.lynth.smt as smt
+from rtl2synth.model import *
 
 BASE_PREFIX = "__BASE."
 STEP_PREFIX = "__STEP."

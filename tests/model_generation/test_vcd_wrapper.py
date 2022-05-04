@@ -2,7 +2,7 @@
 Tests wrapper for reading from a VCD file.
 """
 
-from easyila.verilog import VcdWrapper
+from rtl2synth.verilog import VcdWrapper
 
 vcdtext = """\
 $date 2022-02-14 15:54:18.657260 $end

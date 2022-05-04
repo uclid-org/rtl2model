@@ -1,6 +1,6 @@
 
 """
-Functions for producing a `easyila.model.Model` from a Verilog file.
+Functions for producing a `rtl2synth.model.Model` from a Verilog file.
 
 This code uses a fork of the [`pyverilog`](https://github.com/noloerino/Pyverilog) library
 for parsing and dataflow analysis.
@@ -32,8 +32,8 @@ from pyverilog.dataflow.dataflow import (
 from pyverilog.utils.scope import ScopeChain, ScopeLabel
 from pyverilog.utils import signaltype
 
-from easyila.model import Model, Instance, GeneratedBy, UFPlaceholder
-import easyila.lynth.smt as smt
+from rtl2synth.model import Model, Instance, GeneratedBy, UFPlaceholder
+import rtl2synth.lynth.smt as smt
 
 from .vcd_wrapper import VcdWrapper
 

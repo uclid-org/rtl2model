@@ -1,7 +1,7 @@
 
 import cvc5
 
-from easyila.lynth import smt
+from rtl2synth.lynth import smt
 
 class TestSmtCvc5Conversion:
     """
