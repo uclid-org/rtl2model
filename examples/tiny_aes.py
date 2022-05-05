@@ -42,6 +42,23 @@ REPO_BASE_DIR = subprocess.run(
 
 BASEDIR = os.path.join(REPO_BASE_DIR, "designs/tiny_aes/")
 
+class TinyAesModel(ModelBuilder):
+    def build_binary(self):
+        gen_config.generate_config(
+            signals=self.signals,
+            target_sim_dir=BASEDIR,
+            target_verilog_dir=BASEDIR,
+            root="top"
+        )
+        ...
+
+    def simulate_and_read_signals(self, program):
+        with open(os.path.join(BASEDIR, "inputs.bin"), "wb") as f:
+            f.write(program.to_bytearray())
+        self.run_proc(["./obj_dir/Vtop", "inputs.bin"], cwd=BASEDIR)
+        return read_csv(os.path.join(BASEDIR, "traces/tr.csv"), self.cycle_count)
+
+
 def main():
     top = verilog_to_model(
         os.path.join(BASEDIR, "full_tableless.v"),
@@ -52,6 +69,10 @@ def main():
     )
     top.print()
     assert top.validate()
+
+    import faulthandler
+    faulthandler.enable()
+    model.main_sygus_loop()
 
 if __name__ == "__main__":
     main()

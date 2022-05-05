@@ -6,6 +6,7 @@ import os
 import subprocess
 import sys
 
+import rtl2synth.gen_config as gen_config
 from rtl2synth.guidance import Guidance, AnnoType
 from rtl2synth.synthesis_template import *
 from rtl2synth.sketch import *
