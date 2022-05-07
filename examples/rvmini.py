@@ -24,7 +24,7 @@ REPO_BASE_DIR = subprocess.run(
 BASEDIR = os.path.join(REPO_BASE_DIR, "designs/riscv-mini/")
 
 class RvMiniModel(ModelBuilder):
-    def build_binary(self):
+    def build_sim(self):
         gen_config.generate_config(
             signals=self.signals,
             target_sim_dir=os.path.join(BASEDIR, "src/main/cc/"),

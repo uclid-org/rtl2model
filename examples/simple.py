@@ -19,7 +19,7 @@ BASEDIR = os.path.join(REPO_BASE_DIR, "designs/simple/")
 
 
 class SimpleModel(ModelBuilder):
-    def build_binary(self):
+    def build_sim(self):
         gen_config.generate_config(
             signals=self.signals,
             target_sim_dir=BASEDIR,
@@ -70,7 +70,6 @@ def main():
     ctr_sig = S("top", "ctr", 8)
     o_ctr_sig = S("top", "ctr_o", 8)
     signals = [
-        S("top", "clk", 1),
         S("top", "rst", 1),
         ctr_sig,
         o_ctr_sig,

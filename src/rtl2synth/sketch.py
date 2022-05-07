@@ -40,7 +40,17 @@ _InstField = Union[SketchValue, SketchHole]
 
 @dataclass
 class Inst:
+    """
+    Represents a binary instruction in a program.
+    When converted to bytearray, this is BIG ENDIAN:
+    the most significant byte of the instruction is placed
+    at index 0.
+    """
     value: Tuple[_InstField, ...]
+    """
+    A list of the instruction's fields. These are some
+    combination of `SketchHole`s and `SketchValue`s.
+    """
 
     def __init__(self, *args):
         args = list(args)

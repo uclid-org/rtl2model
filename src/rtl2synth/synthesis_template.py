@@ -33,7 +33,7 @@ class ModelBuilder(ABC):
     """
     An abstract class used to perform synthesis to fill in holes in a partial `Model` object.
 
-    Implement `build_binary` and `simulate_and_read_signals` to allow usage of I/O examples
+    Implement `build_sim` and `simulate_and_read_signals` to allow usage of I/O examples
     during synthesis.
     """
 
@@ -136,7 +136,7 @@ class ModelBuilder(ABC):
         return self.o_ctx.solver
 
     @abstractmethod
-    def build_binary(self):
+    def build_sim(self):
         """
         Compiles the simulation binary.
         """
@@ -452,7 +452,7 @@ class ModelBuilder(ABC):
         rc = process.wait()
         if rc not in ok_rcs:
             print("===STDOUT===")
-            print(lines.join("\n"))
+            print("\n".join(lines))
             print("===STDERR===")
             print(process.stderr.read().decode("utf-8"))
             raise Exception(f"Process executed with exit code {rc}, see full output above.")
@@ -509,6 +509,7 @@ class ModelBuilder(ABC):
         self._add_correctness_oracle()
         solver = self.solver
         prev_candidates = []
+        self.build_sim()
         while True:
             print("Correctness oracle returned false, synthesizing new candidates")
             io_o = self.o_ctx.oracles["io"]
@@ -529,7 +530,6 @@ class ModelBuilder(ABC):
                 # inputs = tuple(inputs)
             # TODO add blocking constraint to prevent sygus from repeating guesses?
             solver.reinit_cvc5()
-            self.build_binary()
             self.o_ctx.call_oracle("io", {v.name: i for v, i in zip(self.input_vars, inputs)})
             io_o.save_call_logs()
 
