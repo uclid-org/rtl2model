@@ -3,7 +3,7 @@ Annotations that provide guidance for oracles.
 """
 
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List, Tuple, Set, Optional, Union
 
@@ -18,7 +18,7 @@ class AnnoType:
     """
 
     val: int
-    bounds: Tuple[int, int] = None
+    bounds: List[Tuple[int, int]] = field(default_factory=list)
     expr: smt.Term = None
 
     def __post_init__(self):
@@ -55,7 +55,7 @@ AnnoType.DONT_CARE = AnnoType(0)
 """The value of this signal is not relevant."""
 
 AnnoType.ASSUME = AnnoType(1)
-AnnoType.AssumeIndexed = lambda b: AnnoType(1, b)
+AnnoType.AssumeIndexed = lambda *b: AnnoType(1, b)
 """The value of this signal should be assumed to match the value during simulation."""
 
 AnnoType.Param = lambda v: AnnoType(2, expr=v)
@@ -64,7 +64,7 @@ This signal represents a synthesis function parameter.
 The program sketch variable or index expression whose value is sampled is specified
 as argument.
 """
-AnnoType.ParamIndexed = lambda b, v: AnnoType(2, b, v)
+AnnoType.ParamIndexed = lambda b, v: AnnoType(2, [b], v)
 
 AnnoType.Output = lambda v: AnnoType(3, expr=v)
 """
@@ -74,7 +74,7 @@ is passed as argument. The path of all variables here is assumed to be of the fo
 "MODULE_NAME.FUNCTION_NAME"; if module name is omitted, then the function is assumed
 to exist in the top level module.
 """
-AnnoType.OutputIndexed = lambda b, v: AnnoType(3, b, v)
+AnnoType.OutputIndexed = lambda b, v: AnnoType(3, [b], v)
 
 
 class Guidance:
@@ -133,7 +133,13 @@ class Guidance:
             elif isinstance(first_key, smt.Term):
                 if len(own_dict) and isinstance(list(own_dict.keys())[0], int):
                     raise Exception("Cannot update guidance for cycle count sampled signal with predicate")
-                own_dict.update(annotation)
+                new_anno_dict = {}
+                for k, v in annotation.items():
+                    if not isinstance(v, list):
+                        new_anno_dict[k] = [v]
+                    else:
+                        new_anno_dict[k] = v
+                own_dict.update(new_anno_dict)
             else:
                 raise Exception(f"Cannot interpret annotation: {annotation}")
         elif isinstance(annotation, AnnoType):
@@ -154,7 +160,7 @@ class Guidance:
             return None
         return own_dict[cycle]
 
-    def get_predicated_annotations(self, signal) -> Dict[smt.Term, AnnoType]:
+    def get_predicated_annotations(self, signal) -> Dict[smt.Term, List[AnnoType]]:
         """
         Returns a dict of all predicate-based annotations for this signal.
         """
@@ -172,5 +178,12 @@ class Guidance:
         """
         outputs = set()
         for signal, cycles in self._guide_dict.items():
-            outputs.update({(cycles[n].expr, signal, n) for n in cycles if cycles[n].is_output()})
+            for n in cycles:
+                # HACK: assumes only one output thing in predicate list
+                if isinstance(cycles[n], list):
+                    t = cycles[n][0]
+                else:
+                    t = cycles[n]
+                if t.is_output():
+                    outputs.add((t.expr, signal, n))
         return outputs

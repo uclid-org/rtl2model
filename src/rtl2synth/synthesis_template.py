@@ -99,6 +99,7 @@ class ModelBuilder(ABC):
                 raise Exception(f"Could not find UF {sf_name} in module {sf_mod}")
             synthfuns[(sf_mod, sf_name)] = (maybe_uf.to_synthfun(g))
         solver = smt.Solver(synthfuns=list(synthfuns.values()))
+        PROFILE.add_model(model, len(synthfuns))
         self.input_vars = sketch.get_hole_vars()
         out_refs = []
         for out_ref, _, _ in guidance.get_outputs():
@@ -199,7 +200,7 @@ class ModelBuilder(ABC):
                 print(f"Sampled {signame}@{cc}={val}")
                 output_vals[sf_ref.name] = val
         if len(output_vals) != len(output_sigs):
-            raise Exception("Failed to sample signal", sampled_outputs - {t[0] for t in output_sigs})
+            raise Exception("Failed to sample signals: " + str({t[1] for t in output_sigs} - sampled_outputs))
         return output_vals
 
     def generate_test_block_verilog(self, signal_values, signal_widths, funcs: Mapping[str, smt.LambdaTerm]):
@@ -257,26 +258,31 @@ class ModelBuilder(ABC):
                     if atype is None or atype.is_dont_care():
                         continue
                     bounds = atype.bounds
-                    if bounds is not None:
-                        qp_var = qp_var[bounds[0]:bounds[1]]
-                    if atype.is_assume():
-                        # Add assume statement
-                        constval = smt.BVConst(signal_values[stepnum][qp], get_width(qp))
-                        if bounds:
-                            constval = constval[bounds[0]:bounds[1]].eval({})
-                        assumes.append(qp_var.op_eq(constval))
-                    elif atype.is_param():
-                        # Add new shadow register
-                        # TODO add comments to assumes somehow?
-                        lhs = atype.expr.replace_vars(shadow_param_map)
-                        if bounds:
-                            lhs = lhs[bounds[0]:bounds[1]]
-                        assumes.append(lhs.op_eq(qp_var))
-                    elif atype.is_output():
-                        # Assert output
-                        asserts.append(func_anno(atype, qp_var))
+                    qp_vars = []
+                    if bounds:
+                        for b in bounds:
+                            qp_vars.append(qp_var[b[0]:b[1]])
                     else:
-                        raise TypeError(f"invalid annotation {atype}")
+                        qp_vars = [qp_var]
+                    for qp_var in qp_vars:
+                        if atype.is_assume():
+                            # Add assume statement
+                            constval = smt.BVConst(signal_values[stepnum][qp], get_width(qp))
+                            if bounds:
+                                constval = constval[bounds[0]:bounds[1]].eval({})
+                            assumes.append(qp_var.op_eq(constval))
+                        elif atype.is_param():
+                            # Add new shadow register
+                            # TODO add comments to assumes somehow?
+                            lhs = atype.expr.replace_vars(shadow_param_map)
+                            if bounds:
+                                lhs = lhs[bounds[0]:bounds[1]]
+                            assumes.append(lhs.op_eq(qp_var))
+                        elif atype.is_output():
+                            # Assert output
+                            asserts.append(func_anno(atype, qp_var))
+                        else:
+                            raise TypeError(f"invalid annotation {atype}")
             ctr_cases.append((itercond, assumes, asserts))
 
         pred_cases_l = []
@@ -285,15 +291,7 @@ class ModelBuilder(ABC):
                 first = True
                 # TODO convert this into an index expression if necessary
                 qp_var = smt.bv_variable(q2b(qp), get_width(qp))
-                for cond, anno in guidance.get_predicated_annotations(qp).items():
-                    if anno.is_dont_care():
-                        continue
-                    bounds = anno.bounds
-                    if bounds is not None:
-                        bounds = anno.bounds
-                        qp_expr = qp_var[bounds[0]:bounds[1]]
-                    else:
-                        qp_expr = qp_var
+                for cond, anno_list in guidance.get_predicated_annotations(qp).items():
                     # Add condition
                     if first:
                         s = f"if ({cond.to_verilog_str()}) begin\n"
@@ -302,30 +300,41 @@ class ModelBuilder(ABC):
                         s = f"else begin\n"
                     else:
                         s = f"else if ({cond.to_verilog_str()}) begin\n"
-                    # Add assume/assert
-                    if anno.is_assume():
-                        s += f"    case ({ctr.to_verilog_str()})\n"
-                        # Add assume statements
-                        for cc in ctr_values:
-                            constval = smt.BVConst(signal_values[cc.val][qp], get_width(qp))
+                    for anno in anno_list:
+                        if anno.is_dont_care():
+                            continue
+                        bounds = anno.bounds
+                        qp_expr = qp_var
+                        # Add assume/assert
+                        if anno.is_assume():
+                            s += f"    case ({ctr.to_verilog_str()})\n"
+                            # Add assume statements
+                            for cc in ctr_values:
+                                s += f"        {cc.to_verilog_str()}: begin\n"
+                                constval = smt.BVConst(signal_values[cc.val][qp], get_width(qp))
+                                if bounds:
+                                    for b in bounds:
+                                        c = constval[b[0]:b[1]].eval({})
+                                        e = qp_expr[b[0]:b[1]]
+                                        s += f"            assume ({e.op_eq(c).to_verilog_str()});\n"
+                                else:
+                                    s += f"            assume ({qp_expr.op_eq(constval).to_verilog_str()});\n"
+                                s += "        end\n"
+                            s += f"    endcase\n"
+                        elif anno.is_param():
+                            # TODO add comments to assumes somehow?
+                            lhs = anno.expr.replace_vars(shadow_param_map)
                             if bounds:
-                                constval = constval[bounds[0]:bounds[1]].eval({})
-                            s += f"        {cc.to_verilog_str()}: assume ({qp_expr.op_eq(constval).to_verilog_str()});\n"
-                        s += f"    endcase\n"
-                    elif anno.is_param():
-                        # Add new shadow register
-                        new_shadow = smt.bv_variable(f"__shadow_{numshadow}", get_width(qp))
-                        # TODO add comments to assumes somehow?
-                        lhs = anno.expr.replace_vars(shadow_param_map)
-                        if bounds:
-                            lhs = lhs[bounds[0]:bounds[1]]
-                        s += f"    assume ({lhs.op_eq(qp_expr).to_verilog_str()});\n"
-                    elif anno.is_output():
-                        # Assert output
-                        # TODO allow for a more coherent mapping from synth funs to outputs
-                        s += f"    assert ({func_anno(anno, qp_expr).to_verilog_str()});\n"
-                    else:
-                        raise TypeError(f"invalid annotation {anno}")
+                                for b in bounds:
+                                    s += f"    assume ({lhs.op_eq(qp_expr[b[0]:b[1]]).to_verilog_str()});\n"
+                            else:
+                                s += f"    assume ({lhs.op_eq(qp_expr).to_verilog_str()});\n"
+                        elif anno.is_output():
+                            # Assert output
+                            # TODO allow for a more coherent mapping from synth funs to outputs
+                            s += f"    assert ({func_anno(anno, qp_expr).to_verilog_str()});\n"
+                        else:
+                            raise TypeError(f"invalid annotation {anno}")
                     s += "end"
                     pred_cases_l.append(s)
 
@@ -346,13 +355,14 @@ class ModelBuilder(ABC):
             for v, vals in self.value_sets.items()
         )
 
-        return shadow_decls + "\n" + set_assumes + "\n" + textwrap.dedent(f"""\
+        return shadow_decls + "\n" + textwrap.dedent(f"""\
 
             {ctr.get_decl(smt.BVConst(0, ctr_width)).to_verilog_str(is_reg=True)}
             always @(posedge {clock_name}) begin
                 {ctr.to_verilog_str()} <= {ctr.to_verilog_str()} + 1;
             end
             """) + f"always @(posedge {clock_name}) begin\n" + \
+            set_assumes + "\n" + \
             textwrap.indent("\n".join(ctr_cases_l), "    ") + \
             "\n\n" + textwrap.indent("\n".join(pred_cases_l), "    ") + \
             "\nend"
@@ -466,7 +476,8 @@ class ModelBuilder(ABC):
                 self.output_refs,
                 lambda *args: self.sample(*args),
                 io_replay_path,
-                new_log_path=io_log_path
+                new_log_path=io_log_path,
+                value_sets=self.value_sets,
             )
         else:
             io = oi.IOOracle(
@@ -474,7 +485,8 @@ class ModelBuilder(ABC):
                 self.input_vars,
                 self.output_refs,
                 lambda *args: self.sample(*args),
-                log_path=io_log_path
+                log_path=io_log_path,
+                value_sets=self.value_sets,
             )
         self.o_ctx.add_oracle(io)
 

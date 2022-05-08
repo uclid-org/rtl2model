@@ -166,6 +166,12 @@ class Model:
     def is_partial(self):
         return len(self.next_ufs) + len(self.ufs) != 0
 
+    def state_var_count(self):
+        return len(self.inputs) + len(self.outputs) + len(self.state)
+
+    def uf_count(self):
+        return len(self.ufs) + len(self.next_ufs)
+
     def find_uf_p(self, uf_name):
         for uf_p in self.ufs + self.next_ufs:
             if uf_p.name == uf_name:

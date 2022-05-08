@@ -176,7 +176,7 @@ class IOOracle(OracleInterface):
         new_inputs = []
         for var in self.in_vars:
             if var in self.value_sets:
-                new_inputs.append(self.rng.choice(self.value_sets[var]))
+                new_inputs.append(self.rng.choice(list(self.value_sets[var])))
             else:
                 new_inputs.append(self.rng.randint(0, 2 ** var.c_bitwidth() - 1))
         return tuple(new_inputs)

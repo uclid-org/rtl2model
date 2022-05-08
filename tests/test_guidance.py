@@ -32,8 +32,8 @@ class TestGuidance:
         })
         assert guidance.get_annotation_at("a", 4) is None
         assert guidance.get_predicated_annotations("a") == {
-            pc_sig.to_variable().op_eq(6): AnnoType.Param(a_var),
-            smt.BoolConst.T: AnnoType.DONT_CARE,
+            pc_sig.to_variable().op_eq(6): [AnnoType.Param(a_var)],
+            smt.BoolConst.T: [AnnoType.DONT_CARE],
         }
         assert guidance.get_outputs() == {
             (o_var, "Tile->b", pc_sig.to_variable().op_eq(8))
@@ -112,3 +112,40 @@ class TestGuidance:
         assert found_params == {("tb->a", 7), ("tb->data[0]", 7), ("tb->data[3]", 3)}
         assert found_assumes == {("tb->reset", 0), ("tb->a", 3)}
         assert found_outputs == {("tb->b", 8)}
+
+    def test_guidance_indexed(self):
+        signals = [
+            S("tb", "reset", 1),
+            S("tb", "clk", 1),
+            S("tb", "data", 8, bounds=(0, 7)),
+            S("tb", "a", 8),
+            S("tb", "b", 8)
+        ]
+        guidance = Guidance(signals, 10)
+        found_params = set()
+        found_assumes = set()
+        found_outputs = set()
+        a_var = smt.bv_variable("a", 8)
+        d0_var = smt.bv_variable("d0", 8)
+        b_var = smt.bv_variable("b", 32)
+        b_eqz = b_var.op_eq(0)
+        guidance.annotate("a", {
+            b_eqz: [
+                AnnoType.AssumeIndexed((5, 4), (1, 0)),
+                AnnoType.ParamIndexed((3, 2), d0_var),
+            ],
+            smt.BoolConst.T: AnnoType.ASSUME,
+        })
+        found_assumes = list()
+        found_params = list()
+        for cond, annolist in guidance.get_predicated_annotations("a").items():
+            for anno in annolist:
+                if anno.is_assume():
+                    found_assumes.append((cond, anno.bounds))
+                elif anno.is_param():
+                    found_params.append((cond, anno.expr, anno.bounds))
+                else:
+                    raise TypeError("invalid AnnoType: " + str(anno))
+        assert found_assumes == [(b_eqz, ((5, 4), (1, 0))), (smt.BoolConst.T, [])]
+        print(found_params[0]   )
+        assert found_params == [(b_eqz, d0_var, [(3, 2)])]
