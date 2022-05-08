@@ -127,6 +127,7 @@ def main():
         S("Tile", "reset", 1),
         S("Tile", "clock", 1),
         S("Tile", "lft_tile_pc", 32),
+        S("Tile", "lft_tile_stall", 32),
         fe_pc_sig,
         ew_pc_sig,
         S("Tile", "lft_tile_fe_inst", 32),
@@ -172,17 +173,32 @@ def main():
     guidance.annotate("lft_tile_regFile_io_raddr2", AnnoType.ASSUME)
     guidance.annotate("lft_tile_regFile_io_waddr", AnnoType.ASSUME)
     start = smt.bv_variable("start", 32)
+    substart = smt.bv_variable("substart", 32)
+    b3 = smt.bv_variable("b3", 3)
     grammar = smt.Grammar(
-        bound_vars=(short_a, short_b),
+        bound_vars=(short_a, short_b, f3),
         nonterminals=(start,),
-        terms={start: (
-            start + start,
-            start - start,
-            start | start,
-            start[11].ite(smt.BVConst(0xFFFFF000, 32), smt.BVConst(0, 32)),
-            short_a.sext(20),
-            short_b.sext(20),
-        ),},
+        terms={
+            start: (
+                f3.op_eq(b3).ite(substart, substart),
+                substart,
+            ),
+            substart: (
+                substart + substart,
+                substart - substart,
+                substart | substart,
+                substart[11].ite(smt.BVConst(0xFFFFF000, 32), smt.BVConst(0, 32)),
+                short_a.sext(20),
+                short_b.sext(20),
+            ),
+            b3: (
+                smt.BVConst(F3_ADD, 3),
+                smt.BVConst(F3_OR, 3),
+                smt.BVConst(F3_XOR, 3),
+                smt.BVConst(F3_AND, 3),
+                smt.BVConst(F3_SLT, 3),
+            )
+        },
     )
     model = RvMiniModel(
         ProjectConfig(os.path.join(BASEDIR, "symbiyosys"), clock_name="clock"),

@@ -61,6 +61,10 @@ class Inst:
                 assert isinstance(arg, SketchHole) or isinstance(arg, SketchValue), arg
         self.value = tuple(args)
 
+    @property
+    def bitwidth(self):
+        return sum(field.bitwidth for field in self.value)
+
     def __mul__(self, other):
         if not isinstance(other, int):
             raise TypeError(f"can only multiply Inst by int (got {repr(other)})")
@@ -79,6 +83,7 @@ class Inst:
                 bits += "X" * field.bitwidth
             else:
                 bits += f"{field.value:0{field.bitwidth}b}"
+        assert len(bits) == self.bitwidth, f"instruction expected {self.bitwidth} bits, instead got {bits}"
         return bits
 
     def to_hex_str(self):

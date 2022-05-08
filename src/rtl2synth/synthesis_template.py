@@ -4,6 +4,7 @@ import argparse
 from dataclasses import dataclass
 import math
 import os
+import re
 from subprocess import Popen, PIPE
 import textwrap
 from typing import List, Mapping, Set
@@ -200,7 +201,7 @@ class ModelBuilder(ABC):
                 print(f"Sampled {signame}@{cc}={val}")
                 output_vals[sf_ref.name] = val
         if len(output_vals) != len(output_sigs):
-            raise Exception("Failed to sample signals: " + str({t[1] for t in output_sigs} - sampled_outputs))
+            raise Exception("Failed to sample some signals (check output trace): " + str({t[1] for t in output_sigs} - sampled_outputs))
         return output_vals
 
     def generate_test_block_verilog(self, signal_values, signal_widths, funcs: Mapping[str, smt.LambdaTerm]):
@@ -244,7 +245,8 @@ class ModelBuilder(ABC):
         ctr_cases = [] # Each item is a tuple of (iterator condition, assumptions, assertions)
         # Maps input variable to shadow
         shadow_param_map = {v: v.add_prefix("__shadow_") for v in self.input_vars}
-        numshadow = 0
+        # Ensures variables are only sampled once
+        sampled_vars = {v: smt.bool_variable("__sampled_" + v.name) for v in self.input_vars + self.output_refs}
         for stepnum in range(guidance.num_cycles):
             itercond = ctr.op_eq(ctr_values[stepnum])
             assumes = []
@@ -322,23 +324,34 @@ class ModelBuilder(ABC):
                                 s += "        end\n"
                             s += f"    endcase\n"
                         elif anno.is_param():
+                            anno_var = anno.expr.get_vars()[0]
+                            sample_var = sampled_vars[anno_var]
                             # TODO add comments to assumes somehow?
                             lhs = anno.expr.replace_vars(shadow_param_map)
+                            s += f"    if (!{sample_var.to_verilog_str()}) begin\n"
                             if bounds:
                                 for b in bounds:
-                                    s += f"    assume ({lhs.op_eq(qp_expr[b[0]:b[1]]).to_verilog_str()});\n"
+                                    s += f"       assume ({lhs.op_eq(qp_expr[b[0]:b[1]]).to_verilog_str()});\n"
                             else:
-                                s += f"    assume ({lhs.op_eq(qp_expr).to_verilog_str()});\n"
+                                s += f"       assume ({lhs.op_eq(qp_expr).to_verilog_str()});\n"
+                            s += f"        {sample_var.to_verilog_str()} <= 1;\n"
+                            s += f"    end\n"
                         elif anno.is_output():
                             # Assert output
                             # TODO allow for a more coherent mapping from synth funs to outputs
-                            s += f"    assert ({func_anno(anno, qp_expr).to_verilog_str()});\n"
+                            anno_var = anno.expr.get_vars()[0]
+                            sample_var = sampled_vars[anno_var]
+                            s += f"    if (!{sample_var.to_verilog_str()}) begin\n"
+                            s += f"        assert ({func_anno(anno, qp_expr).to_verilog_str()});\n"
+                            s += f"        {sample_var.to_verilog_str()} <= 1;\n"
+                            s += f"    end\n"
                         else:
                             raise TypeError(f"invalid annotation {anno}")
                     s += "end"
                     pred_cases_l.append(s)
 
         shadow_decls = "\n".join(s.get_decl().to_verilog_str(is_reg=True, anyconst=True) for s in shadow_param_map.values())
+        sampled_decls = "\n".join(s.get_decl().to_verilog_str(is_reg=True) for s in sampled_vars.values())
         ctr_cases_l = []
         for itercond, assumes, asserts in ctr_cases:
             s = f"if ({itercond.to_verilog_str()}) begin\n"
@@ -355,7 +368,7 @@ class ModelBuilder(ABC):
             for v, vals in self.value_sets.items()
         )
 
-        return shadow_decls + "\n" + textwrap.dedent(f"""\
+        return shadow_decls + "\n" + sampled_decls + "\n" + textwrap.dedent(f"""\
 
             {ctr.get_decl(smt.BVConst(0, ctr_width)).to_verilog_str(is_reg=True)}
             always @(posedge {clock_name}) begin
@@ -402,17 +415,23 @@ class ModelBuilder(ABC):
         """
         # Assume sby outputs variables in reverse order of declaration
         # (last input is first, etc.)
-        in_vals = []
+        in_map = {}
+        in_var_name_map = {v.name: v for v in self.input_vars}
+        shadow_re = re.compile("__shadow_([a-zA-Z0-9_]+)")
         for line in sby_lines:
             if "Value for anyconst" in line:
-                # TODO regex parse variable name
-                in_vals.insert(0, int(line.split()[-1]))
+                var_name = shadow_re.findall(line)[0]
+                # Value is always the last token in the line
+                i_val = int(line.split()[-1])
+                in_map[in_var_name_map[var_name]] = i_val
         top_prefix = self.model.name + "."
         vcd_r = VcdWrapper(
             os.path.join(self.config.sby_dir, "corr_taskBMC/engine_0/trace.vcd"),
             top_prefix + self.config.clock_name
         )
-        in_map = dict(zip(self.input_vars, in_vals))
+        for v in self.input_vars:
+            if v not in in_map:
+                raise Exception(f"No value for variable {v.name} in sby counterexample")
         out_map = {}
         out_annos = self.guidance.get_outputs()
         for sf_ref, sig_name, cc_or_pred in out_annos:
@@ -533,7 +552,7 @@ class ModelBuilder(ABC):
                     print(f"- {v.name} (input {i + 1}):", inputs[i])
             else:
                 if len(io_o.cex_inputs) != 0:
-                    inputs = tuple(io_o.cex_inputs[-1].values())
+                    inputs = io_o.cex_inputs[-1]
                 else:
                     inputs = io_o.new_random_inputs()
                 # inputs = []
@@ -542,7 +561,7 @@ class ModelBuilder(ABC):
                 # inputs = tuple(inputs)
             # TODO add blocking constraint to prevent sygus from repeating guesses?
             solver.reinit_cvc5()
-            self.o_ctx.call_oracle("io", {v.name: i for v, i in zip(self.input_vars, inputs)})
+            self.o_ctx.call_oracle("io", {v.name: i for v, i in inputs.items()})
             io_o.save_call_logs()
 
             solver.clear_constraints()

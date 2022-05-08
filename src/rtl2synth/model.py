@@ -167,10 +167,18 @@ class Model:
         return len(self.next_ufs) + len(self.ufs) != 0
 
     def state_var_count(self):
-        return len(self.inputs) + len(self.outputs) + len(self.state)
+        own_count = len(self.inputs) + len(self.outputs) + len(self.state)
+        if len(self.instances) == 0:
+            return own_count
+        else:
+            return own_count + sum(inst.model.state_var_count() for inst in self.instances.values())
 
     def uf_count(self):
-        return len(self.ufs) + len(self.next_ufs)
+        own_count = len(self.ufs) + len(self.next_ufs)
+        if len(self.instances) == 0:
+            return own_count
+        else:
+            return own_count + sum(inst.model.uf_count() for inst in self.instances.values())
 
     def find_uf_p(self, uf_name):
         for uf_p in self.ufs + self.next_ufs:

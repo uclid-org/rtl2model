@@ -167,19 +167,18 @@ class IOOracle(OracleInterface):
 
     def new_random_inputs(self):
         """
-        Returns a tuple of uniformly sampled, new random inputs, in the order which `input_vars`
-        is in.
+        Returns a map of variables to uniformly sampled, new random inputs.
         """
         # There is a chance this procedure generates repeat inputs, which can be dealth with
         # by checking against `i_history` -- however, if variables have constraints, then it may
         # not be possible to generate any new values
-        new_inputs = []
+        new_inputs = {}
         for var in self.in_vars:
             if var in self.value_sets:
-                new_inputs.append(self.rng.choice(list(self.value_sets[var])))
+                new_inputs[var] = self.rng.choice(list(self.value_sets[var]))
             else:
-                new_inputs.append(self.rng.randint(0, 2 ** var.c_bitwidth() - 1))
-        return tuple(new_inputs)
+                new_inputs[var] = self.rng.randint(0, 2 ** var.c_bitwidth() - 1)
+        return new_inputs
 
     def cexs(self) -> List[CallResult]:
         """
