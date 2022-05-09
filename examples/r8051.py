@@ -17,13 +17,6 @@ REPO_BASE_DIR = subprocess.run(
 ).stdout.decode("utf-8").strip()
 BASEDIR = os.path.join(REPO_BASE_DIR, "designs/R8051/")
 
-op_values = {
-    0x28, # ADD A, R0
-    0x48, # ORL A, R0
-    0x58, # ANL A, R0
-    0xE8, # MOV A, R0
-}
-
 class R8051Model(ModelBuilder):
     def build_sim(self):
         gen_config.generate_config(

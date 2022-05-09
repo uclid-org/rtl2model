@@ -181,14 +181,14 @@ def main():
     guidance.annotate("lft_tile_regFile_io_waddr", AnnoType.ASSUME)
     start = smt.bv_variable("start", 32)
     substart = smt.bv_variable("substart", 32)
-    b3 = smt.bv_variable("b3", 3)
+    bv3 = smt.bv_variable("bv3", 3)
     boolterm = smt.bool_variable("boolterm")
     grammar = smt.Grammar(
         bound_vars=(short_a, short_b, f3),
         nonterminals=(start,),
         terms={
             start: (
-                f3.op_eq(b3).ite(start, start),
+                f3.op_eq(bv3).ite(start, start),
                 substart,
             ),
             substart: (
@@ -204,7 +204,7 @@ def main():
                 short_a[11],
                 short_b[11],
             ),
-            b3: (
+            bv3: (
                 smt.BVConst(F3_ADD, 3),
                 smt.BVConst(F3_OR, 3),
                 smt.BVConst(F3_XOR, 3),
