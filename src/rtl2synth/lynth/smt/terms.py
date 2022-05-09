@@ -896,16 +896,17 @@ class OpTerm(Term):
                 for i in range(len(self.args) - 4, 0, -2):
                     t = a0.op_eq(self.args[i]).ite(self.args[i + 1], t)
                 return t.to_sygus2()
+            # extract, zero_extend, and sign_extend all use decimals instead of hex
             if self.kind == Kind.BVExtract:
                 assert isinstance(self.args[1], BVConst), self.args
                 assert isinstance(self.args[2], BVConst), self.args
                 return f"((_ extract {self.args[1].val} {self.args[2].val}) {self.args[0].to_sygus2()})"
             if self.kind == Kind.BVZeroPad:
                 assert isinstance(self.args[1], BVConst), self.args
-                return f"((_ zero_extend {self.args[1].to_sygus2()}) {self.args[0].to_sygus2()})"
+                return f"((_ zero_extend {self.args[1].val}) {self.args[0].to_sygus2()})"
             if self.kind == Kind.BVSignExtend:
                 assert isinstance(self.args[1], BVConst), self.args
-                return f"((_ sign_extend {self.args[1].to_sygus2()}) {self.args[0].to_sygus2()})"
+                return f"((_ sign_extend {self.args[1].val}) {self.args[0].to_sygus2()})"
             if self.kind == Kind.Distinct:
                 return f"(not (= " +  " ".join(a.to_sygus2() for a in self.args) + "))"
             return "(" + _OP_SYGUS_SYMBOLS[self.kind] + " " + " ".join([a.to_sygus2() for a in self.args]) + ")"
