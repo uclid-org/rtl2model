@@ -66,14 +66,14 @@ class _ProfileResults:
         t = PrettyTable(["operation", "counts", "total seconds", "avg seconds"])
         for s, times in self.segments.items():
             counts = len(times)
-            tot_times = sum(end - start for start, end in times) / 1e6
+            tot_times = sum(end - start for start, end in times) / 1e9
             if counts == 0:
                 avg = "--"
             else:
                 avg = tot_times / counts
             t.add_row([s.name, counts, tot_times, avg])
         print(t)
-        print("Total runtime:", (final - self.init_ns) / 1e9)
+        print("Total runtime:", (final - self.init_ns) / 1e9, "seconds")
         if self.curr_segment_stack:
             s = self.curr_segment_stack[-1]
             t = (final - self.start_ns_stack[-1]) / 1e9
