@@ -20,3 +20,11 @@ Run `git submodule init --update --recursive` to get the source code for those f
 Finally, run `pip3 install -e .` in this directory to install the `rtl2synth` package. You can then run examples with `python3 examples/rvmini.py`.
 
 To build documentation, run `pdoc rtl2synth`.
+
+## Structure
+- `designs`: submodule containing RTL, simulation, and model checking code for each design under test
+- `examples`: example scripts for verifying designs, written using the `rtl2synth` framework
+- `pyvcd`, `Pyverilog`: git submodules for custom builds of dependencies
+- `scripts`: various utility python and shell scripts
+- `src`: python source code for `rtl2synth` module
+- `tests`: test cases for `rtl2synth`

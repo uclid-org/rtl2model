@@ -1,5 +1,7 @@
 """
 Synthesizes a model for riscv-mini from RTL.
+
+THIS VERSION CONTAINS AN ERROR WITH THE REFINEMENT RELATION, AND DOES NOT PASS.
 """
 
 import os
@@ -108,7 +110,7 @@ def main():
         "Tile",
         clock_pattern=".*clock",
         defined_modules=[dpath],
-        # pickle_path="rvmini.pickle",
+        pickle_path="rvmini.pickle",
     )
 
     sketch = ProgramSketch(
@@ -157,10 +159,11 @@ def main():
     guidance = Guidance(SIGNALS, cycle_count)
     for sig in ["reset", "lft_tile_pc", "lft_tile_fe_pc", "lft_tile_ew_pc"]:
         guidance.annotate(sig, AnnoType.ASSUME)
+    # ERROR: registers got swapped here, so refinement relation is incorrect
     # a1 (shadow var)
-    guidance.annotate("lft_tile_regs_11", {ew_pc_var.op_eq(0x204): AnnoType.ParamIndexed((11, 0), short_a)})
+    guidance.annotate("lft_tile_regs_11", {ew_pc_var.op_eq(0x208): AnnoType.ParamIndexed((11, 0), short_a)})
     # a2 (shadow var)
-    guidance.annotate("lft_tile_regs_12", {ew_pc_var.op_eq(0x208): AnnoType.ParamIndexed((11, 0), short_b)})
+    guidance.annotate("lft_tile_regs_12", {ew_pc_var.op_eq(0x204): AnnoType.ParamIndexed((11, 0), short_b)})
     # a3 (output)
     guidance.annotate("lft_tile_regs_13",
         {ew_pc_var.op_eq(0x20C): AnnoType.Output(v("ALUArea.alu_result", bv32))}
