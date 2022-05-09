@@ -103,6 +103,8 @@ def main():
         {("top", "s0"): smt.Grammar(
             bound_vars=(i1, i2),
             nonterminals=(start,),
+            # Order of these terms matters
+            # Python dicts preserve insertion/declaration order
             terms={start: (
                 start + start,
                 start - start,

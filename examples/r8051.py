@@ -9,10 +9,6 @@ from rtl2synth.sketch import *
 import rtl2synth.lynth.smt as smt
 from rtl2synth.verilog import *
 
-# Things needed:
-# - verilator file + Makefile + csv emitting stuff (tracing_manager)
-# - possibly instrumented variables
-
 REPO_BASE_DIR = subprocess.run(
     "git rev-parse --show-toplevel",
     shell=True,
@@ -20,6 +16,13 @@ REPO_BASE_DIR = subprocess.run(
     check=True
 ).stdout.decode("utf-8").strip()
 BASEDIR = os.path.join(REPO_BASE_DIR, "designs/R8051/")
+
+op_values = {
+    0x28, # ADD A, R0
+    0x48, # ORL A, R0
+    0x58, # ANL A, R0
+    0xE8, # MOV A, R0
+}
 
 class R8051Model(ModelBuilder):
     def build_sim(self):
@@ -42,27 +45,24 @@ def main():
     v = smt.Variable
     bv8 = smt.BVSort(8)
     x, y = v("lft_data1", bv8), v("lft_acc", bv8)
-    op = v("lft_cmd0", bv8)
-
     core = verilog_to_model(
         os.path.join(BASEDIR, "full.v"),
         "r8051",
         clock_pattern="clk",
-        # important_signals=[
-        #     "rst",
-        #     "lft_pc",
-        #     "lft_acc",
-        #     # "next_acc",
-        #     "acc",
-        #     "lft_psw_c",
-        #     "lft_cmd0",
-        #     "lft_cmd1",
-        #     "lft_cmd2",
-        #     "ram_wr_byte",
-        #     "lft_data1",
-        # ],
-        coi_conf=COIConf.UF_ARGS_COI,
-        pickle_path="r8051.pickle"
+        important_signals=[
+            "rst",
+            "lft_pc",
+            "lft_acc",
+            "next_acc",
+            "lft_psw_c",
+            "lft_cmd0",
+            "lft_cmd1",
+            "lft_cmd2",
+            "lft_data1",
+        ],
+        coi_conf=COIConf.NO_COI,
+        # coi_conf=COIConf.UF_ARGS_COI,
+        # pickle_path="r8051.pickle"
     )
     core.print()
     core = core.eliminate_dead_code()
@@ -71,15 +71,11 @@ def main():
 
     # https://www.keil.com/support/man/docs/is51/is51_opcodes.htm
     sketch = ProgramSketch(
-        inst_byte(0x00),    # nop
-        inst_byte(0x78),    # MOV R0, imm
-        Inst(x),            # (imm)
-        inst_byte(0x74),    # MOV A, imm
-        Inst(y),            # (imm)
-        Inst(op),           # ??? A, R0 (constrained)
-        inst_byte(0x00),    # NOP
-        inst_byte(0x00),
-        inst_byte(0x00),
+        inst_byte(0x00),                # NOP
+        Inst(SketchValue(0x78, 8), x),  # MOV R0, imm
+        Inst(SketchValue(0x74, 8), y),  # MOV A, imm
+        inst_byte(0x28),                # ADD A, R0
+        inst_byte(0x00) * 20,           # NOP x20
     )
 
     cycle_count = 10
@@ -89,13 +85,11 @@ def main():
         S("tb", "clk", 1),
         S("tb", "rst", 1),
         pc_sig,
-        S("tb", "next_acc", 8),
         S("tb", "lft_acc", 8),
         S("tb", "lft_psw_c", 1),
         S("tb", "lft_cmd0", 8),
         S("tb", "lft_cmd1", 8),
         S("tb", "lft_cmd2", 8),
-        S("tb", "ram_wr_byte", 8),
         S("tb", "data", 8, bounds=(0, 7)),
     ]
     guidance = Guidance(SIGNALS, cycle_count)
@@ -104,52 +98,48 @@ def main():
     guidance.annotate("lft_cmd0", {
         pc_var.op_eq(3): AnnoType.Param(x),
         pc_var.op_eq(5): AnnoType.Param(y),
-        pc_var.op_eq(7): AnnoType.Param(op),
         smt.BoolConst.T: AnnoType.ASSUME,
     })
-    guidance.annotate("lft_acc", {
-        pc_var.op_eq(8): AnnoType.Output(v("r8051.next_acc", bv8)),
+    # guidance.annotate("lft_acc", {
+    #     pc_var.op_eq(8): AnnoType.Output(v("r8051.next_acc", bv8)),
+    # })
+    guidance.annotate("lft_psw_c", {
+        pc_var.op_eq(8): AnnoType.Output(smt.bool_variable("r8051.psw_c"))
     })
 
-    start = smt.Variable("Start", bv8)
-    substart = smt.Variable("BV8", bv8)
-    boolterm = smt.bool_variable("B")
+    bv8term = smt.Variable("bv8", bv8)
+    bv9term = smt.Variable("bv9", smt.BVSort(9))
+    boolterm = smt.bool_variable("boolterm")
     grammar = smt.Grammar(
         (x, y),
-        (start, boolterm, substart),
-        # Order of these terms matters
-        # Python dicts preserve insertion/declaration order
+        (boolterm, bv9term, bv8term),
         {
-            start: (
-                start + start,
-                start - start,
-                start | start,
-                boolterm.ite(substart, substart),
-            ),
             boolterm: (
-                boolterm & boolterm,
-                boolterm | boolterm,
                 ~boolterm,
-                boolterm.implies(boolterm),
-                boolterm ^ boolterm,
+                bv9term.op_eq(bv9term),
+                bv9term < bv9term,
                 smt.BoolConst.T,
             ),
-            substart: (x, y),
+            bv9term: (
+                bv9term + bv9term,
+                bv9term - bv9term,
+                bv9term | bv9term,
+                bv8term.zpad(1),
+                # boolterm.ite(subbv8term, subbv8term),
+            ),
+            bv8term: (x, y, smt.BVConst(0, 8), smt.BVConst(0xFF, 8)),
         }
     )
 
     model = R8051Model(
-        ProjectConfig(os.path.join(BASEDIR, "symbiyosys")),
+        ProjectConfig(
+            sby_dir=os.path.join(BASEDIR, "symbiyosys"),
+            verilator_top="tb",
+        ),
         sketch,
         core,
-        {("r8051", "next_acc"): grammar},
+        {("r8051", "psw_c"): grammar},
         guidance,
-        value_sets={op: {
-            0x28, # ADD A, R0
-            0x48, # ORL A, R0
-            0x58, # ANL A, R0
-            0xE8, # MOV A, R0
-        }}
     )
     import faulthandler
     faulthandler.enable()

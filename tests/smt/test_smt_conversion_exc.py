@@ -28,6 +28,8 @@ exprs = {
     "orr": x.orr(),
     "xorr": x.xorr(),
     # TODO unsigned + signed comparison ops
+    "ult": x < y,
+    "ule": x <= y,
     "zpad": x.zero_pad(smt.BVConst(4, 4)),
     "sext": x.sign_extend(smt.BVConst(4, 4)),
     "sll": x.sll(y),

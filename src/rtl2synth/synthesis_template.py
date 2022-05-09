@@ -22,6 +22,7 @@ from rtl2synth.verilog import VcdWrapper
 class ProjectConfig:
     sby_dir: str
     clock_name: str="clk"
+    verilator_top: Optional[str] = None
     # TODO figure out what other paths we need
 
     def __post_init__(self):
@@ -95,10 +96,19 @@ class ModelBuilder(ABC):
         submodel_map = {m.name: m for m in submodels}
         synthfuns = {}
         for (sf_mod, sf_name), g in synthfun_grammars.items():
+            g_binds = g.bound_vars
             maybe_uf = submodel_map[sf_mod].find_uf_p(sf_name)
             if maybe_uf is None:
                 raise Exception(f"Could not find UF {sf_name} in module {sf_mod}")
-            synthfuns[(sf_mod, sf_name)] = (maybe_uf.to_synthfun(g))
+            if g_binds != maybe_uf.params:
+                print(f"***WARNING: grammar changes type signature of UF {sf_mod}.{sf_name}***")
+                original_args_s = ", ".join(f"{v.name} : {v.sort}" for v in maybe_uf.params)
+                new_args_s = ", ".join(f"{v.name} : {v.sort}" for v in g_binds)
+                print(f"            original args: ({original_args_s}); new args: ({new_args_s})")
+                sf = smt.SynthFun(sf_name, g_binds, maybe_uf.sort, g)
+            else:
+                sf = maybe_uf.to_synthfun(g)
+            synthfuns[(sf_mod, sf_name)] = sf
         solver = smt.Solver(synthfuns=list(synthfuns.values()))
         PROFILE.add_model(model, len(synthfuns))
         self.input_vars = sketch.get_hole_vars()
@@ -357,7 +367,7 @@ class ModelBuilder(ABC):
         shadow_decls = "\n".join(s.get_decl().to_verilog_str(is_reg=True, anyconst=True) for s in shadow_param_map.values())
         sampled_decls = "\n".join(s.get_decl(init_value=smt.BVConst(0, 1)).to_verilog_str(is_reg=True) for s in sampled_vars.values())
         out_decls = "\n".join(s.get_decl().to_verilog_str() for s in out_vars.values())
-        out_assigns = "\n".join(f"assign __hypothesis_{v} = {expr};" for v, expr in out_exprs.items())
+        out_assigns = "\n".join(f"assign __hypothesis_{v} = {expr.to_verilog_str()};" for v, expr in out_exprs.items())
         ctr_cases_l = []
         for itercond, assumes, asserts in ctr_cases:
             s = f"if ({itercond.to_verilog_str()}) begin\n"
@@ -434,7 +444,7 @@ class ModelBuilder(ABC):
                 # Value is always the last token in the line
                 i_val = int(line.split()[-1])
                 in_map[in_var_name_map[var_name]] = i_val
-        top_prefix = self.model.name + "."
+        top_prefix = self.config.verilator_top + "."
         vcd_r = VcdWrapper(
             os.path.join(self.config.sby_dir, "corr_taskBMC/engine_0/trace.vcd"),
             top_prefix + self.config.clock_name

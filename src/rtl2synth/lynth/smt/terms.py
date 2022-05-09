@@ -121,6 +121,7 @@ _OP_SYGUS_SYMBOLS = {
     Kind.BVSll: "bvshl",
     Kind.BVSrl: "bvashr",
     Kind.BVSra: "bvlshr",
+    Kind.BVUlt: "bvult",
     Kind.BVUle: "bvule",
     Kind.BVUgt: "bvugt",
     Kind.BVUge: "bvuge",
@@ -996,7 +997,9 @@ class OpTerm(Term):
                 #        c0r0                  m0                 m1r1          c1
                 return f"{{{{{self.args[1].val}{{{a0_str}[{msb_i}]}}}}, {a0_str}}}"
             if v == Kind.BVZeroPad:
-                return wrap(self.args[0])
+                a0_str = self.args[0].to_verilog_str()
+                #        c0r0                     r1          c1
+                return f"{{{{{self.args[1].val}'h0}}, {a0_str}}}"
             raise NotImplementedError(v)
         elif tgt == TargetFormat.UCLID:
             def wrap(term):
