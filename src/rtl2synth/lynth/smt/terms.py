@@ -1473,7 +1473,11 @@ class BVConst(Term):
             new_sort = cvc5_ctx.solver.mkBitVector(self.width, self.val)
             return new_sort
         elif tgt == TargetFormat.SYGUS2:
-            return "#x{:x}".format(self.val)
+            # sygus literal lengths determine their type
+            if self.width % 4 == 0:
+                return f"#x{self.val:0{self.width // 4}x}"
+            else:
+                return f"#b{self.val:0{self.width}b}"
         elif tgt == TargetFormat.VERILOG:
             return "{}'h{:x}".format(self.width, self.val)
         elif tgt == TargetFormat.UCLID:

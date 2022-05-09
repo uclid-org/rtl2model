@@ -24,10 +24,16 @@ REPO_BASE_DIR = subprocess.run(
 BASEDIR = os.path.join(REPO_BASE_DIR, "designs/riscv-mini/")
 
 F3_ADD = 0b000
-F3_SLT = 0b010
+# F3_SLTU = 0b011
 F3_XOR = 0b100
 F3_OR = 0b110
 F3_AND = 0b111
+f3_set = {
+    F3_ADD,
+    F3_XOR,
+    F3_OR,
+    F3_AND,
+}
 
 class RvMiniModel(ModelBuilder):
     def build_sim(self):
@@ -72,12 +78,17 @@ def main():
             short_a: a[11:0],
             short_b: b[11:0],
             # Workaround hack to make decoding work properly
+            # Refer to chisel code in ALU design
             f3: alu_op.match_const({
                 0: smt.BVConst(F3_ADD, 3),
                 2: smt.BVConst(F3_AND, 3),
                 3: smt.BVConst(F3_OR, 3),
                 4: smt.BVConst(F3_XOR, 3),
-                5: smt.BVConst(F3_SLT, 3),
+                # dummy cases to ensure exhaustion
+                1: smt.BVConst(F3_ADD, 3),
+                5: smt.BVConst(F3_ADD, 3),
+                6: smt.BVConst(F3_ADD, 3),
+                7: smt.BVConst(F3_ADD, 3),
             }),
             io_out: v("alu_result", bv32)
         }
@@ -103,8 +114,8 @@ def main():
     sketch = ProgramSketch(
         inst_word(0) * (31 * 4),     # @000 496 bytes of 0s
         inst_word(0x13) * 4,        # @496 through 508: nop
-        Inst(short_a, SketchValue(0b11000010011, 20)), # @512 addi a2, x0, ???
-        Inst(short_b, SketchValue(0b10110010011, 20)), # @516 addi a1, x0, ???
+        Inst(short_a, SketchValue(0b10110010011, 20)), # @512 addi a1, x0, ???
+        Inst(short_b, SketchValue(0b11000010011, 20)), # @516 addi a2, x0, ???
         # Fix R-type opcode; vary f3 field
         Inst(SketchValue(0x18b, 17), f3, SketchValue(0x6b3, 12)), # @520 ?? a3, a1, a2
         inst_word(0x13) * 20,       # 524 (and later): nop
@@ -113,9 +124,6 @@ def main():
         # remember that instructions don't commit until they reach the last stage, making
         # cycle 14 (IF_PC=532) the minimum -- we can overshoot safely though since there
         # are just more of the same instruction over and over after
-        # the trace seems to stall for some reason though? TODO ask adwait about that
-        # for now, the pattern seems to be that 4 adds retire successfully, then the next add
-        # stalls for an additional 3 cycles
     )
 
     cycle_count = 21
@@ -142,7 +150,6 @@ def main():
         S("Tile", "lft_tile_alu_io_alu_op", 32),
         S("Tile", "lft_tile_alu_io_out", 32),
         S("Tile", "lft_tile_alu_io_sum", 32),
-        S("Tile", "lft_tile_regs_10", 32),
         S("Tile", "lft_tile_regs_11", 32),
         S("Tile", "lft_tile_regs_12", 32),
         S("Tile", "lft_tile_regs_13", 32),
@@ -151,9 +158,9 @@ def main():
     for sig in ["reset", "lft_tile_pc", "lft_tile_fe_pc", "lft_tile_ew_pc"]:
         guidance.annotate(sig, AnnoType.ASSUME)
     # a1 (shadow var)
-    guidance.annotate("lft_tile_regs_11", {ew_pc_var.op_eq(0x208): AnnoType.ParamIndexed((11, 0), short_a)})
+    guidance.annotate("lft_tile_regs_11", {ew_pc_var.op_eq(0x204): AnnoType.ParamIndexed((11, 0), short_a)})
     # a2 (shadow var)
-    guidance.annotate("lft_tile_regs_12", {ew_pc_var.op_eq(0x204): AnnoType.ParamIndexed((11, 0), short_b)})
+    guidance.annotate("lft_tile_regs_12", {ew_pc_var.op_eq(0x208): AnnoType.ParamIndexed((11, 0), short_b)})
     # a3 (output)
     guidance.annotate("lft_tile_regs_13",
         {ew_pc_var.op_eq(0x20C): AnnoType.Output(v("ALUArea.alu_result", bv32))}
@@ -175,28 +182,34 @@ def main():
     start = smt.bv_variable("start", 32)
     substart = smt.bv_variable("substart", 32)
     b3 = smt.bv_variable("b3", 3)
+    boolterm = smt.bool_variable("boolterm")
     grammar = smt.Grammar(
         bound_vars=(short_a, short_b, f3),
         nonterminals=(start,),
         terms={
             start: (
-                f3.op_eq(b3).ite(substart, substart),
+                f3.op_eq(b3).ite(start, start),
                 substart,
             ),
             substart: (
                 substart + substart,
                 substart - substart,
                 substart | substart,
-                substart[11].ite(smt.BVConst(0xFFFFF000, 32), smt.BVConst(0, 32)),
+                boolterm.ite(smt.BVConst(1, 32), smt.BVConst(0, 32)),
+                boolterm.ite(smt.BVConst(0xFFFFF000, 32), smt.BVConst(0, 32)),
                 short_a.sext(20),
                 short_b.sext(20),
+            ),
+            boolterm: (
+                short_a[11],
+                short_b[11],
             ),
             b3: (
                 smt.BVConst(F3_ADD, 3),
                 smt.BVConst(F3_OR, 3),
                 smt.BVConst(F3_XOR, 3),
                 smt.BVConst(F3_AND, 3),
-                smt.BVConst(F3_SLT, 3),
+                # smt.BVConst(F3_SLTU, 3),
             )
         },
     )
@@ -207,13 +220,7 @@ def main():
         {("ALUArea", "alu_result"): grammar},
         # {("ALUArea", "alu_result"): None},
         guidance,
-        {f3: {
-            F3_ADD,
-            F3_SLT,
-            F3_XOR,
-            F3_OR,
-            F3_AND,
-        }}
+        {f3: f3_set}
     )
     import faulthandler
     faulthandler.enable()

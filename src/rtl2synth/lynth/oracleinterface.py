@@ -187,8 +187,6 @@ class IOOracle(OracleInterface):
         return [CallResult(i, o) for i, o in zip(self.cex_inputs, self.cex_outputs)]
 
     def add_cex(self, input_vals, output_vals):
-        self.i_history.append(input_vals)
-        self.o_history.append(output_vals)
         self.cex_inputs.append(input_vals)
         self.cex_outputs.append(output_vals)
 
@@ -199,7 +197,7 @@ class IOOracle(OracleInterface):
         """
         model, synthfuns = args
         constraints = []
-        for call in self.calls:
+        for call in self.calls + self.cexs():
             i_var_map = {i_var: smt.BVConst(i_val, i_var.c_bitwidth()) for i_var, i_val in call.inputs.items()}
             # Constraints: outputs of each synth fun takes on the appropriate value
             # when inputs correspond to these input values

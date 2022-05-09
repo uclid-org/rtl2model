@@ -230,6 +230,7 @@ class ModelBuilder(ABC):
         def func_anno(atype, qp_var):
             """
             Gets the expression for an output annotation.
+            Also updates `out_exprs`.
             """
             assert atype.is_output(), atype
             vs = atype.expr.get_vars()
@@ -238,7 +239,8 @@ class ModelBuilder(ABC):
             if atype.bounds:
                 raise NotImplementedError()
             func = funcs[v.get_base().name]
-            return func.body.replace_vars(shadow_param_map).op_eq(qp_var)
+            out_exprs[v] = func.body.replace_vars(shadow_param_map)
+            return out_vars[v].op_eq(qp_var)
 
         ctr = smt.bv_variable("__lift_cc", ctr_width)
         ctr_values = [smt.BVConst(i, ctr_width) for i in range(guidance.num_cycles)]
@@ -247,6 +249,8 @@ class ModelBuilder(ABC):
         shadow_param_map = {v: v.add_prefix("__shadow_") for v in self.input_vars}
         # Ensures variables are only sampled once
         sampled_vars = {v: smt.bool_variable("__sampled_" + v.name) for v in self.input_vars + self.output_refs}
+        out_vars = {v: v.add_prefix("__hypothesis_") for v in self.output_refs}
+        out_exprs = {}
         for stepnum in range(guidance.num_cycles):
             itercond = ctr.op_eq(ctr_values[stepnum])
             assumes = []
@@ -331,9 +335,9 @@ class ModelBuilder(ABC):
                             s += f"    if (!{sample_var.to_verilog_str()}) begin\n"
                             if bounds:
                                 for b in bounds:
-                                    s += f"       assume ({lhs.op_eq(qp_expr[b[0]:b[1]]).to_verilog_str()});\n"
+                                    s += f"        assume ({lhs.op_eq(qp_expr[b[0]:b[1]]).to_verilog_str()});\n"
                             else:
-                                s += f"       assume ({lhs.op_eq(qp_expr).to_verilog_str()});\n"
+                                s += f"        assume ({lhs.op_eq(qp_expr).to_verilog_str()});\n"
                             s += f"        {sample_var.to_verilog_str()} <= 1;\n"
                             s += f"    end\n"
                         elif anno.is_output():
@@ -351,7 +355,9 @@ class ModelBuilder(ABC):
                     pred_cases_l.append(s)
 
         shadow_decls = "\n".join(s.get_decl().to_verilog_str(is_reg=True, anyconst=True) for s in shadow_param_map.values())
-        sampled_decls = "\n".join(s.get_decl().to_verilog_str(is_reg=True) for s in sampled_vars.values())
+        sampled_decls = "\n".join(s.get_decl(init_value=smt.BVConst(0, 1)).to_verilog_str(is_reg=True) for s in sampled_vars.values())
+        out_decls = "\n".join(s.get_decl().to_verilog_str() for s in out_vars.values())
+        out_assigns = "\n".join(f"assign __hypothesis_{v} = {expr};" for v, expr in out_exprs.items())
         ctr_cases_l = []
         for itercond, assumes, asserts in ctr_cases:
             s = f"if ({itercond.to_verilog_str()}) begin\n"
@@ -368,7 +374,11 @@ class ModelBuilder(ABC):
             for v, vals in self.value_sets.items()
         )
 
-        return shadow_decls + "\n" + sampled_decls + "\n" + textwrap.dedent(f"""\
+        return shadow_decls + "\n" + \
+            sampled_decls + "\n" + \
+            out_decls + "\n" + \
+            out_assigns + "\n" + \
+            textwrap.dedent(f"""\
 
             {ctr.get_decl(smt.BVConst(0, ctr_width)).to_verilog_str(is_reg=True)}
             always @(posedge {clock_name}) begin
@@ -572,8 +582,8 @@ class ModelBuilder(ABC):
             PROFILE.push(Segment.SYNTH_ENGINE)
             sr = solver.check_synth()
             PROFILE.pop()
-            print("Synthesis done, candidates are:")
             if sr.is_unsat:
+                print("Synthesis done, candidates are:")
                 candidates = sr.solution
                 for name, cand in candidates.items():
                     print("   ", name, "=", cand)
@@ -582,9 +592,10 @@ class ModelBuilder(ABC):
                 # Counterexample is implicitly added by the oracle function
                 is_correct = cr.outputs
                 if is_correct:
-                    print("All oracles passed. Found a solution: ")
+                    print("=== All oracles passed. Found a solution: ===")
                     for name, cand in candidates.items():
                         print("   ", name, "=", cand)
+                        print("   ", name, "=", cand.to_sygus2())
                     io_o.save_call_logs()
                     model = self.model
                     for (mod_name, uf_name) in self.sf_map:
@@ -599,4 +610,7 @@ class ModelBuilder(ABC):
                 print("I/O history:")
                 for call in io_o.calls:
                     print(call)
+                print("BMC counterexamples:")
+                for cex in io_o.cexs():
+                    print(cex)
                 return None
