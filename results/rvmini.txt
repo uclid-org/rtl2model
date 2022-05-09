@@ -1,0 +1,2199 @@
+Model Datapath (generated via GeneratedBy.VERILOG_PARSE):
+    inputs=
+        reset : bool,
+        io_host_fromhost_valid : bool,
+        io_host_fromhost_bits : bv32,
+        io_icache_resp_valid : bool,
+        io_icache_resp_bits_data : bv32,
+        io_dcache_resp_valid : bool,
+        io_dcache_resp_bits_data : bv32,
+        io_ctrl_pc_sel : bv2,
+        io_ctrl_inst_kill : bool,
+        io_ctrl_A_sel : bool,
+        io_ctrl_B_sel : bool,
+        io_ctrl_imm_sel : bv3,
+        io_ctrl_alu_op : bv4,
+        io_ctrl_br_type : bv3,
+        io_ctrl_st_type : bv2,
+        io_ctrl_ld_type : bv3,
+        io_ctrl_wb_sel : bv2,
+        io_ctrl_wb_en : bool,
+        io_ctrl_csr_cmd : bv3,
+        io_ctrl_illegal : bool
+    outputs=
+        io_host_tohost : bv32,
+        io_icache_req_valid : bool,
+        io_icache_req_bits_addr : bv32,
+        io_dcache_abort : bool,
+        io_dcache_req_valid : bool,
+        io_dcache_req_bits_addr : bv32,
+        io_dcache_req_bits_data : bv32,
+        io_dcache_req_bits_mask : bv4,
+        io_ctrl_inst : bv32,
+        io_lft_dpath__stall : bool,
+        io_lft_dpath__pc : bv33,
+        io_lft_dpath__fe_pc : bv33,
+        io_lft_dpath__fe_inst : bv32,
+        io_lft_dpath__ew_pc : bv33,
+        io_lft_dpath__regFile_io_rdata1 : bv32,
+        io_lft_dpath__regFile_io_rdata2 : bv32,
+        io_lft_dpath__regFile_io_raddr1 : bv5,
+        io_lft_dpath__regFile_io_raddr2 : bv5,
+        io_lft_dpath__regFile_io_wdata : bv32,
+        io_lft_dpath__regFile_io_waddr : bv5,
+        io_lft_dpath__regs_10 : bv32,
+        io_lft_dpath__regs_11 : bv32,
+        io_lft_dpath__regs_12 : bv32,
+        io_lft_dpath__regs_13 : bv32,
+        io_lft_dpath__regs_14 : bv32,
+        io_lft_dpath__alu_io_A : bv32,
+        io_lft_dpath__alu_io_B : bv32,
+        io_lft_dpath__alu_io_alu_op : bv4,
+        io_lft_dpath__alu_io_out : bv32,
+        io_lft_dpath__alu_io_sum : bv32
+    state=
+        csr_reset : bool,
+        csr_io_stall : bool,
+        csr_io_cmd : bv3,
+        csr_io_in : bv32,
+        csr_io_out : bv32,
+        csr_io_pc : bv32,
+        csr_io_addr : bv32,
+        csr_io_inst : bv32,
+        csr_io_illegal : bool,
+        csr_io_st_type : bv2,
+        csr_io_ld_type : bv3,
+        csr_io_pc_check : bool,
+        csr_io_expt : bool,
+        csr_io_evec : bv32,
+        csr_io_epc : bv32,
+        csr_io_host_fromhost_valid : bool,
+        csr_io_host_fromhost_bits : bv32,
+        csr_io_host_tohost : bv32,
+        regFile_io_raddr1 : bv5,
+        regFile_io_raddr2 : bv5,
+        regFile_io_rdata1 : bv32,
+        regFile_io_rdata2 : bv32,
+        regFile_io_wen : bool,
+        regFile_io_waddr : bv5,
+        regFile_io_wdata : bv32,
+        alu_io_A : bv32,
+        alu_io_B : bv32,
+        alu_io_alu_op : bv4,
+        alu_io_out : bv32,
+        alu_io_sum : bv32,
+        immGen_io_inst : bv32,
+        immGen_io_sel : bv3,
+        immGen_io_out : bv32,
+        brCond_io_rs1 : bv32,
+        brCond_io_rs2 : bv32,
+        brCond_io_br_type : bv3,
+        brCond_io_taken : bool,
+        fe_inst : bv32,
+        fe_pc : bv33,
+        ew_inst : bv32,
+        ew_pc : bv33,
+        ew_alu : bv32,
+        csr_in : bv32,
+        st_type : bv2,
+        ld_type : bv3,
+        wb_sel : bv2,
+        wb_en : bool,
+        csr_cmd : bv3,
+        illegal : bool,
+        pc_check : bool,
+        started : bool,
+        pc : bv33,
+        _T_151 : bool,
+        _T_153 : bool,
+        stall : bool,
+        _T_156 : bv33,
+        _T_157 : bv33,
+        _T_158 : bv32,
+        _T_160 : bool,
+        _T_161 : bool,
+        _T_162 : bool,
+        _T_164 : bv32,
+        _GEN_24 : bv33,
+        _T_166 : bv33,
+        _T_167 : bool,
+        _T_169 : bv34,
+        _T_170 : bv33,
+        _T_171 : bv33,
+        _T_172 : bv33,
+        _T_173 : bv33,
+        _T_174 : bv33,
+        npc : bv33,
+        _T_175 : bool,
+        _T_176 : bool,
+        _T_177 : bool,
+        inst : bv32,
+        _T_182 : bool,
+        _GEN_0 : bv33,
+        _GEN_1 : bv32,
+        rs1_addr : bv5,
+        rs2_addr : bv5,
+        wb_rd_addr : bv5,
+        _T_187 : bool,
+        _T_188 : bool,
+        _T_189 : bool,
+        rs1hazard : bool,
+        _T_191 : bool,
+        _T_192 : bool,
+        _T_193 : bool,
+        rs2hazard : bool,
+        _T_194 : bool,
+        _T_195 : bool,
+        rs1 : bv32,
+        _T_197 : bool,
+        rs2 : bv32,
+        _T_199 : bv33,
+        _T_201 : bv32,
+        _T_202 : bv32,
+        _T_204 : bv32,
+        _GEN_25 : bv35,
+        daddr : bv35,
+        _T_206 : bool,
+        _GEN_26 : bv8,
+        _T_208 : bv8,
+        _T_209 : bool,
+        _GEN_27 : bv4,
+        _T_211 : bv4,
+        _GEN_28 : bv8,
+        woffset : bv8,
+        _T_215 : bool,
+        _T_217 : bool,
+        _T_218 : bool,
+        _T_219 : bool,
+        _GEN_29 : bv287,
+        _T_220 : bv287,
+        _T_221 : bv2,
+        _T_225 : bv2,
+        _T_226 : bv5,
+        _T_229 : bv4,
+        _T_230 : bool,
+        _T_231 : bv4,
+        _T_232 : bool,
+        _T_233 : bv5,
+        _T_234 : bool,
+        _T_235 : bv5,
+        _T_239 : bool,
+        _T_240 : bool,
+        _T_250 : bool,
+        _T_251 : bool,
+        _T_252 : bool,
+        _T_253 : bv32,
+        _GEN_2 : bv33,
+        _GEN_3 : bv32,
+        _GEN_4 : bv32,
+        _GEN_5 : bv32,
+        _GEN_6 : bv2,
+        _GEN_7 : bv3,
+        _GEN_8 : bv2,
+        _GEN_9 : bool,
+        _GEN_10 : bv3,
+        _GEN_11 : bool,
+        _GEN_12 : bool,
+        _GEN_13 : bv2,
+        _GEN_14 : bv3,
+        _GEN_15 : bool,
+        _GEN_16 : bv3,
+        _GEN_17 : bool,
+        _GEN_18 : bool,
+        _GEN_19 : bv33,
+        _GEN_20 : bv32,
+        _GEN_21 : bv32,
+        _GEN_22 : bv32,
+        _GEN_23 : bv2,
+        _T_255 : bool,
+        _GEN_30 : bv8,
+        _T_257 : bv8,
+        _T_258 : bool,
+        _GEN_31 : bv4,
+        _T_260 : bv4,
+        _GEN_32 : bv8,
+        loffset : bv8,
+        lshift : bv32,
+        _T_261 : bv33,
+        _T_262 : bv16,
+        _T_263 : bv16,
+        _T_264 : bv8,
+        _T_265 : bv8,
+        _T_267 : bv17,
+        _T_269 : bv9,
+        _T_270 : bool,
+        _T_271 : bv33,
+        _T_272 : bool,
+        _T_273 : bv33,
+        _T_274 : bool,
+        _T_275 : bv33,
+        _T_276 : bool,
+        load : bv33,
+        _T_277 : bv33,
+        _T_279 : bv34,
+        _T_280 : bv33,
+        _T_281 : bv34,
+        _T_282 : bv33,
+        _T_283 : bool,
+        _T_284 : bv33,
+        _T_285 : bool,
+        _T_286 : bv34,
+        _T_287 : bool,
+        _T_288 : bv34,
+        regWrite : bv34,
+        _T_291 : bool,
+        _T_294 : bool,
+        _T_296 : bv5,
+        _T_298 : bv32,
+        _T_301 : bool
+    ufs=
+    next_ufs=
+    instances=
+        csr:
+            input_bindings=
+                reset: csr_reset,
+                io_stall: csr_io_stall,
+                io_cmd: csr_io_cmd,
+                io_in: csr_io_in,
+                io_pc: csr_io_pc,
+                io_addr: csr_io_addr,
+                io_inst: csr_io_inst,
+                io_illegal: csr_io_illegal,
+                io_st_type: csr_io_st_type,
+                io_ld_type: csr_io_ld_type,
+                io_pc_check: csr_io_pc_check,
+                io_host_fromhost_valid: csr_io_host_fromhost_valid,
+                io_host_fromhost_bits: csr_io_host_fromhost_bits
+            model=
+                Model CSR (generated via GeneratedBy.VERILOG_PARSE):
+                    inputs=
+                        reset : bool,
+                        io_stall : bool,
+                        io_cmd : bv3,
+                        io_in : bv32,
+                        io_pc : bv32,
+                        io_addr : bv32,
+                        io_inst : bv32,
+                        io_illegal : bool,
+                        io_st_type : bv2,
+                        io_ld_type : bv3,
+                        io_pc_check : bool,
+                        io_host_fromhost_valid : bool,
+                        io_host_fromhost_bits : bv32
+                    outputs=
+                        io_out : bv32,
+                        io_expt : bool,
+                        io_evec : bv32,
+                        io_epc : bv32,
+                        io_host_tohost : bv32
+                    state=
+                        time$ : bv32,
+                        timeh : bv32,
+                        cycle : bv32,
+                        cycleh : bv32,
+                        instret : bv32,
+                        instreth : bv32,
+                        PRV : bv2,
+                        PRV1 : bv2,
+                        IE : bool,
+                        IE1 : bool,
+                        MTIP : bool,
+                        MTIE : bool,
+                        MSIP : bool,
+                        MSIE : bool,
+                        mtimecmp : bv32,
+                        mscratch : bv32,
+                        mepc : bv32,
+                        mcause : bv32,
+                        mbadaddr : bv32,
+                        mtohost : bv32,
+                        mfromhost : bv32,
+                        csr_addr : bv12,
+                        rs1_addr : bv5,
+                        _T_102 : bv3,
+                        _T_103 : bv4,
+                        _T_104 : bv3,
+                        _T_106 : bv6,
+                        _T_107 : bv10,
+                        mstatus : bv32,
+                        _T_126 : bv2,
+                        _T_127 : bv4,
+                        _T_129 : bv25,
+                        _T_130 : bv26,
+                        _T_131 : bv28,
+                        mip : bv32,
+                        _T_136 : bv2,
+                        _T_137 : bv4,
+                        _T_139 : bv25,
+                        _T_140 : bv26,
+                        _T_141 : bv28,
+                        mie : bv32,
+                        _GEN_0 : bv32,
+                        _T_154 : bool,
+                        _T_158 : bool,
+                        _T_162 : bool,
+                        _T_166 : bool,
+                        _T_170 : bool,
+                        _T_174 : bool,
+                        _T_178 : bool,
+                        _T_182 : bool,
+                        _T_186 : bool,
+                        _T_190 : bool,
+                        _T_194 : bool,
+                        _T_198 : bool,
+                        _T_202 : bool,
+                        _T_206 : bool,
+                        _T_210 : bool,
+                        _T_214 : bool,
+                        _T_218 : bool,
+                        _T_222 : bool,
+                        _T_226 : bool,
+                        _T_230 : bool,
+                        _T_234 : bool,
+                        _T_238 : bool,
+                        _T_242 : bool,
+                        _T_246 : bool,
+                        _T_250 : bool,
+                        _T_254 : bool,
+                        _T_258 : bool,
+                        _T_262 : bool,
+                        _T_266 : bool,
+                        _T_267 : bv32,
+                        _T_268 : bv32,
+                        _T_269 : bv32,
+                        _T_270 : bv32,
+                        _T_271 : bv32,
+                        _T_272 : bv32,
+                        _T_273 : bv32,
+                        _T_274 : bv32,
+                        _T_275 : bv32,
+                        _T_276 : bv32,
+                        _T_277 : bv32,
+                        _T_278 : bv32,
+                        _T_279 : bv32,
+                        _T_280 : bv32,
+                        _T_281 : bv32,
+                        _T_282 : bv32,
+                        _T_283 : bv32,
+                        _T_284 : bv32,
+                        _T_285 : bv32,
+                        _T_286 : bv32,
+                        _T_287 : bv32,
+                        _T_288 : bv32,
+                        _T_289 : bv32,
+                        _T_290 : bv32,
+                        _T_291 : bv32,
+                        _T_292 : bv32,
+                        _T_293 : bv32,
+                        _T_294 : bv32,
+                        _T_295 : bv32,
+                        _T_296 : bv2,
+                        privValid : bool,
+                        privInst : bool,
+                        _T_297 : bool,
+                        _T_299 : bool,
+                        _T_300 : bool,
+                        _T_301 : bool,
+                        _T_303 : bool,
+                        isEcall : bool,
+                        _T_305 : bool,
+                        isEbreak : bool,
+                        isEret : bool,
+                        _T_430 : bool,
+                        _T_431 : bool,
+                        _T_432 : bool,
+                        _T_433 : bool,
+                        _T_434 : bool,
+                        _T_435 : bool,
+                        _T_436 : bool,
+                        _T_437 : bool,
+                        _T_438 : bool,
+                        _T_439 : bool,
+                        _T_440 : bool,
+                        _T_441 : bool,
+                        _T_442 : bool,
+                        _T_443 : bool,
+                        _T_444 : bool,
+                        _T_445 : bool,
+                        _T_446 : bool,
+                        _T_447 : bool,
+                        _T_448 : bool,
+                        _T_449 : bool,
+                        _T_450 : bool,
+                        _T_451 : bool,
+                        _T_452 : bool,
+                        _T_453 : bool,
+                        _T_454 : bool,
+                        _T_455 : bool,
+                        _T_456 : bool,
+                        csrValid : bool,
+                        _T_457 : bv2,
+                        _T_458 : bv2,
+                        _T_460 : bool,
+                        _T_461 : bool,
+                        _T_462 : bool,
+                        _T_463 : bool,
+                        csrRO : bool,
+                        _T_464 : bool,
+                        _T_465 : bool,
+                        _T_467 : bool,
+                        _T_468 : bool,
+                        wen : bool,
+                        _T_470 : bv32,
+                        _T_471 : bv32,
+                        _T_472 : bv32,
+                        _T_473 : bool,
+                        _T_474 : bv32,
+                        _T_475 : bool,
+                        _T_476 : bv32,
+                        _T_477 : bool,
+                        wdata : bv32,
+                        _T_478 : bool,
+                        iaddrInvalid : bool,
+                        _T_533 : bv2,
+                        _T_535 : bool,
+                        _T_536 : bool,
+                        _T_538 : bool,
+                        _T_539 : bool,
+                        _T_540 : bool,
+                        _T_541 : bool,
+                        _T_542 : bool,
+                        laddrInvalid : bool,
+                        _T_548 : bool,
+                        _T_549 : bool,
+                        _T_550 : bool,
+                        saddrInvalid : bool,
+                        _T_551 : bool,
+                        _T_552 : bool,
+                        _T_553 : bool,
+                        _T_554 : bv2,
+                        _T_556 : bool,
+                        _T_558 : bool,
+                        _T_560 : bool,
+                        _T_561 : bool,
+                        _T_562 : bool,
+                        _T_563 : bool,
+                        _T_564 : bool,
+                        _T_565 : bool,
+                        _T_568 : bool,
+                        _T_569 : bool,
+                        _T_570 : bool,
+                        _T_571 : bool,
+                        _GEN_260 : bv8,
+                        _T_572 : bv8,
+                        _GEN_261 : bv32,
+                        _T_573 : bv33,
+                        _T_574 : bv32,
+                        _T_576 : bv33,
+                        _T_577 : bv32,
+                        _T_578 : bv32,
+                        _T_580 : bool,
+                        _T_582 : bv33,
+                        _T_583 : bv32,
+                        _GEN_1 : bv32,
+                        _T_585 : bv33,
+                        _T_586 : bv32,
+                        _T_587 : bv32,
+                        _T_589 : bool,
+                        _T_591 : bv33,
+                        _T_592 : bv32,
+                        _GEN_2 : bv32,
+                        _T_594 : bool,
+                        _T_596 : bool,
+                        _T_597 : bool,
+                        _T_598 : bool,
+                        _T_599 : bool,
+                        _T_601 : bool,
+                        isInstRet : bool,
+                        _T_603 : bv33,
+                        _T_604 : bv32,
+                        _GEN_3 : bv32,
+                        _T_605 : bv32,
+                        _T_607 : bool,
+                        _T_608 : bool,
+                        _T_610 : bv33,
+                        _T_611 : bv32,
+                        _GEN_4 : bv32,
+                        _T_614 : bv30,
+                        _GEN_262 : bv32,
+                        _T_615 : bv32,
+                        _GEN_263 : bv4,
+                        _T_622 : bv5,
+                        _T_623 : bv4,
+                        _T_624 : bv2,
+                        _T_625 : bv4,
+                        _T_626 : bv4,
+                        _T_627 : bv4,
+                        _T_628 : bv4,
+                        _T_630 : bool,
+                        _T_631 : bool,
+                        _GEN_5 : bv32,
+                        _T_633 : bool,
+                        _T_634 : bv2,
+                        _T_635 : bool,
+                        _T_636 : bv2,
+                        _T_637 : bool,
+                        _T_638 : bool,
+                        _T_639 : bool,
+                        _T_641 : bool,
+                        _T_644 : bool,
+                        _T_645 : bool,
+                        _T_646 : bool,
+                        _T_647 : bool,
+                        _T_648 : bool,
+                        _T_650 : bv32,
+                        _GEN_264 : bv35,
+                        _T_652 : bv35,
+                        _T_653 : bool,
+                        _T_655 : bv32,
+                        _T_656 : bool,
+                        _T_657 : bool,
+                        _T_658 : bool,
+                        _T_659 : bool,
+                        _T_660 : bool,
+                        _T_661 : bool,
+                        _T_662 : bool,
+                        _T_663 : bool,
+                        _T_664 : bool,
+                        _GEN_6 : bv32,
+                        _GEN_7 : bv32,
+                        _GEN_8 : bv32,
+                        _GEN_9 : bv32,
+                        _GEN_10 : bv32,
+                        _GEN_11 : bv32,
+                        _GEN_12 : bv32,
+                        _GEN_13 : bv32,
+                        _GEN_14 : bv32,
+                        _GEN_15 : bv32,
+                        _GEN_16 : bv32,
+                        _GEN_17 : bv32,
+                        _GEN_18 : bv32,
+                        _GEN_19 : bv32,
+                        _GEN_20 : bv32,
+                        _GEN_21 : bv32,
+                        _GEN_22 : bv32,
+                        _GEN_23 : bv32,
+                        _GEN_24 : bv32,
+                        _GEN_25 : bv32,
+                        _GEN_26 : bv32,
+                        _GEN_27 : bv32,
+                        _GEN_28 : bv32,
+                        _GEN_29 : bv32,
+                        _GEN_30 : bv32,
+                        _GEN_31 : bv32,
+                        _GEN_32 : bv32,
+                        _GEN_33 : bv32,
+                        _GEN_34 : bv32,
+                        _GEN_35 : bv32,
+                        _GEN_36 : bv32,
+                        _GEN_37 : bv32,
+                        _GEN_38 : bv32,
+                        _GEN_39 : bv32,
+                        _GEN_40 : bv32,
+                        _GEN_41 : bv32,
+                        _GEN_42 : bv32,
+                        _GEN_43 : bv32,
+                        _GEN_44 : bv32,
+                        _GEN_45 : bv32,
+                        _GEN_46 : bv32,
+                        _GEN_47 : bv32,
+                        _GEN_48 : bv32,
+                        _GEN_49 : bv32,
+                        _GEN_50 : bv32,
+                        _GEN_51 : bv32,
+                        _GEN_52 : bv32,
+                        _GEN_53 : bv32,
+                        _GEN_54 : bv32,
+                        _GEN_55 : bv32,
+                        _GEN_56 : bv32,
+                        _GEN_57 : bv32,
+                        _GEN_58 : bv32,
+                        _GEN_59 : bv32,
+                        _GEN_60 : bv32,
+                        _GEN_61 : bv35,
+                        _GEN_62 : bv32,
+                        _GEN_63 : bv32,
+                        _GEN_64 : bv32,
+                        _GEN_65 : bv32,
+                        _GEN_66 : bv32,
+                        _GEN_67 : bv32,
+                        _GEN_68 : bv32,
+                        _GEN_69 : bv32,
+                        _GEN_70 : bv32,
+                        _GEN_71 : bv32,
+                        _GEN_72 : bv32,
+                        _GEN_73 : bv35,
+                        _GEN_74 : bv32,
+                        _GEN_75 : bv32,
+                        _GEN_76 : bv32,
+                        _GEN_77 : bv32,
+                        _GEN_78 : bv32,
+                        _GEN_79 : bv32,
+                        _GEN_80 : bv32,
+                        _GEN_81 : bv32,
+                        _GEN_82 : bv32,
+                        _GEN_83 : bv32,
+                        _GEN_84 : bv32,
+                        _GEN_85 : bv32,
+                        _GEN_86 : bv35,
+                        _GEN_87 : bv32,
+                        _GEN_88 : bv32,
+                        _GEN_89 : bv32,
+                        _GEN_90 : bv32,
+                        _GEN_91 : bv32,
+                        _GEN_92 : bv32,
+                        _GEN_93 : bv32,
+                        _GEN_94 : bv32,
+                        _GEN_95 : bv32,
+                        _GEN_96 : bv32,
+                        _GEN_97 : bv32,
+                        _GEN_98 : bv32,
+                        _GEN_99 : bv32,
+                        _GEN_100 : bv35,
+                        _GEN_101 : bv32,
+                        _GEN_102 : bv32,
+                        _GEN_103 : bv32,
+                        _GEN_104 : bv32,
+                        _GEN_105 : bv32,
+                        _GEN_106 : bv32,
+                        _GEN_107 : bv32,
+                        _GEN_108 : bv32,
+                        _GEN_109 : bv32,
+                        _GEN_110 : bv32,
+                        _GEN_111 : bv32,
+                        _GEN_112 : bv32,
+                        _GEN_113 : bv32,
+                        _GEN_114 : bv35,
+                        _GEN_115 : bv32,
+                        _GEN_116 : bv32,
+                        _GEN_117 : bv32,
+                        _GEN_118 : bv32,
+                        _GEN_119 : bv32,
+                        _GEN_120 : bv32,
+                        _GEN_121 : bv32,
+                        _GEN_122 : bv32,
+                        _GEN_123 : bool,
+                        _GEN_124 : bool,
+                        _GEN_125 : bv32,
+                        _GEN_126 : bv32,
+                        _GEN_127 : bv32,
+                        _GEN_128 : bv32,
+                        _GEN_129 : bv35,
+                        _GEN_130 : bv32,
+                        _GEN_131 : bv32,
+                        _GEN_132 : bv32,
+                        _GEN_133 : bv32,
+                        _GEN_134 : bv32,
+                        _GEN_135 : bv32,
+                        _GEN_136 : bv32,
+                        _GEN_137 : bv32,
+                        _GEN_138 : bool,
+                        _GEN_139 : bool,
+                        _GEN_140 : bool,
+                        _GEN_141 : bool,
+                        _GEN_142 : bv32,
+                        _GEN_143 : bv32,
+                        _GEN_144 : bv32,
+                        _GEN_145 : bv32,
+                        _GEN_146 : bv35,
+                        _GEN_147 : bv32,
+                        _GEN_148 : bv32,
+                        _GEN_149 : bv32,
+                        _GEN_150 : bv32,
+                        _GEN_151 : bv32,
+                        _GEN_152 : bv32,
+                        _GEN_153 : bv32,
+                        _GEN_154 : bv32,
+                        _GEN_155 : bv2,
+                        _GEN_156 : bool,
+                        _GEN_157 : bv2,
+                        _GEN_158 : bool,
+                        _GEN_159 : bool,
+                        _GEN_160 : bool,
+                        _GEN_161 : bool,
+                        _GEN_162 : bool,
+                        _GEN_163 : bv32,
+                        _GEN_164 : bv32,
+                        _GEN_165 : bv32,
+                        _GEN_166 : bv32,
+                        _GEN_167 : bv35,
+                        _GEN_168 : bv32,
+                        _GEN_169 : bv32,
+                        _GEN_170 : bv32,
+                        _GEN_171 : bv32,
+                        _GEN_172 : bv32,
+                        _GEN_173 : bv32,
+                        _GEN_174 : bv32,
+                        _GEN_175 : bv32,
+                        _GEN_176 : bv2,
+                        _GEN_177 : bool,
+                        _GEN_178 : bv2,
+                        _GEN_179 : bool,
+                        _GEN_180 : bool,
+                        _GEN_181 : bool,
+                        _GEN_182 : bool,
+                        _GEN_183 : bool,
+                        _GEN_184 : bv32,
+                        _GEN_185 : bv32,
+                        _GEN_186 : bv32,
+                        _GEN_187 : bv32,
+                        _GEN_188 : bv35,
+                        _GEN_189 : bv32,
+                        _GEN_190 : bv32,
+                        _GEN_191 : bv32,
+                        _GEN_192 : bv32,
+                        _GEN_193 : bv32,
+                        _GEN_194 : bv32,
+                        _GEN_195 : bv32,
+                        _GEN_196 : bv32,
+                        _GEN_197 : bv2,
+                        _GEN_198 : bool,
+                        _GEN_199 : bv2,
+                        _GEN_200 : bool,
+                        _GEN_201 : bool,
+                        _GEN_202 : bool,
+                        _GEN_203 : bool,
+                        _GEN_204 : bool,
+                        _GEN_205 : bv32,
+                        _GEN_206 : bv32,
+                        _GEN_207 : bv32,
+                        _GEN_208 : bv32,
+                        _GEN_209 : bv35,
+                        _GEN_210 : bv32,
+                        _GEN_211 : bv32,
+                        _GEN_212 : bv32,
+                        _GEN_213 : bv32,
+                        _GEN_214 : bv32,
+                        _GEN_215 : bv32,
+                        _GEN_216 : bv32,
+                        _GEN_217 : bv32,
+                        _GEN_218 : bv35,
+                        _GEN_219 : bv32,
+                        _GEN_220 : bv2,
+                        _GEN_221 : bool,
+                        _GEN_222 : bv2,
+                        _GEN_223 : bool,
+                        _GEN_224 : bv32,
+                        _GEN_225 : bool,
+                        _GEN_226 : bool,
+                        _GEN_227 : bool,
+                        _GEN_228 : bool,
+                        _GEN_229 : bv32,
+                        _GEN_230 : bv32,
+                        _GEN_231 : bv32,
+                        _GEN_232 : bv32,
+                        _GEN_233 : bv32,
+                        _GEN_234 : bv32,
+                        _GEN_235 : bv32,
+                        _GEN_236 : bv32,
+                        _GEN_237 : bv32,
+                        _GEN_238 : bv32,
+                        _GEN_239 : bv35,
+                        _GEN_240 : bv32,
+                        _GEN_241 : bv2,
+                        _GEN_242 : bool,
+                        _GEN_243 : bv2,
+                        _GEN_244 : bool,
+                        _GEN_245 : bv32,
+                        _GEN_246 : bool,
+                        _GEN_247 : bool,
+                        _GEN_248 : bool,
+                        _GEN_249 : bool,
+                        _GEN_250 : bv32,
+                        _GEN_251 : bv32,
+                        _GEN_252 : bv32,
+                        _GEN_253 : bv32,
+                        _GEN_254 : bv32,
+                        _GEN_255 : bv32,
+                        _GEN_256 : bv32,
+                        _GEN_257 : bv32,
+                        _GEN_258 : bv32,
+                        _GEN_259 : bv32
+                    ufs=
+                    next_ufs=
+                    instances=
+                    logic=
+                        io_out: _T_295,
+                        io_expt: _T_571,
+                        io_evec: _T_574,
+                        io_epc: mepc,
+                        io_host_tohost: mtohost,
+                        csr_addr: io_inst[31:20],
+                        rs1_addr: io_inst[19:15],
+                        _T_102: {IE1,PRV},
+                        _T_103: {_T_102,IE},
+                        _T_104: {0,PRV1},
+                        _T_106: {3'h0,_T_104},
+                        _T_107: {_T_106,_T_103},
+                        mstatus: {22'h0,_T_107},
+                        _T_126: {MSIP,0},
+                        _T_127: {_T_126,2'h0},
+                        _T_129: {24'h0,MTIP},
+                        _T_130: {_T_129,0},
+                        _T_131: {_T_130,2'h0},
+                        mip: {_T_131,_T_127},
+                        _T_136: {MSIE,0},
+                        _T_137: {_T_136,2'h0},
+                        _T_139: {24'h0,MTIE},
+                        _T_140: {_T_139,0},
+                        _T_141: {_T_140,2'h0},
+                        mie: {_T_141,_T_137},
+                        _GEN_0: io_host_fromhost_valid ? io_host_fromhost_bits : mfromhost,
+                        _T_154: 12'hc00 == csr_addr,
+                        _T_158: 12'hc01 == csr_addr,
+                        _T_162: 12'hc02 == csr_addr,
+                        _T_166: 12'hc80 == csr_addr,
+                        _T_170: 12'hc81 == csr_addr,
+                        _T_174: 12'hc82 == csr_addr,
+                        _T_178: 12'h900 == csr_addr,
+                        _T_182: 12'h901 == csr_addr,
+                        _T_186: 12'h902 == csr_addr,
+                        _T_190: 12'h980 == csr_addr,
+                        _T_194: 12'h981 == csr_addr,
+                        _T_198: 12'h982 == csr_addr,
+                        _T_202: 12'hf00 == csr_addr,
+                        _T_206: 12'hf01 == csr_addr,
+                        _T_210: 12'hf10 == csr_addr,
+                        _T_214: 12'h301 == csr_addr,
+                        _T_218: 12'h302 == csr_addr,
+                        _T_222: 12'h304 == csr_addr,
+                        _T_226: 12'h321 == csr_addr,
+                        _T_230: 12'h701 == csr_addr,
+                        _T_234: 12'h741 == csr_addr,
+                        _T_238: 12'h340 == csr_addr,
+                        _T_242: 12'h341 == csr_addr,
+                        _T_246: 12'h342 == csr_addr,
+                        _T_250: 12'h343 == csr_addr,
+                        _T_254: 12'h344 == csr_addr,
+                        _T_258: 12'h780 == csr_addr,
+                        _T_262: 12'h781 == csr_addr,
+                        _T_266: 12'h300 == csr_addr,
+                        _T_267: _T_266 ? mstatus : 32'h0,
+                        _T_268: _T_262 ? mfromhost : _T_267,
+                        _T_269: _T_258 ? mtohost : _T_268,
+                        _T_270: _T_254 ? mip : _T_269,
+                        _T_271: _T_250 ? mbadaddr : _T_270,
+                        _T_272: _T_246 ? mcause : _T_271,
+                        _T_273: _T_242 ? mepc : _T_272,
+                        _T_274: _T_238 ? mscratch : _T_273,
+                        _T_275: _T_234 ? timeh : _T_274,
+                        _T_276: _T_230 ? time$ : _T_275,
+                        _T_277: _T_226 ? mtimecmp : _T_276,
+                        _T_278: _T_222 ? mie : _T_277,
+                        _T_279: _T_218 ? 32'h0 : _T_278,
+                        _T_280: _T_214 ? 32'h100 : _T_279,
+                        _T_281: _T_210 ? 32'h0 : _T_280,
+                        _T_282: _T_206 ? 32'h0 : _T_281,
+                        _T_283: _T_202 ? 32'h100100 : _T_282,
+                        _T_284: _T_198 ? instreth : _T_283,
+                        _T_285: _T_194 ? timeh : _T_284,
+                        _T_286: _T_190 ? cycleh : _T_285,
+                        _T_287: _T_186 ? instret : _T_286,
+                        _T_288: _T_182 ? time$ : _T_287,
+                        _T_289: _T_178 ? cycle : _T_288,
+                        _T_290: _T_174 ? instreth : _T_289,
+                        _T_291: _T_170 ? timeh : _T_290,
+                        _T_292: _T_166 ? cycleh : _T_291,
+                        _T_293: _T_162 ? instret : _T_292,
+                        _T_294: _T_158 ? time$ : _T_293,
+                        _T_295: _T_154 ? cycle : _T_294,
+                        _T_296: csr_addr[9:8],
+                        privValid: _T_296 <= PRV,
+                        privInst: io_cmd == 3'h4,
+                        _T_297: (csr_addr[0:0] == 1'h1) ? 1 : 0,
+                        _T_299: _T_297 == 0,
+                        _T_300: privInst && _T_299,
+                        _T_301: (csr_addr[8:8] == 1'h1) ? 1 : 0,
+                        _T_303: _T_301 == 0,
+                        isEcall: _T_300 && _T_303,
+                        _T_305: privInst && _T_297,
+                        isEbreak: _T_305 && _T_303,
+                        isEret: _T_300 && _T_301,
+                        _T_430: _T_154 || _T_158,
+                        _T_431: _T_430 || _T_162,
+                        _T_432: _T_431 || _T_166,
+                        _T_433: _T_432 || _T_170,
+                        _T_434: _T_433 || _T_174,
+                        _T_435: _T_434 || _T_178,
+                        _T_436: _T_435 || _T_182,
+                        _T_437: _T_436 || _T_186,
+                        _T_438: _T_437 || _T_190,
+                        _T_439: _T_438 || _T_194,
+                        _T_440: _T_439 || _T_198,
+                        _T_441: _T_440 || _T_202,
+                        _T_442: _T_441 || _T_206,
+                        _T_443: _T_442 || _T_210,
+                        _T_444: _T_443 || _T_214,
+                        _T_445: _T_444 || _T_218,
+                        _T_446: _T_445 || _T_222,
+                        _T_447: _T_446 || _T_226,
+                        _T_448: _T_447 || _T_230,
+                        _T_449: _T_448 || _T_234,
+                        _T_450: _T_449 || _T_238,
+                        _T_451: _T_450 || _T_242,
+                        _T_452: _T_451 || _T_246,
+                        _T_453: _T_452 || _T_250,
+                        _T_454: _T_453 || _T_254,
+                        _T_455: _T_454 || _T_258,
+                        _T_456: _T_455 || _T_262,
+                        csrValid: _T_456 || _T_266,
+                        _T_457: csr_addr[11:10],
+                        _T_458: ~_T_457,
+                        _T_460: _T_458 == 2'h0,
+                        _T_461: csr_addr == 12'h301,
+                        _T_462: _T_460 || _T_461,
+                        _T_463: csr_addr == 12'h302,
+                        csrRO: _T_462 || _T_463,
+                        _T_464: io_cmd == 3'h1,
+                        _T_465: (io_cmd[1:1] == 1'h1) ? 1 : 0,
+                        _T_467: rs1_addr != 5'h0,
+                        _T_468: _T_465 && _T_467,
+                        wen: _T_464 || _T_468,
+                        _T_470: io_out | io_in,
+                        _T_471: ~io_in,
+                        _T_472: io_out & _T_471,
+                        _T_473: 3'h3 == io_cmd,
+                        _T_474: _T_473 ? _T_472 : 32'h0,
+                        _T_475: 3'h2 == io_cmd,
+                        _T_476: _T_475 ? _T_470 : _T_474,
+                        _T_477: 3'h1 == io_cmd,
+                        wdata: _T_477 ? io_in : _T_476,
+                        _T_478: (io_addr[1:1] == 1'h1) ? 1 : 0,
+                        iaddrInvalid: io_pc_check && _T_478,
+                        _T_533: io_addr[1:0],
+                        _T_535: _T_533 != 2'h0,
+                        _T_536: (io_addr[0:0] == 1'h1) ? 1 : 0,
+                        _T_538: 3'h4 == io_ld_type,
+                        _T_539: _T_538 ? _T_536 : 0,
+                        _T_540: 3'h2 == io_ld_type,
+                        _T_541: _T_540 ? _T_536 : _T_539,
+                        _T_542: 3'h1 == io_ld_type,
+                        laddrInvalid: _T_542 ? _T_535 : _T_541,
+                        _T_548: 2'h2 == io_st_type,
+                        _T_549: _T_548 ? _T_536 : 0,
+                        _T_550: 2'h1 == io_st_type,
+                        saddrInvalid: _T_550 ? _T_535 : _T_549,
+                        _T_551: io_illegal || iaddrInvalid,
+                        _T_552: _T_551 || laddrInvalid,
+                        _T_553: _T_552 || saddrInvalid,
+                        _T_554: io_cmd[1:0],
+                        _T_556: _T_554 != 2'h0,
+                        _T_558: csrValid == 0,
+                        _T_560: privValid == 0,
+                        _T_561: _T_558 || _T_560,
+                        _T_562: _T_556 && _T_561,
+                        _T_563: _T_553 || _T_562,
+                        _T_564: wen && csrRO,
+                        _T_565: _T_563 || _T_564,
+                        _T_568: privInst && _T_560,
+                        _T_569: _T_565 || _T_568,
+                        _T_570: _T_569 || isEcall,
+                        _T_571: _T_570 || isEbreak,
+                        _GEN_260: {6'h0,PRV},
+                        _T_572: (_GEN_260) << 32'h6,
+                        _GEN_261: {24'h0,_T_572},
+                        _T_573: 32'h100 + _GEN_261,
+                        _T_574: _T_573[31:0],
+                        _T_576: time$ + 32'h1,
+                        _T_577: _T_576[31:0],
+                        _T_578: ~time$,
+                        _T_580: _T_578 == 32'h0,
+                        _T_582: timeh + 32'h1,
+                        _T_583: _T_582[31:0],
+                        _GEN_1: _T_580 ? _T_583 : timeh,
+                        _T_585: cycle + 32'h1,
+                        _T_586: _T_585[31:0],
+                        _T_587: ~cycle,
+                        _T_589: _T_587 == 32'h0,
+                        _T_591: cycleh + 32'h1,
+                        _T_592: _T_591[31:0],
+                        _GEN_2: _T_589 ? _T_592 : cycleh,
+                        _T_594: io_inst != 32'h13,
+                        _T_596: io_expt == 0,
+                        _T_597: _T_596 || isEcall,
+                        _T_598: _T_597 || isEbreak,
+                        _T_599: _T_594 && _T_598,
+                        _T_601: io_stall == 0,
+                        isInstRet: _T_599 && _T_601,
+                        _T_603: instret + 32'h1,
+                        _T_604: _T_603[31:0],
+                        _GEN_3: isInstRet ? _T_604 : instret,
+                        _T_605: ~instret,
+                        _T_607: _T_605 == 32'h0,
+                        _T_608: isInstRet && _T_607,
+                        _T_610: instreth + 32'h1,
+                        _T_611: _T_610[31:0],
+                        _GEN_4: _T_608 ? _T_611 : instreth,
+                        _T_614: io_pc[31:2],
+                        _GEN_262: {2'h0,_T_614},
+                        _T_615: _GEN_262 << 32'h2,
+                        _GEN_263: {2'h0,PRV},
+                        _T_622: 4'h8 + _GEN_263,
+                        _T_623: _T_622[3:0],
+                        _T_624: isEbreak ? 2'h3 : 2'h2,
+                        _T_625: isEcall ? _T_623 : ({2'h0,_T_624}),
+                        _T_626: saddrInvalid ? 4'h6 : _T_625,
+                        _T_627: laddrInvalid ? 4'h4 : _T_626,
+                        _T_628: iaddrInvalid ? 4'h0 : _T_627,
+                        _T_630: iaddrInvalid || laddrInvalid,
+                        _T_631: _T_630 || saddrInvalid,
+                        _GEN_5: _T_631 ? io_addr : mbadaddr,
+                        _T_633: csr_addr == 12'h300,
+                        _T_634: wdata[5:4],
+                        _T_635: (wdata[3:3] == 1'h1) ? 1 : 0,
+                        _T_636: wdata[2:1],
+                        _T_637: (wdata[0:0] == 1'h1) ? 1 : 0,
+                        _T_638: csr_addr == 12'h344,
+                        _T_639: (wdata[7:7] == 1'h1) ? 1 : 0,
+                        _T_641: csr_addr == 12'h304,
+                        _T_644: csr_addr == 12'h701,
+                        _T_645: csr_addr == 12'h741,
+                        _T_646: csr_addr == 12'h321,
+                        _T_647: csr_addr == 12'h340,
+                        _T_648: csr_addr == 12'h341,
+                        _T_650: wdata >>> (2'h2),
+                        _GEN_264: {3'h0,_T_650},
+                        _T_652: _GEN_264 << (2'h2),
+                        _T_653: csr_addr == 12'h342,
+                        _T_655: wdata & 32'h8000000f,
+                        _T_656: csr_addr == 12'h343,
+                        _T_657: csr_addr == 12'h780,
+                        _T_658: csr_addr == 12'h781,
+                        _T_659: csr_addr == 12'h900,
+                        _T_660: csr_addr == 12'h901,
+                        _T_661: csr_addr == 12'h902,
+                        _T_662: csr_addr == 12'h980,
+                        _T_663: csr_addr == 12'h981,
+                        _T_664: csr_addr == 12'h982,
+                        _GEN_6: _T_664 ? wdata : _GEN_4,
+                        _GEN_7: _T_663 ? wdata : _GEN_1,
+                        _GEN_8: _T_663 ? _GEN_4 : _GEN_6,
+                        _GEN_9: _T_662 ? wdata : _GEN_2,
+                        _GEN_10: _T_662 ? _GEN_1 : _GEN_7,
+                        _GEN_11: _T_662 ? _GEN_4 : _GEN_8,
+                        _GEN_12: _T_661 ? wdata : _GEN_3,
+                        _GEN_13: _T_661 ? _GEN_2 : _GEN_9,
+                        _GEN_14: _T_661 ? _GEN_1 : _GEN_10,
+                        _GEN_15: _T_661 ? _GEN_4 : _GEN_11,
+                        _GEN_16: _T_660 ? wdata : _T_577,
+                        _GEN_17: _T_660 ? _GEN_3 : _GEN_12,
+                        _GEN_18: _T_660 ? _GEN_2 : _GEN_13,
+                        _GEN_19: _T_660 ? _GEN_1 : _GEN_14,
+                        _GEN_20: _T_660 ? _GEN_4 : _GEN_15,
+                        _GEN_21: _T_659 ? wdata : _T_586,
+                        _GEN_22: _T_659 ? _T_577 : _GEN_16,
+                        _GEN_23: _T_659 ? _GEN_3 : _GEN_17,
+                        _GEN_24: _T_659 ? _GEN_2 : _GEN_18,
+                        _GEN_25: _T_659 ? _GEN_1 : _GEN_19,
+                        _GEN_26: _T_659 ? _GEN_4 : _GEN_20,
+                        _GEN_27: _T_658 ? wdata : _GEN_0,
+                        _GEN_28: _T_658 ? _T_586 : _GEN_21,
+                        _GEN_29: _T_658 ? _T_577 : _GEN_22,
+                        _GEN_30: _T_658 ? _GEN_3 : _GEN_23,
+                        _GEN_31: _T_658 ? _GEN_2 : _GEN_24,
+                        _GEN_32: _T_658 ? _GEN_1 : _GEN_25,
+                        _GEN_33: _T_658 ? _GEN_4 : _GEN_26,
+                        _GEN_34: _T_657 ? wdata : mtohost,
+                        _GEN_35: _T_657 ? _GEN_0 : _GEN_27,
+                        _GEN_36: _T_657 ? _T_586 : _GEN_28,
+                        _GEN_37: _T_657 ? _T_577 : _GEN_29,
+                        _GEN_38: _T_657 ? _GEN_3 : _GEN_30,
+                        _GEN_39: _T_657 ? _GEN_2 : _GEN_31,
+                        _GEN_40: _T_657 ? _GEN_1 : _GEN_32,
+                        _GEN_41: _T_657 ? _GEN_4 : _GEN_33,
+                        _GEN_42: _T_656 ? wdata : mbadaddr,
+                        _GEN_43: _T_656 ? mtohost : _GEN_34,
+                        _GEN_44: _T_656 ? _GEN_0 : _GEN_35,
+                        _GEN_45: _T_656 ? _T_586 : _GEN_36,
+                        _GEN_46: _T_656 ? _T_577 : _GEN_37,
+                        _GEN_47: _T_656 ? _GEN_3 : _GEN_38,
+                        _GEN_48: _T_656 ? _GEN_2 : _GEN_39,
+                        _GEN_49: _T_656 ? _GEN_1 : _GEN_40,
+                        _GEN_50: _T_656 ? _GEN_4 : _GEN_41,
+                        _GEN_51: _T_653 ? _T_655 : mcause,
+                        _GEN_52: _T_653 ? mbadaddr : _GEN_42,
+                        _GEN_53: _T_653 ? mtohost : _GEN_43,
+                        _GEN_54: _T_653 ? _GEN_0 : _GEN_44,
+                        _GEN_55: _T_653 ? _T_586 : _GEN_45,
+                        _GEN_56: _T_653 ? _T_577 : _GEN_46,
+                        _GEN_57: _T_653 ? _GEN_3 : _GEN_47,
+                        _GEN_58: _T_653 ? _GEN_2 : _GEN_48,
+                        _GEN_59: _T_653 ? _GEN_1 : _GEN_49,
+                        _GEN_60: _T_653 ? _GEN_4 : _GEN_50,
+                        _GEN_61: _T_648 ? _T_652 : ({3'h0,mepc}),
+                        _GEN_62: _T_648 ? mcause : _GEN_51,
+                        _GEN_63: _T_648 ? mbadaddr : _GEN_52,
+                        _GEN_64: _T_648 ? mtohost : _GEN_53,
+                        _GEN_65: _T_648 ? _GEN_0 : _GEN_54,
+                        _GEN_66: _T_648 ? _T_586 : _GEN_55,
+                        _GEN_67: _T_648 ? _T_577 : _GEN_56,
+                        _GEN_68: _T_648 ? _GEN_3 : _GEN_57,
+                        _GEN_69: _T_648 ? _GEN_2 : _GEN_58,
+                        _GEN_70: _T_648 ? _GEN_1 : _GEN_59,
+                        _GEN_71: _T_648 ? _GEN_4 : _GEN_60,
+                        _GEN_72: _T_647 ? wdata : mscratch,
+                        _GEN_73: _T_647 ? ({3'h0,mepc}) : _GEN_61,
+                        _GEN_74: _T_647 ? mcause : _GEN_62,
+                        _GEN_75: _T_647 ? mbadaddr : _GEN_63,
+                        _GEN_76: _T_647 ? mtohost : _GEN_64,
+                        _GEN_77: _T_647 ? _GEN_0 : _GEN_65,
+                        _GEN_78: _T_647 ? _T_586 : _GEN_66,
+                        _GEN_79: _T_647 ? _T_577 : _GEN_67,
+                        _GEN_80: _T_647 ? _GEN_3 : _GEN_68,
+                        _GEN_81: _T_647 ? _GEN_2 : _GEN_69,
+                        _GEN_82: _T_647 ? _GEN_1 : _GEN_70,
+                        _GEN_83: _T_647 ? _GEN_4 : _GEN_71,
+                        _GEN_84: _T_646 ? wdata : mtimecmp,
+                        _GEN_85: _T_646 ? mscratch : _GEN_72,
+                        _GEN_86: _T_646 ? ({3'h0,mepc}) : _GEN_73,
+                        _GEN_87: _T_646 ? mcause : _GEN_74,
+                        _GEN_88: _T_646 ? mbadaddr : _GEN_75,
+                        _GEN_89: _T_646 ? mtohost : _GEN_76,
+                        _GEN_90: _T_646 ? _GEN_0 : _GEN_77,
+                        _GEN_91: _T_646 ? _T_586 : _GEN_78,
+                        _GEN_92: _T_646 ? _T_577 : _GEN_79,
+                        _GEN_93: _T_646 ? _GEN_3 : _GEN_80,
+                        _GEN_94: _T_646 ? _GEN_2 : _GEN_81,
+                        _GEN_95: _T_646 ? _GEN_1 : _GEN_82,
+                        _GEN_96: _T_646 ? _GEN_4 : _GEN_83,
+                        _GEN_97: _T_645 ? wdata : _GEN_95,
+                        _GEN_98: _T_645 ? mtimecmp : _GEN_84,
+                        _GEN_99: _T_645 ? mscratch : _GEN_85,
+                        _GEN_100: _T_645 ? ({3'h0,mepc}) : _GEN_86,
+                        _GEN_101: _T_645 ? mcause : _GEN_87,
+                        _GEN_102: _T_645 ? mbadaddr : _GEN_88,
+                        _GEN_103: _T_645 ? mtohost : _GEN_89,
+                        _GEN_104: _T_645 ? _GEN_0 : _GEN_90,
+                        _GEN_105: _T_645 ? _T_586 : _GEN_91,
+                        _GEN_106: _T_645 ? _T_577 : _GEN_92,
+                        _GEN_107: _T_645 ? _GEN_3 : _GEN_93,
+                        _GEN_108: _T_645 ? _GEN_2 : _GEN_94,
+                        _GEN_109: _T_645 ? _GEN_4 : _GEN_96,
+                        _GEN_110: _T_644 ? wdata : _GEN_106,
+                        _GEN_111: _T_644 ? _GEN_1 : _GEN_97,
+                        _GEN_112: _T_644 ? mtimecmp : _GEN_98,
+                        _GEN_113: _T_644 ? mscratch : _GEN_99,
+                        _GEN_114: _T_644 ? ({3'h0,mepc}) : _GEN_100,
+                        _GEN_115: _T_644 ? mcause : _GEN_101,
+                        _GEN_116: _T_644 ? mbadaddr : _GEN_102,
+                        _GEN_117: _T_644 ? mtohost : _GEN_103,
+                        _GEN_118: _T_644 ? _GEN_0 : _GEN_104,
+                        _GEN_119: _T_644 ? _T_586 : _GEN_105,
+                        _GEN_120: _T_644 ? _GEN_3 : _GEN_107,
+                        _GEN_121: _T_644 ? _GEN_2 : _GEN_108,
+                        _GEN_122: _T_644 ? _GEN_4 : _GEN_109,
+                        _GEN_123: _T_641 ? _T_639 : MTIE,
+                        _GEN_124: _T_641 ? _T_635 : MSIE,
+                        _GEN_125: _T_641 ? _T_577 : _GEN_110,
+                        _GEN_126: _T_641 ? _GEN_1 : _GEN_111,
+                        _GEN_127: _T_641 ? mtimecmp : _GEN_112,
+                        _GEN_128: _T_641 ? mscratch : _GEN_113,
+                        _GEN_129: _T_641 ? ({3'h0,mepc}) : _GEN_114,
+                        _GEN_130: _T_641 ? mcause : _GEN_115,
+                        _GEN_131: _T_641 ? mbadaddr : _GEN_116,
+                        _GEN_132: _T_641 ? mtohost : _GEN_117,
+                        _GEN_133: _T_641 ? _GEN_0 : _GEN_118,
+                        _GEN_134: _T_641 ? _T_586 : _GEN_119,
+                        _GEN_135: _T_641 ? _GEN_3 : _GEN_120,
+                        _GEN_136: _T_641 ? _GEN_2 : _GEN_121,
+                        _GEN_137: _T_641 ? _GEN_4 : _GEN_122,
+                        _GEN_138: _T_638 ? _T_639 : MTIP,
+                        _GEN_139: _T_638 ? _T_635 : MSIP,
+                        _GEN_140: _T_638 ? MTIE : _GEN_123,
+                        _GEN_141: _T_638 ? MSIE : _GEN_124,
+                        _GEN_142: _T_638 ? _T_577 : _GEN_125,
+                        _GEN_143: _T_638 ? _GEN_1 : _GEN_126,
+                        _GEN_144: _T_638 ? mtimecmp : _GEN_127,
+                        _GEN_145: _T_638 ? mscratch : _GEN_128,
+                        _GEN_146: _T_638 ? ({3'h0,mepc}) : _GEN_129,
+                        _GEN_147: _T_638 ? mcause : _GEN_130,
+                        _GEN_148: _T_638 ? mbadaddr : _GEN_131,
+                        _GEN_149: _T_638 ? mtohost : _GEN_132,
+                        _GEN_150: _T_638 ? _GEN_0 : _GEN_133,
+                        _GEN_151: _T_638 ? _T_586 : _GEN_134,
+                        _GEN_152: _T_638 ? _GEN_3 : _GEN_135,
+                        _GEN_153: _T_638 ? _GEN_2 : _GEN_136,
+                        _GEN_154: _T_638 ? _GEN_4 : _GEN_137,
+                        _GEN_155: _T_633 ? _T_634 : PRV1,
+                        _GEN_156: _T_633 ? _T_635 : IE1,
+                        _GEN_157: _T_633 ? _T_636 : PRV,
+                        _GEN_158: _T_633 ? _T_637 : IE,
+                        _GEN_159: _T_633 ? MTIP : _GEN_138,
+                        _GEN_160: _T_633 ? MSIP : _GEN_139,
+                        _GEN_161: _T_633 ? MTIE : _GEN_140,
+                        _GEN_162: _T_633 ? MSIE : _GEN_141,
+                        _GEN_163: _T_633 ? _T_577 : _GEN_142,
+                        _GEN_164: _T_633 ? _GEN_1 : _GEN_143,
+                        _GEN_165: _T_633 ? mtimecmp : _GEN_144,
+                        _GEN_166: _T_633 ? mscratch : _GEN_145,
+                        _GEN_167: _T_633 ? ({3'h0,mepc}) : _GEN_146,
+                        _GEN_168: _T_633 ? mcause : _GEN_147,
+                        _GEN_169: _T_633 ? mbadaddr : _GEN_148,
+                        _GEN_170: _T_633 ? mtohost : _GEN_149,
+                        _GEN_171: _T_633 ? _GEN_0 : _GEN_150,
+                        _GEN_172: _T_633 ? _T_586 : _GEN_151,
+                        _GEN_173: _T_633 ? _GEN_3 : _GEN_152,
+                        _GEN_174: _T_633 ? _GEN_2 : _GEN_153,
+                        _GEN_175: _T_633 ? _GEN_4 : _GEN_154,
+                        _GEN_176: wen ? _GEN_155 : PRV1,
+                        _GEN_177: wen ? _GEN_156 : IE1,
+                        _GEN_178: wen ? _GEN_157 : PRV,
+                        _GEN_179: wen ? _GEN_158 : IE,
+                        _GEN_180: wen ? _GEN_159 : MTIP,
+                        _GEN_181: wen ? _GEN_160 : MSIP,
+                        _GEN_182: wen ? _GEN_161 : MTIE,
+                        _GEN_183: wen ? _GEN_162 : MSIE,
+                        _GEN_184: wen ? _GEN_163 : _T_577,
+                        _GEN_185: wen ? _GEN_164 : _GEN_1,
+                        _GEN_186: wen ? _GEN_165 : mtimecmp,
+                        _GEN_187: wen ? _GEN_166 : mscratch,
+                        _GEN_188: wen ? _GEN_167 : ({3'h0,mepc}),
+                        _GEN_189: wen ? _GEN_168 : mcause,
+                        _GEN_190: wen ? _GEN_169 : mbadaddr,
+                        _GEN_191: wen ? _GEN_170 : mtohost,
+                        _GEN_192: wen ? _GEN_171 : _GEN_0,
+                        _GEN_193: wen ? _GEN_172 : _T_586,
+                        _GEN_194: wen ? _GEN_173 : _GEN_3,
+                        _GEN_195: wen ? _GEN_174 : _GEN_2,
+                        _GEN_196: wen ? _GEN_175 : _GEN_4,
+                        _GEN_197: isEret ? PRV1 : _GEN_178,
+                        _GEN_198: isEret ? IE1 : _GEN_179,
+                        _GEN_199: isEret ? 2'h0 : _GEN_176,
+                        _GEN_200: isEret ? 1 : _GEN_177,
+                        _GEN_201: isEret ? MTIP : _GEN_180,
+                        _GEN_202: isEret ? MSIP : _GEN_181,
+                        _GEN_203: isEret ? MTIE : _GEN_182,
+                        _GEN_204: isEret ? MSIE : _GEN_183,
+                        _GEN_205: isEret ? _T_577 : _GEN_184,
+                        _GEN_206: isEret ? _GEN_1 : _GEN_185,
+                        _GEN_207: isEret ? mtimecmp : _GEN_186,
+                        _GEN_208: isEret ? mscratch : _GEN_187,
+                        _GEN_209: isEret ? ({3'h0,mepc}) : _GEN_188,
+                        _GEN_210: isEret ? mcause : _GEN_189,
+                        _GEN_211: isEret ? mbadaddr : _GEN_190,
+                        _GEN_212: isEret ? mtohost : _GEN_191,
+                        _GEN_213: isEret ? _GEN_0 : _GEN_192,
+                        _GEN_214: isEret ? _T_586 : _GEN_193,
+                        _GEN_215: isEret ? _GEN_3 : _GEN_194,
+                        _GEN_216: isEret ? _GEN_2 : _GEN_195,
+                        _GEN_217: isEret ? _GEN_4 : _GEN_196,
+                        _GEN_218: io_expt ? ({3'h0,_T_615}) : _GEN_209,
+                        _GEN_219: io_expt ? ({28'h0,_T_628}) : _GEN_210,
+                        _GEN_220: io_expt ? 2'h3 : _GEN_197,
+                        _GEN_221: io_expt ? 0 : _GEN_198,
+                        _GEN_222: io_expt ? PRV : _GEN_199,
+                        _GEN_223: io_expt ? IE : _GEN_200,
+                        _GEN_224: io_expt ? _GEN_5 : _GEN_211,
+                        _GEN_225: io_expt ? MTIP : _GEN_201,
+                        _GEN_226: io_expt ? MSIP : _GEN_202,
+                        _GEN_227: io_expt ? MTIE : _GEN_203,
+                        _GEN_228: io_expt ? MSIE : _GEN_204,
+                        _GEN_229: io_expt ? _T_577 : _GEN_205,
+                        _GEN_230: io_expt ? _GEN_1 : _GEN_206,
+                        _GEN_231: io_expt ? mtimecmp : _GEN_207,
+                        _GEN_232: io_expt ? mscratch : _GEN_208,
+                        _GEN_233: io_expt ? mtohost : _GEN_212,
+                        _GEN_234: io_expt ? _GEN_0 : _GEN_213,
+                        _GEN_235: io_expt ? _T_586 : _GEN_214,
+                        _GEN_236: io_expt ? _GEN_3 : _GEN_215,
+                        _GEN_237: io_expt ? _GEN_2 : _GEN_216,
+                        _GEN_238: io_expt ? _GEN_4 : _GEN_217,
+                        _GEN_239: _T_601 ? _GEN_218 : ({3'h0,mepc}),
+                        _GEN_240: _T_601 ? _GEN_219 : mcause,
+                        _GEN_241: _T_601 ? _GEN_220 : PRV,
+                        _GEN_242: _T_601 ? _GEN_221 : IE,
+                        _GEN_243: _T_601 ? _GEN_222 : PRV1,
+                        _GEN_244: _T_601 ? _GEN_223 : IE1,
+                        _GEN_245: _T_601 ? _GEN_224 : mbadaddr,
+                        _GEN_246: _T_601 ? _GEN_225 : MTIP,
+                        _GEN_247: _T_601 ? _GEN_226 : MSIP,
+                        _GEN_248: _T_601 ? _GEN_227 : MTIE,
+                        _GEN_249: _T_601 ? _GEN_228 : MSIE,
+                        _GEN_250: _T_601 ? _GEN_229 : _T_577,
+                        _GEN_251: _T_601 ? _GEN_230 : _GEN_1,
+                        _GEN_252: _T_601 ? _GEN_231 : mtimecmp,
+                        _GEN_253: _T_601 ? _GEN_232 : mscratch,
+                        _GEN_254: _T_601 ? _GEN_233 : mtohost,
+                        _GEN_255: _T_601 ? _GEN_234 : _GEN_0,
+                        _GEN_256: _T_601 ? _GEN_235 : _T_586,
+                        _GEN_257: _T_601 ? _GEN_236 : _GEN_3,
+                        _GEN_258: _T_601 ? _GEN_237 : _GEN_2,
+                        _GEN_259: _T_601 ? _GEN_238 : _GEN_4
+                    transition=
+                        time$: reset ? 32'h0 : (_T_601 ? (io_expt ? _T_577 : (isEret ? _T_577 : (wen ? (_T_633 ? _T_577 : (_T_638 ? _T_577 : (_T_641 ? _T_577 : (_T_644 ? (_T_477 ? io_in : (_T_475 ? _T_470 : (_T_473 ? _T_472 : 32'h0))) : (_T_645 ? _T_577 : (_T_646 ? _T_577 : (_T_647 ? _T_577 : (_T_648 ? _T_577 : (_T_653 ? _T_577 : (_T_656 ? _T_577 : (_T_657 ? _T_577 : (_T_658 ? _T_577 : (_T_659 ? _T_577 : (_T_660 ? (_T_477 ? io_in : (_T_475 ? _T_470 : (_T_473 ? _T_472 : 32'h0))) : _T_577)))))))))))))) : _T_577))) : _T_577),
+                        timeh: reset ? 32'h0 : (_T_601 ? (io_expt ? (_T_580 ? _T_583 : timeh) : (isEret ? (_T_580 ? _T_583 : timeh) : (wen ? (_T_633 ? (_T_580 ? _T_583 : timeh) : (_T_638 ? (_T_580 ? _T_583 : timeh) : (_T_641 ? _GEN_1 : (_T_644 ? _GEN_1 : (_T_645 ? (_T_477 ? io_in : (_T_475 ? _T_470 : (_T_473 ? _T_472 : 32'h0))) : (_T_646 ? _GEN_1 : (_T_647 ? _GEN_1 : (_T_648 ? _GEN_1 : (_T_653 ? _GEN_1 : (_T_656 ? _GEN_1 : (_T_657 ? _GEN_1 : (_T_658 ? _GEN_1 : (_T_659 ? _GEN_1 : (_T_660 ? _GEN_1 : (_T_661 ? _GEN_1 : (_T_662 ? _GEN_1 : (_T_663 ? (_T_477 ? io_in : (_T_475 ? _T_470 : (_T_473 ? _T_472 : 32'h0))) : _GEN_1))))))))))))))))) : _GEN_1))) : _GEN_1),
+                        cycle: reset ? 32'h0 : (_T_601 ? (io_expt ? _T_586 : (isEret ? _T_586 : (wen ? (_T_633 ? _T_586 : (_T_638 ? _T_586 : (_T_641 ? _T_586 : (_T_644 ? _T_586 : (_T_645 ? _T_586 : (_T_646 ? _T_586 : (_T_647 ? _T_586 : (_T_648 ? _T_586 : (_T_653 ? _T_586 : (_T_656 ? _T_586 : (_T_657 ? _T_586 : (_T_658 ? _T_586 : (_T_659 ? (_T_477 ? io_in : (_T_475 ? _T_470 : (_T_473 ? _T_472 : 32'h0))) : _T_586))))))))))))) : _T_586))) : _T_586),
+                        cycleh: reset ? 32'h0 : (_T_601 ? (io_expt ? (_T_589 ? _T_592 : cycleh) : (isEret ? (_T_589 ? _T_592 : cycleh) : (wen ? (_T_633 ? (_T_589 ? _T_592 : cycleh) : (_T_638 ? (_T_589 ? _T_592 : cycleh) : (_T_641 ? _GEN_2 : (_T_644 ? _GEN_2 : (_T_645 ? _GEN_2 : (_T_646 ? _GEN_2 : (_T_647 ? _GEN_2 : (_T_648 ? _GEN_2 : (_T_653 ? _GEN_2 : (_T_656 ? _GEN_2 : (_T_657 ? _GEN_2 : (_T_658 ? _GEN_2 : (_T_659 ? _GEN_2 : (_T_660 ? _GEN_2 : (_T_661 ? _GEN_2 : (_T_662 ? (_T_477 ? io_in : (_T_475 ? _T_470 : (_T_473 ? _T_472 : 32'h0))) : _GEN_2)))))))))))))))) : _GEN_2))) : _GEN_2),
+                        instret: reset ? 32'h0 : (_T_601 ? (io_expt ? (isInstRet ? _T_604 : instret) : (isEret ? (isInstRet ? _T_604 : instret) : (wen ? (_T_633 ? (isInstRet ? _T_604 : instret) : (_T_638 ? (isInstRet ? _T_604 : instret) : (_T_641 ? _GEN_3 : (_T_644 ? _GEN_3 : (_T_645 ? _GEN_3 : (_T_646 ? _GEN_3 : (_T_647 ? _GEN_3 : (_T_648 ? _GEN_3 : (_T_653 ? _GEN_3 : (_T_656 ? _GEN_3 : (_T_657 ? _GEN_3 : (_T_658 ? _GEN_3 : (_T_659 ? _GEN_3 : (_T_660 ? _GEN_3 : (_T_661 ? (_T_477 ? io_in : (_T_475 ? _T_470 : (_T_473 ? _T_472 : 32'h0))) : _GEN_3))))))))))))))) : _GEN_3))) : _GEN_3),
+                        instreth: reset ? 32'h0 : (_T_601 ? (io_expt ? (_T_608 ? _T_611 : instreth) : (isEret ? (_T_608 ? _T_611 : instreth) : (wen ? (_T_633 ? (_T_608 ? _T_611 : instreth) : (_T_638 ? (_T_608 ? _T_611 : instreth) : (_T_641 ? _GEN_4 : (_T_644 ? _GEN_4 : (_T_645 ? _GEN_4 : (_T_646 ? _GEN_4 : (_T_647 ? _GEN_4 : (_T_648 ? _GEN_4 : (_T_653 ? _GEN_4 : (_T_656 ? _GEN_4 : (_T_657 ? _GEN_4 : (_T_658 ? _GEN_4 : (_T_659 ? _GEN_4 : (_T_660 ? _GEN_4 : (_T_661 ? _GEN_4 : (_T_662 ? _GEN_4 : (_T_663 ? _GEN_4 : (_T_664 ? (_T_477 ? io_in : (_T_475 ? _T_470 : (_T_473 ? _T_472 : 32'h0))) : _GEN_4)))))))))))))))))) : _GEN_4))) : _GEN_4),
+                        PRV: reset ? 2'h3 : (_T_601 ? (io_expt ? 2'h3 : (isEret ? PRV1 : (wen ? (_T_633 ? _T_636 : PRV) : PRV))) : PRV),
+                        PRV1: reset ? 2'h3 : (_T_601 ? (io_expt ? PRV : (isEret ? 2'h0 : (wen ? (_T_633 ? _T_634 : PRV1) : PRV1))) : PRV1),
+                        IE: reset ? 0 : (_T_601 ? (io_expt ? 0 : (isEret ? IE1 : (wen ? (_T_633 ? _T_637 : IE) : IE))) : IE),
+                        IE1: reset ? 0 : (_T_601 ? (io_expt ? IE : (isEret ? 1 : (wen ? (_T_633 ? _T_635 : IE1) : IE1))) : IE1),
+                        MTIP: reset ? 0 : (_T_601 ? ((!io_expt) ? ((!isEret) ? (wen ? ((!_T_633) ? (_T_638 ? _T_639 : MTIP) : MTIP) : MTIP) : MTIP) : MTIP) : MTIP),
+                        MTIE: reset ? 0 : (_T_601 ? ((!io_expt) ? ((!isEret) ? (wen ? ((!_T_633) ? ((!_T_638) ? (_T_641 ? _T_639 : MTIE) : MTIE) : MTIE) : MTIE) : MTIE) : MTIE) : MTIE),
+                        MSIP: reset ? 0 : (_T_601 ? ((!io_expt) ? ((!isEret) ? (wen ? ((!_T_633) ? (_T_638 ? _T_635 : MSIP) : MSIP) : MSIP) : MSIP) : MSIP) : MSIP),
+                        MSIE: reset ? 0 : (_T_601 ? ((!io_expt) ? ((!isEret) ? (wen ? ((!_T_633) ? ((!_T_638) ? (_T_641 ? _T_635 : MSIE) : MSIE) : MSIE) : MSIE) : MSIE) : MSIE) : MSIE),
+                        mtimecmp: _T_601 ? ((!io_expt) ? ((!isEret) ? (wen ? ((!_T_633) ? ((!_T_638) ? ((!_T_641) ? ((!_T_644) ? ((!_T_645) ? (_T_646 ? (_T_477 ? io_in : (_T_475 ? _T_470 : (_T_473 ? _T_472 : 32'h0))) : mtimecmp) : mtimecmp) : mtimecmp) : mtimecmp) : mtimecmp) : mtimecmp) : mtimecmp) : mtimecmp) : mtimecmp) : mtimecmp,
+                        mscratch: _T_601 ? ((!io_expt) ? ((!isEret) ? (wen ? ((!_T_633) ? ((!_T_638) ? ((!_T_641) ? ((!_T_644) ? ((!_T_645) ? ((!_T_646) ? (_T_647 ? (_T_477 ? io_in : (_T_475 ? _T_470 : (_T_473 ? _T_472 : 32'h0))) : mscratch) : mscratch) : mscratch) : mscratch) : mscratch) : mscratch) : mscratch) : mscratch) : mscratch) : mscratch) : mscratch,
+                        mepc: _T_601 ? _GEN_239[31:0] : _GEN_239[31:0],
+                        mcause: _T_601 ? (io_expt ? ({28'h0,_T_628}) : ((!isEret) ? (wen ? ((!_T_633) ? ((!_T_638) ? ((!_T_641) ? ((!_T_644) ? ((!_T_645) ? ((!_T_646) ? ((!_T_647) ? ((!_T_648) ? (_T_653 ? _T_655 : mcause) : mcause) : mcause) : mcause) : mcause) : mcause) : mcause) : mcause) : mcause) : mcause) : mcause)) : mcause,
+                        mbadaddr: _T_601 ? (io_expt ? (_T_631 ? io_addr : mbadaddr) : ((!isEret) ? (wen ? ((!_T_633) ? ((!_T_638) ? ((!_T_641) ? ((!_T_644) ? ((!_T_645) ? ((!_T_646) ? ((!_T_647) ? ((!_T_648) ? ((!_T_653) ? (_T_656 ? (_T_477 ? io_in : (_T_475 ? _T_470 : (_T_473 ? _T_472 : 32'h0))) : mbadaddr) : mbadaddr) : mbadaddr) : mbadaddr) : mbadaddr) : mbadaddr) : mbadaddr) : mbadaddr) : mbadaddr) : mbadaddr) : mbadaddr) : mbadaddr)) : mbadaddr,
+                        mtohost: reset ? 32'h0 : (_T_601 ? ((!io_expt) ? ((!isEret) ? (wen ? ((!_T_633) ? ((!_T_638) ? ((!_T_641) ? ((!_T_644) ? ((!_T_645) ? ((!_T_646) ? ((!_T_647) ? ((!_T_648) ? ((!_T_653) ? ((!_T_656) ? (_T_657 ? (_T_477 ? io_in : (_T_475 ? _T_470 : (_T_473 ? _T_472 : 32'h0))) : mtohost) : mtohost) : mtohost) : mtohost) : mtohost) : mtohost) : mtohost) : mtohost) : mtohost) : mtohost) : mtohost) : mtohost) : mtohost) : mtohost) : mtohost),
+                        mfromhost: _T_601 ? (io_expt ? (io_host_fromhost_valid ? io_host_fromhost_bits : mfromhost) : (isEret ? (io_host_fromhost_valid ? io_host_fromhost_bits : mfromhost) : (wen ? (_T_633 ? (io_host_fromhost_valid ? io_host_fromhost_bits : mfromhost) : (_T_638 ? (io_host_fromhost_valid ? io_host_fromhost_bits : mfromhost) : (_T_641 ? _GEN_0 : (_T_644 ? _GEN_0 : (_T_645 ? _GEN_0 : (_T_646 ? _GEN_0 : (_T_647 ? _GEN_0 : (_T_648 ? _GEN_0 : (_T_653 ? _GEN_0 : (_T_656 ? _GEN_0 : (_T_657 ? _GEN_0 : (_T_658 ? (_T_477 ? io_in : (_T_475 ? _T_470 : (_T_473 ? _T_472 : 32'h0))) : _GEN_0)))))))))))) : _GEN_0))) : _GEN_0
+
+        ,
+        regFile:
+            input_bindings=
+                io_raddr1: regFile_io_raddr1,
+                io_raddr2: regFile_io_raddr2,
+                io_wen: regFile_io_wen,
+                io_waddr: regFile_io_waddr,
+                io_wdata: regFile_io_wdata
+            model=
+                Model RegFile (generated via GeneratedBy.VERILOG_PARSE):
+                    inputs=
+                        io_raddr1 : bv5,
+                        io_raddr2 : bv5,
+                        io_wen : bool,
+                        io_waddr : bv5,
+                        io_wdata : bv32
+                    outputs=
+                        io_rdata1 : bv32,
+                        io_rdata2 : bv32,
+                        io_lft__regs_10 : bv32,
+                        io_lft__regs_11 : bv32,
+                        io_lft__regs_12 : bv32,
+                        io_lft__regs_13 : bv32,
+                        io_lft__regs_14 : bv32
+                    state=
+                        regs : [bv5]bv32,
+                        regs__T_23_data : bv32,
+                        regs__T_23_addr : bv5,
+                        regs__T_28_data : bv32,
+                        regs__T_28_addr : bv5,
+                        regs__T_34_data : bv32,
+                        regs__T_34_addr : bv5,
+                        regs__T_34_mask : bool,
+                        regs__T_34_en : bool,
+                        _T_22 : bool,
+                        _T_25 : bv32,
+                        _T_27 : bool,
+                        _T_30 : bv32,
+                        _T_32 : bool,
+                        _T_33 : bool
+                    ufs=
+                    next_ufs=
+                    instances=
+                    logic=
+                        io_rdata1: _T_25,
+                        io_rdata2: _T_30,
+                        io_lft__regs_10: regs[5'ha],
+                        io_lft__regs_11: regs[5'hb],
+                        io_lft__regs_12: regs[5'hc],
+                        io_lft__regs_13: regs[5'hd],
+                        io_lft__regs_14: regs[5'he],
+                        regs__T_23_data: regs[regs__T_23_addr],
+                        regs__T_23_addr: io_raddr1,
+                        regs__T_28_data: regs[regs__T_28_addr],
+                        regs__T_28_addr: io_raddr2,
+                        regs__T_34_data: io_wdata,
+                        regs__T_34_addr: io_waddr,
+                        regs__T_34_mask: _T_33,
+                        regs__T_34_en: _T_33,
+                        _T_22: io_raddr1 != 5'h0,
+                        _T_25: _T_22 ? regs__T_23_data : 32'h0,
+                        _T_27: io_raddr2 != 5'h0,
+                        _T_30: _T_27 ? regs__T_28_data : 32'h0,
+                        _T_32: io_waddr != 5'h0,
+                        _T_33: io_wen && _T_32
+                    transition=
+                        regs[regs__T_34_addr]: (regs__T_34_en && regs__T_34_mask) ? regs__T_34_data : (regs[regs__T_34_addr])
+
+        ,
+        alu:
+            input_bindings=
+                io_A: alu_io_A,
+                io_B: alu_io_B,
+                io_alu_op: alu_io_alu_op
+            model=
+                Model ALUArea (generated via GeneratedBy.MANUAL):
+                    inputs=
+                        io_A : bv32,
+                        io_B : bv32,
+                        io_alu_op : bv4
+                    outputs=
+                        io_out : bv32,
+                        io_sum : bv32
+                    state=
+                        short_A : bv12,
+                        short_B : bv12,
+                        f3 : bv3
+                    ufs=
+                        alu_result(short_A, short_B, f3),
+                        io_sum()
+                    next_ufs=
+                    instances=
+                    logic=
+                        short_A: io_A[11:0],
+                        short_B: io_B[11:0],
+                        f3: (io_alu_op == 4'h0) ? 3'h0 : ((io_alu_op == 4'h2) ? 3'h7 : ((io_alu_op == 4'h3) ? 3'h6 : ((io_alu_op == 4'h4) ? 3'h4 : ((io_alu_op == 4'h1) ? 3'h0 : ((io_alu_op == 4'h5) ? 3'h0 : ((io_alu_op == 4'h6) ? 3'h0 : 3'h0)))))),
+                        io_out: alu_result
+                    transition=
+
+        ,
+        immGen:
+            input_bindings=
+                io_inst: immGen_io_inst,
+                io_sel: immGen_io_sel
+            model=
+                Model ImmGenWire (generated via GeneratedBy.VERILOG_PARSE):
+                    inputs=
+                        io_inst : bv32,
+                        io_sel : bv3
+                    outputs=
+                        io_out : bv32
+                    state=
+                        _T_11 : bv12,
+                        Iimm : bv12,
+                        _T_12 : bv7,
+                        _T_13 : bv5,
+                        _T_14 : bv12,
+                        Simm : bv12,
+                        _T_15 : bool,
+                        _T_16 : bool,
+                        _T_17 : bv6,
+                        _T_18 : bv4,
+                        _T_20 : bv5,
+                        _T_21 : bv2,
+                        _T_22 : bv8,
+                        _T_23 : bv13,
+                        Bimm : bv13,
+                        _T_24 : bv20,
+                        _T_26 : bv32,
+                        Uimm : bv32,
+                        _T_28 : bv8,
+                        _T_29 : bool,
+                        _T_31 : bv4,
+                        _T_33 : bv10,
+                        _T_34 : bv11,
+                        _T_35 : bv9,
+                        _T_36 : bv10,
+                        _T_37 : bv21,
+                        Jimm : bv21,
+                        _T_38 : bv5,
+                        Zimm : bv6,
+                        _T_40 : bv12,
+                        _T_41 : bv12,
+                        _T_42 : bool,
+                        _T_43 : bv12,
+                        _T_44 : bool,
+                        _T_45 : bv21,
+                        _T_46 : bool,
+                        _T_47 : bv32,
+                        _T_48 : bool,
+                        _T_49 : bv32,
+                        _T_50 : bool,
+                        _T_51 : bv32,
+                        _T_52 : bool,
+                        _T_53 : bv32,
+                        _T_54 : bv32
+                    ufs=
+                    next_ufs=
+                    instances=
+                    logic=
+                        io_out: _T_54,
+                        _T_11: io_inst[31:20],
+                        Iimm: _T_11,
+                        _T_12: io_inst[31:25],
+                        _T_13: io_inst[11:7],
+                        _T_14: {_T_12,_T_13},
+                        Simm: _T_14,
+                        _T_15: (io_inst[31:31] == 1'h1) ? 1 : 0,
+                        _T_16: (io_inst[7:7] == 1'h1) ? 1 : 0,
+                        _T_17: io_inst[30:25],
+                        _T_18: io_inst[11:8],
+                        _T_20: {_T_18,0},
+                        _T_21: {_T_15,_T_16},
+                        _T_22: {_T_21,_T_17},
+                        _T_23: {_T_22,_T_20},
+                        Bimm: _T_23,
+                        _T_24: io_inst[31:12],
+                        _T_26: {_T_24,12'h0},
+                        Uimm: _T_26,
+                        _T_28: io_inst[19:12],
+                        _T_29: (io_inst[20:20] == 1'h1) ? 1 : 0,
+                        _T_31: io_inst[24:21],
+                        _T_33: {_T_17,_T_31},
+                        _T_34: {_T_33,0},
+                        _T_35: {_T_15,_T_28},
+                        _T_36: {_T_35,_T_29},
+                        _T_37: {_T_36,_T_34},
+                        Jimm: _T_37,
+                        _T_38: io_inst[19:15],
+                        Zimm: {0,_T_38},
+                        _T_40: (Iimm) & ((~32'h2) + 32'h1),
+                        _T_41: _T_40,
+                        _T_42: 3'h6 == io_sel,
+                        _T_43: _T_42 ? ({({((Zimm[5:5] == 1'h1) ? 1 : 0),((Zimm[5:5] == 1'h1) ? 1 : 0),((Zimm[5:5] == 1'h1) ? 1 : 0),((Zimm[5:5] == 1'h1) ? 1 : 0),((Zimm[5:5] == 1'h1) ? 1 : 0),((Zimm[5:5] == 1'h1) ? 1 : 0)}),Zimm}) : _T_41,
+                        _T_44: 3'h4 == io_sel,
+                        _T_45: _T_44 ? Jimm : ({({((_T_43[11:11] == 1'h1) ? 1 : 0),((_T_43[11:11] == 1'h1) ? 1 : 0),((_T_43[11:11] == 1'h1) ? 1 : 0),((_T_43[11:11] == 1'h1) ? 1 : 0),((_T_43[11:11] == 1'h1) ? 1 : 0),((_T_43[11:11] == 1'h1) ? 1 : 0),((_T_43[11:11] == 1'h1) ? 1 : 0),((_T_43[11:11] == 1'h1) ? 1 : 0),((_T_43[11:11] == 1'h1) ? 1 : 0)}),_T_43}),
+                        _T_46: 3'h3 == io_sel,
+                        _T_47: _T_46 ? Uimm : ({({((_T_45[20:20] == 1'h1) ? 1 : 0),((_T_45[20:20] == 1'h1) ? 1 : 0),((_T_45[20:20] == 1'h1) ? 1 : 0),((_T_45[20:20] == 1'h1) ? 1 : 0),((_T_45[20:20] == 1'h1) ? 1 : 0),((_T_45[20:20] == 1'h1) ? 1 : 0),((_T_45[20:20] == 1'h1) ? 1 : 0),((_T_45[20:20] == 1'h1) ? 1 : 0),((_T_45[20:20] == 1'h1) ? 1 : 0),((_T_45[20:20] == 1'h1) ? 1 : 0),((_T_45[20:20] == 1'h1) ? 1 : 0)}),_T_45}),
+                        _T_48: 3'h5 == io_sel,
+                        _T_49: _T_48 ? ({({((Bimm[12:12] == 1'h1) ? 1 : 0),((Bimm[12:12] == 1'h1) ? 1 : 0),((Bimm[12:12] == 1'h1) ? 1 : 0),((Bimm[12:12] == 1'h1) ? 1 : 0),((Bimm[12:12] == 1'h1) ? 1 : 0),((Bimm[12:12] == 1'h1) ? 1 : 0),((Bimm[12:12] == 1'h1) ? 1 : 0),((Bimm[12:12] == 1'h1) ? 1 : 0),((Bimm[12:12] == 1'h1) ? 1 : 0),((Bimm[12:12] == 1'h1) ? 1 : 0),((Bimm[12:12] == 1'h1) ? 1 : 0),((Bimm[12:12] == 1'h1) ? 1 : 0),((Bimm[12:12] == 1'h1) ? 1 : 0),((Bimm[12:12] == 1'h1) ? 1 : 0),((Bimm[12:12] == 1'h1) ? 1 : 0),((Bimm[12:12] == 1'h1) ? 1 : 0),((Bimm[12:12] == 1'h1) ? 1 : 0),((Bimm[12:12] == 1'h1) ? 1 : 0),((Bimm[12:12] == 1'h1) ? 1 : 0)}),Bimm}) : _T_47,
+                        _T_50: 3'h2 == io_sel,
+                        _T_51: _T_50 ? ({({((Simm[11:11] == 1'h1) ? 1 : 0),((Simm[11:11] == 1'h1) ? 1 : 0),((Simm[11:11] == 1'h1) ? 1 : 0),((Simm[11:11] == 1'h1) ? 1 : 0),((Simm[11:11] == 1'h1) ? 1 : 0),((Simm[11:11] == 1'h1) ? 1 : 0),((Simm[11:11] == 1'h1) ? 1 : 0),((Simm[11:11] == 1'h1) ? 1 : 0),((Simm[11:11] == 1'h1) ? 1 : 0),((Simm[11:11] == 1'h1) ? 1 : 0),((Simm[11:11] == 1'h1) ? 1 : 0),((Simm[11:11] == 1'h1) ? 1 : 0),((Simm[11:11] == 1'h1) ? 1 : 0),((Simm[11:11] == 1'h1) ? 1 : 0),((Simm[11:11] == 1'h1) ? 1 : 0),((Simm[11:11] == 1'h1) ? 1 : 0),((Simm[11:11] == 1'h1) ? 1 : 0),((Simm[11:11] == 1'h1) ? 1 : 0),((Simm[11:11] == 1'h1) ? 1 : 0),((Simm[11:11] == 1'h1) ? 1 : 0)}),Simm}) : _T_49,
+                        _T_52: 3'h1 == io_sel,
+                        _T_53: _T_52 ? ({({((Iimm[11:11] == 1'h1) ? 1 : 0),((Iimm[11:11] == 1'h1) ? 1 : 0),((Iimm[11:11] == 1'h1) ? 1 : 0),((Iimm[11:11] == 1'h1) ? 1 : 0),((Iimm[11:11] == 1'h1) ? 1 : 0),((Iimm[11:11] == 1'h1) ? 1 : 0),((Iimm[11:11] == 1'h1) ? 1 : 0),((Iimm[11:11] == 1'h1) ? 1 : 0),((Iimm[11:11] == 1'h1) ? 1 : 0),((Iimm[11:11] == 1'h1) ? 1 : 0),((Iimm[11:11] == 1'h1) ? 1 : 0),((Iimm[11:11] == 1'h1) ? 1 : 0),((Iimm[11:11] == 1'h1) ? 1 : 0),((Iimm[11:11] == 1'h1) ? 1 : 0),((Iimm[11:11] == 1'h1) ? 1 : 0),((Iimm[11:11] == 1'h1) ? 1 : 0),((Iimm[11:11] == 1'h1) ? 1 : 0),((Iimm[11:11] == 1'h1) ? 1 : 0),((Iimm[11:11] == 1'h1) ? 1 : 0),((Iimm[11:11] == 1'h1) ? 1 : 0)}),Iimm}) : _T_51,
+                        _T_54: _T_53
+                    transition=
+
+        ,
+        brCond:
+            input_bindings=
+                io_rs1: brCond_io_rs1,
+                io_rs2: brCond_io_rs2,
+                io_br_type: brCond_io_br_type
+            model=
+                Model BrCondArea (generated via GeneratedBy.VERILOG_PARSE):
+                    inputs=
+                        io_rs1 : bv32,
+                        io_rs2 : bv32,
+                        io_br_type : bv3
+                    outputs=
+                        io_taken : bool
+                    state=
+                        _T_13 : bv33,
+                        _T_14 : bv33,
+                        diff : bv32,
+                        neq : bool,
+                        eq : bool,
+                        _T_17 : bool,
+                        _T_18 : bool,
+                        isSameSign : bool,
+                        _T_19 : bool,
+                        lt : bool,
+                        ltu : bool,
+                        ge : bool,
+                        geu : bool,
+                        _T_25 : bool,
+                        _T_26 : bool,
+                        _T_27 : bool,
+                        _T_28 : bool,
+                        _T_29 : bool,
+                        _T_30 : bool,
+                        _T_31 : bool,
+                        _T_32 : bool,
+                        _T_33 : bool,
+                        _T_34 : bool,
+                        _T_35 : bool,
+                        _T_36 : bool,
+                        _T_37 : bool,
+                        _T_38 : bool,
+                        _T_39 : bool,
+                        _T_40 : bool,
+                        _T_41 : bool
+                    ufs=
+                    next_ufs=
+                    instances=
+                    logic=
+                        io_taken: _T_41,
+                        _T_13: io_rs1 - io_rs2,
+                        _T_14: _T_13,
+                        diff: _T_14[31:0],
+                        neq: diff != 32'h0,
+                        eq: neq == 0,
+                        _T_17: (io_rs1[31:31] == 1'h1) ? 1 : 0,
+                        _T_18: (io_rs2[31:31] == 1'h1) ? 1 : 0,
+                        isSameSign: _T_17 == _T_18,
+                        _T_19: (diff[31:31] == 1'h1) ? 1 : 0,
+                        lt: isSameSign ? _T_19 : _T_17,
+                        ltu: isSameSign ? _T_19 : _T_18,
+                        ge: lt == 0,
+                        geu: ltu == 0,
+                        _T_25: io_br_type == 3'h3,
+                        _T_26: _T_25 && eq,
+                        _T_27: io_br_type == 3'h6,
+                        _T_28: _T_27 && neq,
+                        _T_29: _T_26 || _T_28,
+                        _T_30: io_br_type == 3'h2,
+                        _T_31: _T_30 && lt,
+                        _T_32: _T_29 || _T_31,
+                        _T_33: io_br_type == 3'h5,
+                        _T_34: _T_33 && ge,
+                        _T_35: _T_32 || _T_34,
+                        _T_36: io_br_type == 3'h1,
+                        _T_37: _T_36 && ltu,
+                        _T_38: _T_35 || _T_37,
+                        _T_39: io_br_type == 3'h4,
+                        _T_40: _T_39 && geu,
+                        _T_41: _T_38 || _T_40
+                    transition=
+
+    logic=
+        io_host_tohost: csr_io_host_tohost,
+        io_icache_req_valid: _T_182,
+        io_icache_req_bits_addr: npc[31:0],
+        io_dcache_abort: csr_io_expt,
+        io_dcache_req_valid: _T_219,
+        io_dcache_req_bits_addr: daddr[31:0],
+        io_dcache_req_bits_data: _T_220[31:0],
+        io_dcache_req_bits_mask: _T_235[3:0],
+        io_ctrl_inst: fe_inst,
+        io_lft_dpath__stall: stall,
+        io_lft_dpath__pc: pc,
+        io_lft_dpath__fe_pc: fe_pc,
+        io_lft_dpath__fe_inst: fe_inst,
+        io_lft_dpath__ew_pc: ew_pc,
+        io_lft_dpath__regFile_io_rdata1: regFile_io_rdata1,
+        io_lft_dpath__regFile_io_rdata2: regFile_io_rdata2,
+        io_lft_dpath__regFile_io_raddr1: regFile_io_raddr1,
+        io_lft_dpath__regFile_io_raddr2: regFile_io_raddr2,
+        io_lft_dpath__regFile_io_wdata: regFile_io_wdata,
+        io_lft_dpath__regFile_io_waddr: regFile_io_waddr,
+        io_lft_dpath__regs_10: regFile.io_lft__regs_10,
+        io_lft_dpath__regs_11: regFile.io_lft__regs_11,
+        io_lft_dpath__regs_12: regFile.io_lft__regs_12,
+        io_lft_dpath__regs_13: regFile.io_lft__regs_13,
+        io_lft_dpath__regs_14: regFile.io_lft__regs_14,
+        io_lft_dpath__alu_io_A: alu_io_A,
+        io_lft_dpath__alu_io_B: alu_io_B,
+        io_lft_dpath__alu_io_alu_op: alu_io_alu_op,
+        io_lft_dpath__alu_io_out: alu_io_out,
+        io_lft_dpath__alu_io_sum: alu_io_sum,
+        csr_reset: reset,
+        csr_io_stall: stall,
+        csr_io_cmd: csr_cmd,
+        csr_io_in: csr_in,
+        csr_io_out: csr.io_out,
+        csr_io_pc: ew_pc[31:0],
+        csr_io_addr: ew_alu,
+        csr_io_inst: ew_inst,
+        csr_io_illegal: illegal,
+        csr_io_st_type: st_type,
+        csr_io_ld_type: ld_type,
+        csr_io_pc_check: pc_check,
+        csr_io_expt: csr.io_expt,
+        csr_io_evec: csr.io_evec,
+        csr_io_epc: csr.io_epc,
+        csr_io_host_fromhost_valid: io_host_fromhost_valid,
+        csr_io_host_fromhost_bits: io_host_fromhost_bits,
+        csr_io_host_tohost: csr.io_host_tohost,
+        regFile_io_raddr1: rs1_addr,
+        regFile_io_raddr2: rs2_addr,
+        regFile_io_rdata1: regFile.io_rdata1,
+        regFile_io_rdata2: regFile.io_rdata2,
+        regFile_io_wen: _T_294,
+        regFile_io_waddr: wb_rd_addr,
+        regFile_io_wdata: regWrite[31:0],
+        alu_io_A: _T_199[31:0],
+        alu_io_B: _T_201,
+        alu_io_alu_op: io_ctrl_alu_op,
+        alu_io_out: alu.io_out,
+        alu_io_sum: alu.io_sum,
+        immGen_io_inst: fe_inst,
+        immGen_io_sel: io_ctrl_imm_sel,
+        immGen_io_out: immGen.io_out,
+        brCond_io_rs1: rs1,
+        brCond_io_rs2: rs2,
+        brCond_io_br_type: io_ctrl_br_type,
+        brCond_io_taken: brCond.io_taken,
+        _T_151: io_icache_resp_valid == 0,
+        _T_153: io_dcache_resp_valid == 0,
+        stall: _T_151 || _T_153,
+        _T_156: 32'h200 - 32'h4,
+        _T_157: _T_156,
+        _T_158: _T_157[31:0],
+        _T_160: io_ctrl_pc_sel == 2'h3,
+        _T_161: io_ctrl_pc_sel == 2'h1,
+        _T_162: _T_161 || brCond_io_taken,
+        _T_164: alu_io_sum >>> 32'h1,
+        _GEN_24: {0,_T_164},
+        _T_166: _GEN_24 << 33'h1,
+        _T_167: io_ctrl_pc_sel == 2'h2,
+        _T_169: pc + 33'h4,
+        _T_170: _T_169[32:0],
+        _T_171: _T_167 ? pc : _T_170,
+        _T_172: _T_162 ? _T_166 : _T_171,
+        _T_173: _T_160 ? ({0,csr_io_epc}) : _T_172,
+        _T_174: csr_io_expt ? ({0,csr_io_evec}) : _T_173,
+        npc: stall ? pc : _T_174,
+        _T_175: started || io_ctrl_inst_kill,
+        _T_176: _T_175 || brCond_io_taken,
+        _T_177: _T_176 || csr_io_expt,
+        inst: _T_177 ? 32'h13 : io_icache_resp_bits_data,
+        _T_182: stall == 0,
+        _GEN_0: _T_182 ? pc : fe_pc,
+        _GEN_1: _T_182 ? inst : fe_inst,
+        rs1_addr: fe_inst[19:15],
+        rs2_addr: fe_inst[24:20],
+        wb_rd_addr: ew_inst[11:7],
+        _T_187: rs1_addr != 5'h0,
+        _T_188: wb_en && _T_187,
+        _T_189: rs1_addr == wb_rd_addr,
+        rs1hazard: _T_188 && _T_189,
+        _T_191: rs2_addr != 5'h0,
+        _T_192: wb_en && _T_191,
+        _T_193: rs2_addr == wb_rd_addr,
+        rs2hazard: _T_192 && _T_193,
+        _T_194: wb_sel == 2'h0,
+        _T_195: _T_194 && rs1hazard,
+        rs1: _T_195 ? ew_alu : regFile_io_rdata1,
+        _T_197: _T_194 && rs2hazard,
+        rs2: _T_197 ? ew_alu : regFile_io_rdata2,
+        _T_199: io_ctrl_A_sel ? ({0,rs1}) : fe_pc,
+        _T_201: io_ctrl_B_sel ? rs2 : immGen_io_out,
+        _T_202: stall ? ew_alu : alu_io_sum,
+        _T_204: _T_202 >>> (2'h2),
+        _GEN_25: {3'h0,_T_204},
+        daddr: _GEN_25 << (2'h2),
+        _T_206: (alu_io_sum[1:1] == 1'h1) ? 1 : 0,
+        _GEN_26: {7'h0,_T_206},
+        _T_208: _GEN_26 << (3'h4),
+        _T_209: (alu_io_sum[0:0] == 1'h1) ? 1 : 0,
+        _GEN_27: {3'h0,_T_209},
+        _T_211: _GEN_27 << (2'h3),
+        _GEN_28: {4'h0,_T_211},
+        woffset: _T_208 | _GEN_28,
+        _T_215: io_ctrl_st_type != 2'h0,
+        _T_217: io_ctrl_ld_type != 3'h0,
+        _T_218: _T_215 || _T_217,
+        _T_219: _T_182 && _T_218,
+        _GEN_29: {255'h0,rs2},
+        _T_220: _GEN_29 << (woffset),
+        _T_221: stall ? st_type : io_ctrl_st_type,
+        _T_225: alu_io_sum[1:0],
+        _T_226: 5'h3 << (_T_225),
+        _T_229: 4'h1 << (_T_225),
+        _T_230: 2'h3 == _T_221,
+        _T_231: _T_230 ? _T_229 : 4'h0,
+        _T_232: 2'h2 == _T_221,
+        _T_233: _T_232 ? _T_226 : ({0,_T_231}),
+        _T_234: 2'h1 == _T_221,
+        _T_235: _T_234 ? 5'hf : _T_233,
+        _T_239: _T_182 && csr_io_expt,
+        _T_240: reset || _T_239,
+        _T_250: csr_io_expt == 0,
+        _T_251: _T_182 && _T_250,
+        _T_252: io_ctrl_imm_sel == 3'h6,
+        _T_253: _T_252 ? immGen_io_out : rs1,
+        _GEN_2: _T_251 ? fe_pc : ew_pc,
+        _GEN_3: _T_251 ? fe_inst : ew_inst,
+        _GEN_4: _T_251 ? alu_io_out : ew_alu,
+        _GEN_5: _T_251 ? _T_253 : csr_in,
+        _GEN_6: _T_251 ? io_ctrl_st_type : st_type,
+        _GEN_7: _T_251 ? io_ctrl_ld_type : ld_type,
+        _GEN_8: _T_251 ? io_ctrl_wb_sel : wb_sel,
+        _GEN_9: _T_251 ? io_ctrl_wb_en : wb_en,
+        _GEN_10: _T_251 ? io_ctrl_csr_cmd : csr_cmd,
+        _GEN_11: _T_251 ? io_ctrl_illegal : illegal,
+        _GEN_12: _T_251 ? _T_161 : pc_check,
+        _GEN_13: _T_240 ? 2'h0 : _GEN_6,
+        _GEN_14: _T_240 ? 3'h0 : _GEN_7,
+        _GEN_15: _T_240 ? 0 : _GEN_9,
+        _GEN_16: _T_240 ? 3'h0 : _GEN_10,
+        _GEN_17: _T_240 ? 0 : _GEN_11,
+        _GEN_18: _T_240 ? 0 : _GEN_12,
+        _GEN_19: _T_240 ? ew_pc : _GEN_2,
+        _GEN_20: _T_240 ? ew_inst : _GEN_3,
+        _GEN_21: _T_240 ? ew_alu : _GEN_4,
+        _GEN_22: _T_240 ? csr_in : _GEN_5,
+        _GEN_23: _T_240 ? wb_sel : _GEN_8,
+        _T_255: (ew_alu[1:1] == 1'h1) ? 1 : 0,
+        _GEN_30: {7'h0,_T_255},
+        _T_257: _GEN_30 << (3'h4),
+        _T_258: (ew_alu[0:0] == 1'h1) ? 1 : 0,
+        _GEN_31: {3'h0,_T_258},
+        _T_260: _GEN_31 << (2'h3),
+        _GEN_32: {4'h0,_T_260},
+        loffset: _T_257 | _GEN_32,
+        lshift: io_dcache_resp_bits_data >>> (loffset),
+        _T_261: {0,io_dcache_resp_bits_data},
+        _T_262: lshift[15:0],
+        _T_263: _T_262,
+        _T_264: lshift[7:0],
+        _T_265: _T_264,
+        _T_267: {0,_T_262},
+        _T_269: {0,_T_264},
+        _T_270: 3'h5 == ld_type,
+        _T_271: _T_270 ? ({({((_T_269[8:8] == 1'h1) ? 1 : 0),((_T_269[8:8] == 1'h1) ? 1 : 0),((_T_269[8:8] == 1'h1) ? 1 : 0),((_T_269[8:8] == 1'h1) ? 1 : 0),((_T_269[8:8] == 1'h1) ? 1 : 0),((_T_269[8:8] == 1'h1) ? 1 : 0),((_T_269[8:8] == 1'h1) ? 1 : 0),((_T_269[8:8] == 1'h1) ? 1 : 0),((_T_269[8:8] == 1'h1) ? 1 : 0),((_T_269[8:8] == 1'h1) ? 1 : 0),((_T_269[8:8] == 1'h1) ? 1 : 0),((_T_269[8:8] == 1'h1) ? 1 : 0),((_T_269[8:8] == 1'h1) ? 1 : 0),((_T_269[8:8] == 1'h1) ? 1 : 0),((_T_269[8:8] == 1'h1) ? 1 : 0),((_T_269[8:8] == 1'h1) ? 1 : 0),((_T_269[8:8] == 1'h1) ? 1 : 0),((_T_269[8:8] == 1'h1) ? 1 : 0),((_T_269[8:8] == 1'h1) ? 1 : 0),((_T_269[8:8] == 1'h1) ? 1 : 0),((_T_269[8:8] == 1'h1) ? 1 : 0),((_T_269[8:8] == 1'h1) ? 1 : 0),((_T_269[8:8] == 1'h1) ? 1 : 0),((_T_269[8:8] == 1'h1) ? 1 : 0)}),_T_269}) : _T_261,
+        _T_272: 3'h4 == ld_type,
+        _T_273: _T_272 ? ({({((_T_267[16:16] == 1'h1) ? 1 : 0),((_T_267[16:16] == 1'h1) ? 1 : 0),((_T_267[16:16] == 1'h1) ? 1 : 0),((_T_267[16:16] == 1'h1) ? 1 : 0),((_T_267[16:16] == 1'h1) ? 1 : 0),((_T_267[16:16] == 1'h1) ? 1 : 0),((_T_267[16:16] == 1'h1) ? 1 : 0),((_T_267[16:16] == 1'h1) ? 1 : 0),((_T_267[16:16] == 1'h1) ? 1 : 0),((_T_267[16:16] == 1'h1) ? 1 : 0),((_T_267[16:16] == 1'h1) ? 1 : 0),((_T_267[16:16] == 1'h1) ? 1 : 0),((_T_267[16:16] == 1'h1) ? 1 : 0),((_T_267[16:16] == 1'h1) ? 1 : 0),((_T_267[16:16] == 1'h1) ? 1 : 0),((_T_267[16:16] == 1'h1) ? 1 : 0)}),_T_267}) : _T_271,
+        _T_274: 3'h3 == ld_type,
+        _T_275: _T_274 ? ({({((_T_265[7:7] == 1'h1) ? 1 : 0),((_T_265[7:7] == 1'h1) ? 1 : 0),((_T_265[7:7] == 1'h1) ? 1 : 0),((_T_265[7:7] == 1'h1) ? 1 : 0),((_T_265[7:7] == 1'h1) ? 1 : 0),((_T_265[7:7] == 1'h1) ? 1 : 0),((_T_265[7:7] == 1'h1) ? 1 : 0),((_T_265[7:7] == 1'h1) ? 1 : 0),((_T_265[7:7] == 1'h1) ? 1 : 0),((_T_265[7:7] == 1'h1) ? 1 : 0),((_T_265[7:7] == 1'h1) ? 1 : 0),((_T_265[7:7] == 1'h1) ? 1 : 0),((_T_265[7:7] == 1'h1) ? 1 : 0),((_T_265[7:7] == 1'h1) ? 1 : 0),((_T_265[7:7] == 1'h1) ? 1 : 0),((_T_265[7:7] == 1'h1) ? 1 : 0),((_T_265[7:7] == 1'h1) ? 1 : 0),((_T_265[7:7] == 1'h1) ? 1 : 0),((_T_265[7:7] == 1'h1) ? 1 : 0),((_T_265[7:7] == 1'h1) ? 1 : 0),((_T_265[7:7] == 1'h1) ? 1 : 0),((_T_265[7:7] == 1'h1) ? 1 : 0),((_T_265[7:7] == 1'h1) ? 1 : 0),((_T_265[7:7] == 1'h1) ? 1 : 0),((_T_265[7:7] == 1'h1) ? 1 : 0)}),_T_265}) : _T_273,
+        _T_276: 3'h2 == ld_type,
+        load: _T_276 ? ({({((_T_263[15:15] == 1'h1) ? 1 : 0),((_T_263[15:15] == 1'h1) ? 1 : 0),((_T_263[15:15] == 1'h1) ? 1 : 0),((_T_263[15:15] == 1'h1) ? 1 : 0),((_T_263[15:15] == 1'h1) ? 1 : 0),((_T_263[15:15] == 1'h1) ? 1 : 0),((_T_263[15:15] == 1'h1) ? 1 : 0),((_T_263[15:15] == 1'h1) ? 1 : 0),((_T_263[15:15] == 1'h1) ? 1 : 0),((_T_263[15:15] == 1'h1) ? 1 : 0),((_T_263[15:15] == 1'h1) ? 1 : 0),((_T_263[15:15] == 1'h1) ? 1 : 0),((_T_263[15:15] == 1'h1) ? 1 : 0),((_T_263[15:15] == 1'h1) ? 1 : 0),((_T_263[15:15] == 1'h1) ? 1 : 0),((_T_263[15:15] == 1'h1) ? 1 : 0),((_T_263[15:15] == 1'h1) ? 1 : 0)}),_T_263}) : _T_275,
+        _T_277: {0,ew_alu},
+        _T_279: ew_pc + 33'h4,
+        _T_280: _T_279[32:0],
+        _T_281: {0,_T_280},
+        _T_282: {0,csr_io_out},
+        _T_283: 2'h3 == wb_sel,
+        _T_284: _T_283 ? _T_282 : _T_277,
+        _T_285: 2'h2 == wb_sel,
+        _T_286: _T_285 ? _T_281 : ({((_T_284[32:32] == 1'h1) ? 1 : 0),_T_284}),
+        _T_287: 2'h1 == wb_sel,
+        _T_288: _T_287 ? ({((load[32:32] == 1'h1) ? 1 : 0),load}) : _T_286,
+        regWrite: _T_288,
+        _T_291: wb_en && _T_182,
+        _T_294: _T_291 && _T_250,
+        _T_296: regFile_io_wen ? wb_rd_addr : 5'h0,
+        _T_298: regFile_io_wen ? regFile_io_wdata : 32'h0,
+        _T_301: reset == 0
+    transition=
+        fe_inst: reset ? 32'h13 : (_T_182 ? (_T_177 ? 32'h13 : io_icache_resp_bits_data) : fe_inst),
+        fe_pc: _T_182 ? pc : fe_pc,
+        ew_inst: reset ? 32'h13 : ((!_T_240) ? (_T_251 ? fe_inst : ew_inst) : ew_inst),
+        ew_pc: (!_T_240) ? (_T_251 ? fe_pc : ew_pc) : ew_pc,
+        ew_alu: (!_T_240) ? (_T_251 ? alu_io_out : ew_alu) : ew_alu,
+        csr_in: (!_T_240) ? (_T_251 ? (_T_252 ? immGen_io_out : (_T_195 ? ew_alu : regFile_io_rdata1)) : csr_in) : csr_in,
+        st_type: _T_240 ? 2'h0 : (_T_251 ? io_ctrl_st_type : st_type),
+        ld_type: _T_240 ? 3'h0 : (_T_251 ? io_ctrl_ld_type : ld_type),
+        wb_sel: (!_T_240) ? (_T_251 ? io_ctrl_wb_sel : wb_sel) : wb_sel,
+        wb_en: _T_240 ? 0 : (_T_251 ? io_ctrl_wb_en : wb_en),
+        csr_cmd: _T_240 ? 3'h0 : (_T_251 ? io_ctrl_csr_cmd : csr_cmd),
+        illegal: _T_240 ? 0 : (_T_251 ? io_ctrl_illegal : illegal),
+        pc_check: _T_240 ? 0 : (_T_251 ? _T_161 : pc_check),
+        started: _T_301 ? reset : (reset ? reset : reset),
+        pc: reset ? ({0,_T_158}) : ((!stall) ? (csr_io_expt ? ({0,csr_io_evec}) : (_T_160 ? ({0,csr_io_epc}) : (_T_162 ? _T_166 : ((!_T_167) ? _T_170 : pc)))) : pc)
+
+Copied files!
+Correctness oracle returned false, synthesizing new candidates
+calling io oracle
+Beginning sample
+Sampled Tile->lft_tile_regs_13@13=897
+io oracle result: inputs: f3=0x4, short_B=0x7ea, short_A=0x46b; outputs: ALUArea.alu_result=0x381
+Running synthesis...
+Synthesis done, candidates are:
+    alu_result = (short_A,short_B,f3) -> ({{20{short_A[11]}}, short_A}) - (({{20{short_A[11]}}, short_A}) + (({{20{short_A[11]}}, short_A}) | (({{20{short_A[11]}}, short_A}) - (({{20{short_A[11]}}, short_A}) + ({{20{short_B[11]}}, short_B})))))
+calling corr oracle
+SBY 23:55:32 [corr_taskBMC] Removing directory '/home/jhshi/research/easyila/designs/riscv-mini/symbiyosys/corr_taskBMC'.
+SBY 23:55:32 [corr_taskBMC] Copy '/home/jhshi/research/easyila/designs/riscv-mini/symbiyosys/TileM.v' to '/home/jhshi/research/easyila/designs/riscv-mini/symbiyosys/corr_taskBMC/src/TileM.v'.
+SBY 23:55:32 [corr_taskBMC] Copy '/home/jhshi/research/easyila/designs/riscv-mini/symbiyosys/Formal.v' to '/home/jhshi/research/easyila/designs/riscv-mini/symbiyosys/corr_taskBMC/src/Formal.v'.
+SBY 23:55:32 [corr_taskBMC] engine_0: smtbmc yices
+SBY 23:55:32 [corr_taskBMC] base: starting process "cd corr_taskBMC/src; yosys -ql ../model/design.log ../model/design.ys"
+SBY 23:55:34 [corr_taskBMC] base: finished (returncode=0)
+SBY 23:55:34 [corr_taskBMC] smt2: starting process "cd corr_taskBMC/model; yosys -ql design_smt2.log design_smt2.ys"
+SBY 23:55:34 [corr_taskBMC] smt2: finished (returncode=0)
+SBY 23:55:34 [corr_taskBMC] engine_0: starting process "cd corr_taskBMC; yosys-smtbmc -s yices --presat --unroll --noprogress -t 15  --append 0 --dump-vcd engine_0/trace.vcd --dump-vlogtb engine_0/trace_tb.v --dump-smtc engine_0/trace.smtc model/design_smt2.smt2"
+SBY 23:55:34 [corr_taskBMC] engine_0: ##   0:00:00  Solver: yices
+SBY 23:55:35 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 0..
+SBY 23:55:35 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 0..
+SBY 23:55:35 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 1..
+SBY 23:55:35 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 1..
+SBY 23:55:35 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 2..
+SBY 23:55:35 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 2..
+SBY 23:55:35 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 3..
+SBY 23:55:35 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 3..
+SBY 23:55:35 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 4..
+SBY 23:55:36 [corr_taskBMC] engine_0: ##   0:00:01  Checking assertions in step 4..
+SBY 23:55:36 [corr_taskBMC] engine_0: ##   0:00:01  Checking assumptions in step 5..
+SBY 23:55:36 [corr_taskBMC] engine_0: ##   0:00:01  Checking assertions in step 5..
+SBY 23:55:36 [corr_taskBMC] engine_0: ##   0:00:01  Checking assumptions in step 6..
+SBY 23:55:36 [corr_taskBMC] engine_0: ##   0:00:02  Checking assertions in step 6..
+SBY 23:55:37 [corr_taskBMC] engine_0: ##   0:00:02  Checking assumptions in step 7..
+SBY 23:55:38 [corr_taskBMC] engine_0: ##   0:00:03  Checking assertions in step 7..
+SBY 23:55:38 [corr_taskBMC] engine_0: ##   0:00:03  Checking assumptions in step 8..
+SBY 23:55:40 [corr_taskBMC] engine_0: ##   0:00:05  Checking assertions in step 8..
+SBY 23:55:40 [corr_taskBMC] engine_0: ##   0:00:05  Checking assumptions in step 9..
+SBY 23:55:41 [corr_taskBMC] engine_0: ##   0:00:06  Checking assertions in step 9..
+SBY 23:55:42 [corr_taskBMC] engine_0: ##   0:00:07  Checking assumptions in step 10..
+SBY 23:55:42 [corr_taskBMC] engine_0: ##   0:00:07  Checking assertions in step 10..
+SBY 23:55:42 [corr_taskBMC] engine_0: ##   0:00:07  Checking assumptions in step 11..
+SBY 23:55:42 [corr_taskBMC] engine_0: ##   0:00:07  Checking assertions in step 11..
+SBY 23:55:43 [corr_taskBMC] engine_0: ##   0:00:08  Checking assumptions in step 12..
+SBY 23:55:43 [corr_taskBMC] engine_0: ##   0:00:08  Checking assertions in step 12..
+SBY 23:55:43 [corr_taskBMC] engine_0: ##   0:00:09  Checking assumptions in step 13..
+SBY 23:55:46 [corr_taskBMC] engine_0: ##   0:00:11  Checking assertions in step 13..
+SBY 23:55:47 [corr_taskBMC] engine_0: ##   0:00:12  Checking assumptions in step 14..
+SBY 23:55:49 [corr_taskBMC] engine_0: ##   0:00:14  Checking assertions in step 14..
+SBY 23:55:49 [corr_taskBMC] engine_0: ##   0:00:14  BMC failed!
+SBY 23:55:49 [corr_taskBMC] engine_0: ##   0:00:14  Value for anyconst Tile.__shadow_short_B (Formal.v:0.0-0.0): 2378
+SBY 23:55:49 [corr_taskBMC] engine_0: ##   0:00:14  Value for anyconst Tile.__shadow_short_A (Formal.v:0.0-0.0): 1995
+SBY 23:55:49 [corr_taskBMC] engine_0: ##   0:00:14  Value for anyconst Tile.__shadow_f3 (Formal.v:0.0-0.0): 7
+SBY 23:55:49 [corr_taskBMC] engine_0: ##   0:00:14  Assert failed in Tile: Formal.v:513.49-514.73
+SBY 23:55:49 [corr_taskBMC] engine_0: ##   0:00:14  Writing trace to VCD file: engine_0/trace.vcd
+SBY 23:55:51 [corr_taskBMC] engine_0: ##   0:00:16  Writing trace to Verilog testbench: engine_0/trace_tb.v
+SBY 23:55:51 [corr_taskBMC] engine_0: ##   0:00:16  Writing trace to constraints file: engine_0/trace.smtc
+SBY 23:55:51 [corr_taskBMC] engine_0: ##   0:00:16  Status: failed
+SBY 23:55:51 [corr_taskBMC] engine_0: finished (returncode=1)
+SBY 23:55:51 [corr_taskBMC] engine_0: Status returned by engine: FAIL
+SBY 23:55:51 [corr_taskBMC] summary: Elapsed clock time [H:MM:SS (secs)]: 0:00:18 (18)
+SBY 23:55:51 [corr_taskBMC] summary: Elapsed process time [H:MM:SS (secs)]: 0:00:19 (19)
+SBY 23:55:51 [corr_taskBMC] summary: engine_0 (smtbmc yices) returned FAIL
+SBY 23:55:51 [corr_taskBMC] summary: counterexample trace: corr_taskBMC/engine_0/trace.vcd
+SBY 23:55:51 [corr_taskBMC] DONE (FAIL, rc=2)
+SBY 23:55:51 The following tasks failed: ['taskBMC']
+Adding counterexample: (short_B=2378, short_A=1995, f3=7) -> (ALUArea.alu_result=330)
+Correctness oracle returned false, synthesizing new candidates
+calling io oracle
+Beginning sample
+Sampled Tile->lft_tile_regs_13@13=330
+io oracle result: inputs: short_B=0x94a, short_A=0x7cb, f3=0x7; outputs: ALUArea.alu_result=0x14a
+Running synthesis...
+Synthesis done, candidates are:
+    alu_result = (short_A,short_B,f3) -> (f3 == 3'h4) ? (({{20{short_A[11]}}, short_A}) - (({{20{short_A[11]}}, short_A}) + (({{20{short_A[11]}}, short_A}) | (({{20{short_A[11]}}, short_A}) - (({{20{short_A[11]}}, short_A}) + ({{20{short_B[11]}}, short_B})))))) : (({{20{short_A[11]}}, short_A}) + (({{20{short_B[11]}}, short_B}) - (({{20{short_A[11]}}, short_A}) | ({{20{short_B[11]}}, short_B}))))
+calling corr oracle
+SBY 23:55:52 [corr_taskBMC] Removing directory '/home/jhshi/research/easyila/designs/riscv-mini/symbiyosys/corr_taskBMC'.
+SBY 23:55:52 [corr_taskBMC] Copy '/home/jhshi/research/easyila/designs/riscv-mini/symbiyosys/TileM.v' to '/home/jhshi/research/easyila/designs/riscv-mini/symbiyosys/corr_taskBMC/src/TileM.v'.
+SBY 23:55:52 [corr_taskBMC] Copy '/home/jhshi/research/easyila/designs/riscv-mini/symbiyosys/Formal.v' to '/home/jhshi/research/easyila/designs/riscv-mini/symbiyosys/corr_taskBMC/src/Formal.v'.
+SBY 23:55:52 [corr_taskBMC] engine_0: smtbmc yices
+SBY 23:55:52 [corr_taskBMC] base: starting process "cd corr_taskBMC/src; yosys -ql ../model/design.log ../model/design.ys"
+SBY 23:55:54 [corr_taskBMC] base: finished (returncode=0)
+SBY 23:55:54 [corr_taskBMC] smt2: starting process "cd corr_taskBMC/model; yosys -ql design_smt2.log design_smt2.ys"
+SBY 23:55:54 [corr_taskBMC] smt2: finished (returncode=0)
+SBY 23:55:54 [corr_taskBMC] engine_0: starting process "cd corr_taskBMC; yosys-smtbmc -s yices --presat --unroll --noprogress -t 15  --append 0 --dump-vcd engine_0/trace.vcd --dump-vlogtb engine_0/trace_tb.v --dump-smtc engine_0/trace.smtc model/design_smt2.smt2"
+SBY 23:55:54 [corr_taskBMC] engine_0: ##   0:00:00  Solver: yices
+SBY 23:55:54 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 0..
+SBY 23:55:54 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 0..
+SBY 23:55:54 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 1..
+SBY 23:55:54 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 1..
+SBY 23:55:54 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 2..
+SBY 23:55:54 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 2..
+SBY 23:55:55 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 3..
+SBY 23:55:55 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 3..
+SBY 23:55:55 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 4..
+SBY 23:55:55 [corr_taskBMC] engine_0: ##   0:00:01  Checking assertions in step 4..
+SBY 23:55:55 [corr_taskBMC] engine_0: ##   0:00:01  Checking assumptions in step 5..
+SBY 23:55:55 [corr_taskBMC] engine_0: ##   0:00:01  Checking assertions in step 5..
+SBY 23:55:55 [corr_taskBMC] engine_0: ##   0:00:01  Checking assumptions in step 6..
+SBY 23:55:56 [corr_taskBMC] engine_0: ##   0:00:02  Checking assertions in step 6..
+SBY 23:55:56 [corr_taskBMC] engine_0: ##   0:00:02  Checking assumptions in step 7..
+SBY 23:55:57 [corr_taskBMC] engine_0: ##   0:00:03  Checking assertions in step 7..
+SBY 23:55:57 [corr_taskBMC] engine_0: ##   0:00:03  Checking assumptions in step 8..
+SBY 23:55:59 [corr_taskBMC] engine_0: ##   0:00:05  Checking assertions in step 8..
+SBY 23:55:59 [corr_taskBMC] engine_0: ##   0:00:05  Checking assumptions in step 9..
+SBY 23:56:01 [corr_taskBMC] engine_0: ##   0:00:06  Checking assertions in step 9..
+SBY 23:56:01 [corr_taskBMC] engine_0: ##   0:00:06  Checking assumptions in step 10..
+SBY 23:56:01 [corr_taskBMC] engine_0: ##   0:00:07  Checking assertions in step 10..
+SBY 23:56:01 [corr_taskBMC] engine_0: ##   0:00:07  Checking assumptions in step 11..
+SBY 23:56:02 [corr_taskBMC] engine_0: ##   0:00:07  Checking assertions in step 11..
+SBY 23:56:02 [corr_taskBMC] engine_0: ##   0:00:07  Checking assumptions in step 12..
+SBY 23:56:02 [corr_taskBMC] engine_0: ##   0:00:08  Checking assertions in step 12..
+SBY 23:56:03 [corr_taskBMC] engine_0: ##   0:00:08  Checking assumptions in step 13..
+SBY 23:56:06 [corr_taskBMC] engine_0: ##   0:00:11  Checking assertions in step 13..
+SBY 23:56:06 [corr_taskBMC] engine_0: ##   0:00:11  Checking assumptions in step 14..
+SBY 23:56:08 [corr_taskBMC] engine_0: ##   0:00:14  Checking assertions in step 14..
+SBY 23:56:08 [corr_taskBMC] engine_0: ##   0:00:14  BMC failed!
+SBY 23:56:08 [corr_taskBMC] engine_0: ##   0:00:14  Value for anyconst Tile.__shadow_short_B (Formal.v:0.0-0.0): 2730
+SBY 23:56:08 [corr_taskBMC] engine_0: ##   0:00:14  Value for anyconst Tile.__shadow_short_A (Formal.v:0.0-0.0): 2859
+SBY 23:56:08 [corr_taskBMC] engine_0: ##   0:00:14  Value for anyconst Tile.__shadow_f3 (Formal.v:0.0-0.0): 6
+SBY 23:56:08 [corr_taskBMC] engine_0: ##   0:00:14  Assert failed in Tile: Formal.v:513.49-514.73
+SBY 23:56:08 [corr_taskBMC] engine_0: ##   0:00:14  Writing trace to VCD file: engine_0/trace.vcd
+SBY 23:56:10 [corr_taskBMC] engine_0: ##   0:00:16  Writing trace to Verilog testbench: engine_0/trace_tb.v
+SBY 23:56:10 [corr_taskBMC] engine_0: ##   0:00:16  Writing trace to constraints file: engine_0/trace.smtc
+SBY 23:56:10 [corr_taskBMC] engine_0: ##   0:00:16  Status: failed
+SBY 23:56:10 [corr_taskBMC] engine_0: finished (returncode=1)
+SBY 23:56:10 [corr_taskBMC] engine_0: Status returned by engine: FAIL
+SBY 23:56:10 [corr_taskBMC] summary: Elapsed clock time [H:MM:SS (secs)]: 0:00:18 (18)
+SBY 23:56:10 [corr_taskBMC] summary: Elapsed process time [H:MM:SS (secs)]: 0:00:19 (19)
+SBY 23:56:10 [corr_taskBMC] summary: engine_0 (smtbmc yices) returned FAIL
+SBY 23:56:10 [corr_taskBMC] summary: counterexample trace: corr_taskBMC/engine_0/trace.vcd
+SBY 23:56:10 [corr_taskBMC] DONE (FAIL, rc=2)
+SBY 23:56:10 The following tasks failed: ['taskBMC']
+Adding counterexample: (short_B=2730, short_A=2859, f3=6) -> (ALUArea.alu_result=4294966187)
+Correctness oracle returned false, synthesizing new candidates
+calling io oracle
+Beginning sample
+Sampled Tile->lft_tile_regs_13@13=4294966187
+io oracle result: inputs: short_B=0xaaa, short_A=0xb2b, f3=0x6; outputs: ALUArea.alu_result=0xfffffbab
+Running synthesis...
+Synthesis done, candidates are:
+    alu_result = (short_A,short_B,f3) -> (f3 == 3'h4) ? (({{20{short_A[11]}}, short_A}) - (({{20{short_A[11]}}, short_A}) + (({{20{short_A[11]}}, short_A}) | (({{20{short_A[11]}}, short_A}) - (({{20{short_A[11]}}, short_A}) + ({{20{short_B[11]}}, short_B})))))) : ((f3 == 3'h7) ? (({{20{short_A[11]}}, short_A}) + (({{20{short_B[11]}}, short_B}) - (({{20{short_A[11]}}, short_A}) | ({{20{short_B[11]}}, short_B})))) : (({{20{short_A[11]}}, short_A}) | ({{20{short_B[11]}}, short_B})))
+calling corr oracle
+SBY 23:56:11 [corr_taskBMC] Removing directory '/home/jhshi/research/easyila/designs/riscv-mini/symbiyosys/corr_taskBMC'.
+SBY 23:56:11 [corr_taskBMC] Copy '/home/jhshi/research/easyila/designs/riscv-mini/symbiyosys/TileM.v' to '/home/jhshi/research/easyila/designs/riscv-mini/symbiyosys/corr_taskBMC/src/TileM.v'.
+SBY 23:56:11 [corr_taskBMC] Copy '/home/jhshi/research/easyila/designs/riscv-mini/symbiyosys/Formal.v' to '/home/jhshi/research/easyila/designs/riscv-mini/symbiyosys/corr_taskBMC/src/Formal.v'.
+SBY 23:56:11 [corr_taskBMC] engine_0: smtbmc yices
+SBY 23:56:11 [corr_taskBMC] base: starting process "cd corr_taskBMC/src; yosys -ql ../model/design.log ../model/design.ys"
+SBY 23:56:13 [corr_taskBMC] base: finished (returncode=0)
+SBY 23:56:13 [corr_taskBMC] smt2: starting process "cd corr_taskBMC/model; yosys -ql design_smt2.log design_smt2.ys"
+SBY 23:56:13 [corr_taskBMC] smt2: finished (returncode=0)
+SBY 23:56:13 [corr_taskBMC] engine_0: starting process "cd corr_taskBMC; yosys-smtbmc -s yices --presat --unroll --noprogress -t 15  --append 0 --dump-vcd engine_0/trace.vcd --dump-vlogtb engine_0/trace_tb.v --dump-smtc engine_0/trace.smtc model/design_smt2.smt2"
+SBY 23:56:13 [corr_taskBMC] engine_0: ##   0:00:00  Solver: yices
+SBY 23:56:13 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 0..
+SBY 23:56:13 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 0..
+SBY 23:56:13 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 1..
+SBY 23:56:13 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 1..
+SBY 23:56:14 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 2..
+SBY 23:56:14 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 2..
+SBY 23:56:14 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 3..
+SBY 23:56:14 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 3..
+SBY 23:56:14 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 4..
+SBY 23:56:14 [corr_taskBMC] engine_0: ##   0:00:01  Checking assertions in step 4..
+SBY 23:56:14 [corr_taskBMC] engine_0: ##   0:00:01  Checking assumptions in step 5..
+SBY 23:56:14 [corr_taskBMC] engine_0: ##   0:00:01  Checking assertions in step 5..
+SBY 23:56:15 [corr_taskBMC] engine_0: ##   0:00:01  Checking assumptions in step 6..
+SBY 23:56:15 [corr_taskBMC] engine_0: ##   0:00:02  Checking assertions in step 6..
+SBY 23:56:15 [corr_taskBMC] engine_0: ##   0:00:02  Checking assumptions in step 7..
+SBY 23:56:16 [corr_taskBMC] engine_0: ##   0:00:03  Checking assertions in step 7..
+SBY 23:56:16 [corr_taskBMC] engine_0: ##   0:00:03  Checking assumptions in step 8..
+SBY 23:56:18 [corr_taskBMC] engine_0: ##   0:00:05  Checking assertions in step 8..
+SBY 23:56:19 [corr_taskBMC] engine_0: ##   0:00:05  Checking assumptions in step 9..
+SBY 23:56:20 [corr_taskBMC] engine_0: ##   0:00:06  Checking assertions in step 9..
+SBY 23:56:20 [corr_taskBMC] engine_0: ##   0:00:07  Checking assumptions in step 10..
+SBY 23:56:20 [corr_taskBMC] engine_0: ##   0:00:07  Checking assertions in step 10..
+SBY 23:56:20 [corr_taskBMC] engine_0: ##   0:00:07  Checking assumptions in step 11..
+SBY 23:56:21 [corr_taskBMC] engine_0: ##   0:00:07  Checking assertions in step 11..
+SBY 23:56:21 [corr_taskBMC] engine_0: ##   0:00:07  Checking assumptions in step 12..
+SBY 23:56:22 [corr_taskBMC] engine_0: ##   0:00:08  Checking assertions in step 12..
+SBY 23:56:22 [corr_taskBMC] engine_0: ##   0:00:08  Checking assumptions in step 13..
+SBY 23:56:25 [corr_taskBMC] engine_0: ##   0:00:11  Checking assertions in step 13..
+SBY 23:56:25 [corr_taskBMC] engine_0: ##   0:00:12  Checking assumptions in step 14..
+SBY 23:56:27 [corr_taskBMC] engine_0: ##   0:00:14  Checking assertions in step 14..
+SBY 23:56:28 [corr_taskBMC] engine_0: ##   0:00:14  BMC failed!
+SBY 23:56:28 [corr_taskBMC] engine_0: ##   0:00:14  Value for anyconst Tile.__shadow_short_B (Formal.v:0.0-0.0): 1322
+SBY 23:56:28 [corr_taskBMC] engine_0: ##   0:00:14  Value for anyconst Tile.__shadow_short_A (Formal.v:0.0-0.0): 3371
+SBY 23:56:28 [corr_taskBMC] engine_0: ##   0:00:14  Value for anyconst Tile.__shadow_f3 (Formal.v:0.0-0.0): 0
+SBY 23:56:28 [corr_taskBMC] engine_0: ##   0:00:14  Assert failed in Tile: Formal.v:513.49-514.73
+SBY 23:56:28 [corr_taskBMC] engine_0: ##   0:00:14  Writing trace to VCD file: engine_0/trace.vcd
+SBY 23:56:30 [corr_taskBMC] engine_0: ##   0:00:16  Writing trace to Verilog testbench: engine_0/trace_tb.v
+SBY 23:56:30 [corr_taskBMC] engine_0: ##   0:00:16  Writing trace to constraints file: engine_0/trace.smtc
+SBY 23:56:30 [corr_taskBMC] engine_0: ##   0:00:16  Status: failed
+SBY 23:56:30 [corr_taskBMC] engine_0: finished (returncode=1)
+SBY 23:56:30 [corr_taskBMC] engine_0: Status returned by engine: FAIL
+SBY 23:56:30 [corr_taskBMC] summary: Elapsed clock time [H:MM:SS (secs)]: 0:00:18 (18)
+SBY 23:56:30 [corr_taskBMC] summary: Elapsed process time [H:MM:SS (secs)]: 0:00:19 (19)
+SBY 23:56:30 [corr_taskBMC] summary: engine_0 (smtbmc yices) returned FAIL
+SBY 23:56:30 [corr_taskBMC] summary: counterexample trace: corr_taskBMC/engine_0/trace.vcd
+SBY 23:56:30 [corr_taskBMC] DONE (FAIL, rc=2)
+SBY 23:56:30 The following tasks failed: ['taskBMC']
+Adding counterexample: (short_B=1322, short_A=3371, f3=0) -> (ALUArea.alu_result=597)
+Correctness oracle returned false, synthesizing new candidates
+calling io oracle
+Beginning sample
+Sampled Tile->lft_tile_regs_13@13=597
+io oracle result: inputs: short_B=0x52a, short_A=0xd2b, f3=0x0; outputs: ALUArea.alu_result=0x255
+Running synthesis...
+Synthesis done, candidates are:
+    alu_result = (short_A,short_B,f3) -> (f3 == 3'h0) ? (({{20{short_A[11]}}, short_A}) + ({{20{short_B[11]}}, short_B})) : ((f3 == 3'h4) ? (({{20{short_A[11]}}, short_A}) - (({{20{short_A[11]}}, short_A}) + (({{20{short_A[11]}}, short_A}) | (({{20{short_A[11]}}, short_A}) - (({{20{short_A[11]}}, short_A}) + ({{20{short_B[11]}}, short_B})))))) : ((f3 == 3'h7) ? (({{20{short_A[11]}}, short_A}) + (({{20{short_B[11]}}, short_B}) - (({{20{short_A[11]}}, short_A}) | ({{20{short_B[11]}}, short_B})))) : (({{20{short_A[11]}}, short_A}) | ({{20{short_B[11]}}, short_B}))))
+calling corr oracle
+SBY 23:56:30 [corr_taskBMC] Removing directory '/home/jhshi/research/easyila/designs/riscv-mini/symbiyosys/corr_taskBMC'.
+SBY 23:56:30 [corr_taskBMC] Copy '/home/jhshi/research/easyila/designs/riscv-mini/symbiyosys/TileM.v' to '/home/jhshi/research/easyila/designs/riscv-mini/symbiyosys/corr_taskBMC/src/TileM.v'.
+SBY 23:56:30 [corr_taskBMC] Copy '/home/jhshi/research/easyila/designs/riscv-mini/symbiyosys/Formal.v' to '/home/jhshi/research/easyila/designs/riscv-mini/symbiyosys/corr_taskBMC/src/Formal.v'.
+SBY 23:56:30 [corr_taskBMC] engine_0: smtbmc yices
+SBY 23:56:30 [corr_taskBMC] base: starting process "cd corr_taskBMC/src; yosys -ql ../model/design.log ../model/design.ys"
+SBY 23:56:33 [corr_taskBMC] base: finished (returncode=0)
+SBY 23:56:33 [corr_taskBMC] smt2: starting process "cd corr_taskBMC/model; yosys -ql design_smt2.log design_smt2.ys"
+SBY 23:56:33 [corr_taskBMC] smt2: finished (returncode=0)
+SBY 23:56:33 [corr_taskBMC] engine_0: starting process "cd corr_taskBMC; yosys-smtbmc -s yices --presat --unroll --noprogress -t 15  --append 0 --dump-vcd engine_0/trace.vcd --dump-vlogtb engine_0/trace_tb.v --dump-smtc engine_0/trace.smtc model/design_smt2.smt2"
+SBY 23:56:33 [corr_taskBMC] engine_0: ##   0:00:00  Solver: yices
+SBY 23:56:33 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 0..
+SBY 23:56:33 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 0..
+SBY 23:56:33 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 1..
+SBY 23:56:33 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 1..
+SBY 23:56:33 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 2..
+SBY 23:56:33 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 2..
+SBY 23:56:33 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 3..
+SBY 23:56:33 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 3..
+SBY 23:56:34 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 4..
+SBY 23:56:34 [corr_taskBMC] engine_0: ##   0:00:01  Checking assertions in step 4..
+SBY 23:56:34 [corr_taskBMC] engine_0: ##   0:00:01  Checking assumptions in step 5..
+SBY 23:56:34 [corr_taskBMC] engine_0: ##   0:00:01  Checking assertions in step 5..
+SBY 23:56:34 [corr_taskBMC] engine_0: ##   0:00:01  Checking assumptions in step 6..
+SBY 23:56:35 [corr_taskBMC] engine_0: ##   0:00:02  Checking assertions in step 6..
+SBY 23:56:35 [corr_taskBMC] engine_0: ##   0:00:02  Checking assumptions in step 7..
+SBY 23:56:36 [corr_taskBMC] engine_0: ##   0:00:03  Checking assertions in step 7..
+SBY 23:56:36 [corr_taskBMC] engine_0: ##   0:00:03  Checking assumptions in step 8..
+SBY 23:56:38 [corr_taskBMC] engine_0: ##   0:00:05  Checking assertions in step 8..
+SBY 23:56:39 [corr_taskBMC] engine_0: ##   0:00:05  Checking assumptions in step 9..
+SBY 23:56:40 [corr_taskBMC] engine_0: ##   0:00:07  Checking assertions in step 9..
+SBY 23:56:40 [corr_taskBMC] engine_0: ##   0:00:07  Checking assumptions in step 10..
+SBY 23:56:40 [corr_taskBMC] engine_0: ##   0:00:07  Checking assertions in step 10..
+SBY 23:56:41 [corr_taskBMC] engine_0: ##   0:00:07  Checking assumptions in step 11..
+SBY 23:56:41 [corr_taskBMC] engine_0: ##   0:00:08  Checking assertions in step 11..
+SBY 23:56:41 [corr_taskBMC] engine_0: ##   0:00:08  Checking assumptions in step 12..
+SBY 23:56:42 [corr_taskBMC] engine_0: ##   0:00:09  Checking assertions in step 12..
+SBY 23:56:42 [corr_taskBMC] engine_0: ##   0:00:09  Checking assumptions in step 13..
+SBY 23:56:45 [corr_taskBMC] engine_0: ##   0:00:12  Checking assertions in step 13..
+SBY 23:56:45 [corr_taskBMC] engine_0: ##   0:00:12  Checking assumptions in step 14..
+SBY 23:56:48 [corr_taskBMC] engine_0: ##   0:00:14  Checking assertions in step 14..
+SBY 23:56:48 [corr_taskBMC] engine_0: ##   0:00:15  BMC failed!
+SBY 23:56:48 [corr_taskBMC] engine_0: ##   0:00:15  Value for anyconst Tile.__shadow_short_B (Formal.v:0.0-0.0): 3306
+SBY 23:56:48 [corr_taskBMC] engine_0: ##   0:00:15  Value for anyconst Tile.__shadow_short_A (Formal.v:0.0-0.0): 1675
+SBY 23:56:48 [corr_taskBMC] engine_0: ##   0:00:15  Value for anyconst Tile.__shadow_f3 (Formal.v:0.0-0.0): 4
+SBY 23:56:48 [corr_taskBMC] engine_0: ##   0:00:15  Assert failed in Tile: Formal.v:513.49-514.73
+SBY 23:56:48 [corr_taskBMC] engine_0: ##   0:00:15  Writing trace to VCD file: engine_0/trace.vcd
+SBY 23:56:50 [corr_taskBMC] engine_0: ##   0:00:17  Writing trace to Verilog testbench: engine_0/trace_tb.v
+SBY 23:56:50 [corr_taskBMC] engine_0: ##   0:00:17  Writing trace to constraints file: engine_0/trace.smtc
+SBY 23:56:50 [corr_taskBMC] engine_0: ##   0:00:17  Status: failed
+SBY 23:56:50 [corr_taskBMC] engine_0: finished (returncode=1)
+SBY 23:56:50 [corr_taskBMC] engine_0: Status returned by engine: FAIL
+SBY 23:56:50 [corr_taskBMC] summary: Elapsed clock time [H:MM:SS (secs)]: 0:00:19 (19)
+SBY 23:56:50 [corr_taskBMC] summary: Elapsed process time [H:MM:SS (secs)]: 0:00:19 (19)
+SBY 23:56:50 [corr_taskBMC] summary: engine_0 (smtbmc yices) returned FAIL
+SBY 23:56:50 [corr_taskBMC] summary: counterexample trace: corr_taskBMC/engine_0/trace.vcd
+SBY 23:56:50 [corr_taskBMC] DONE (FAIL, rc=2)
+SBY 23:56:50 The following tasks failed: ['taskBMC']
+Adding counterexample: (short_B=3306, short_A=1675, f3=4) -> (ALUArea.alu_result=4294965857)
+Correctness oracle returned false, synthesizing new candidates
+calling io oracle
+Beginning sample
+Sampled Tile->lft_tile_regs_13@13=4294965857
+io oracle result: inputs: short_B=0xcea, short_A=0x68b, f3=0x4; outputs: ALUArea.alu_result=0xfffffa61
+Running synthesis...
+Synthesis done, candidates are:
+    alu_result = (short_A,short_B,f3) -> (f3 == 3'h4) ? ((({{20{short_A[11]}}, short_A}) | ({{20{short_B[11]}}, short_B})) - (({{20{short_A[11]}}, short_A}) + (({{20{short_B[11]}}, short_B}) - (({{20{short_A[11]}}, short_A}) | ({{20{short_B[11]}}, short_B}))))) : ((f3 == 3'h7) ? (({{20{short_A[11]}}, short_A}) + (({{20{short_B[11]}}, short_B}) - (({{20{short_A[11]}}, short_A}) | ({{20{short_B[11]}}, short_B})))) : ((f3 == 3'h6) ? (({{20{short_A[11]}}, short_A}) | ({{20{short_B[11]}}, short_B})) : (({{20{short_A[11]}}, short_A}) + ({{20{short_B[11]}}, short_B}))))
+calling corr oracle
+SBY 23:56:51 [corr_taskBMC] Removing directory '/home/jhshi/research/easyila/designs/riscv-mini/symbiyosys/corr_taskBMC'.
+SBY 23:56:51 [corr_taskBMC] Copy '/home/jhshi/research/easyila/designs/riscv-mini/symbiyosys/TileM.v' to '/home/jhshi/research/easyila/designs/riscv-mini/symbiyosys/corr_taskBMC/src/TileM.v'.
+SBY 23:56:51 [corr_taskBMC] Copy '/home/jhshi/research/easyila/designs/riscv-mini/symbiyosys/Formal.v' to '/home/jhshi/research/easyila/designs/riscv-mini/symbiyosys/corr_taskBMC/src/Formal.v'.
+SBY 23:56:51 [corr_taskBMC] engine_0: smtbmc yices
+SBY 23:56:51 [corr_taskBMC] base: starting process "cd corr_taskBMC/src; yosys -ql ../model/design.log ../model/design.ys"
+SBY 23:56:53 [corr_taskBMC] base: finished (returncode=0)
+SBY 23:56:53 [corr_taskBMC] smt2: starting process "cd corr_taskBMC/model; yosys -ql design_smt2.log design_smt2.ys"
+SBY 23:56:53 [corr_taskBMC] smt2: finished (returncode=0)
+SBY 23:56:53 [corr_taskBMC] engine_0: starting process "cd corr_taskBMC; yosys-smtbmc -s yices --presat --unroll --noprogress -t 15  --append 0 --dump-vcd engine_0/trace.vcd --dump-vlogtb engine_0/trace_tb.v --dump-smtc engine_0/trace.smtc model/design_smt2.smt2"
+SBY 23:56:53 [corr_taskBMC] engine_0: ##   0:00:00  Solver: yices
+SBY 23:56:54 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 0..
+SBY 23:56:54 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 0..
+SBY 23:56:54 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 1..
+SBY 23:56:54 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 1..
+SBY 23:56:54 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 2..
+SBY 23:56:54 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 2..
+SBY 23:56:54 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 3..
+SBY 23:56:54 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 3..
+SBY 23:56:54 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 4..
+SBY 23:56:54 [corr_taskBMC] engine_0: ##   0:00:01  Checking assertions in step 4..
+SBY 23:56:55 [corr_taskBMC] engine_0: ##   0:00:01  Checking assumptions in step 5..
+SBY 23:56:55 [corr_taskBMC] engine_0: ##   0:00:01  Checking assertions in step 5..
+SBY 23:56:55 [corr_taskBMC] engine_0: ##   0:00:01  Checking assumptions in step 6..
+SBY 23:56:55 [corr_taskBMC] engine_0: ##   0:00:02  Checking assertions in step 6..
+SBY 23:56:56 [corr_taskBMC] engine_0: ##   0:00:02  Checking assumptions in step 7..
+SBY 23:56:56 [corr_taskBMC] engine_0: ##   0:00:03  Checking assertions in step 7..
+SBY 23:56:57 [corr_taskBMC] engine_0: ##   0:00:03  Checking assumptions in step 8..
+SBY 23:56:59 [corr_taskBMC] engine_0: ##   0:00:05  Checking assertions in step 8..
+SBY 23:56:59 [corr_taskBMC] engine_0: ##   0:00:05  Checking assumptions in step 9..
+SBY 23:57:00 [corr_taskBMC] engine_0: ##   0:00:06  Checking assertions in step 9..
+SBY 23:57:00 [corr_taskBMC] engine_0: ##   0:00:07  Checking assumptions in step 10..
+SBY 23:57:01 [corr_taskBMC] engine_0: ##   0:00:07  Checking assertions in step 10..
+SBY 23:57:01 [corr_taskBMC] engine_0: ##   0:00:07  Checking assumptions in step 11..
+SBY 23:57:01 [corr_taskBMC] engine_0: ##   0:00:07  Checking assertions in step 11..
+SBY 23:57:02 [corr_taskBMC] engine_0: ##   0:00:08  Checking assumptions in step 12..
+SBY 23:57:02 [corr_taskBMC] engine_0: ##   0:00:08  Checking assertions in step 12..
+SBY 23:57:03 [corr_taskBMC] engine_0: ##   0:00:09  Checking assumptions in step 13..
+SBY 23:57:11 [corr_taskBMC] engine_0: ##   0:00:17  Checking assertions in step 13..
+SBY 23:57:12 [corr_taskBMC] engine_0: ##   0:00:18  Checking assumptions in step 14..
+SBY 23:57:54 [corr_taskBMC] engine_0: ##   0:01:00  Checking assertions in step 14..
+SBY 23:57:54 [corr_taskBMC] engine_0: ##   0:01:00  Status: passed
+SBY 23:57:54 [corr_taskBMC] engine_0: finished (returncode=0)
+SBY 23:57:54 [corr_taskBMC] engine_0: Status returned by engine: pass
+SBY 23:57:54 [corr_taskBMC] summary: Elapsed clock time [H:MM:SS (secs)]: 0:01:02 (62)
+SBY 23:57:54 [corr_taskBMC] summary: Elapsed process time [H:MM:SS (secs)]: 0:01:03 (63)
+SBY 23:57:54 [corr_taskBMC] summary: engine_0 (smtbmc yices) returned pass
+SBY 23:57:54 [corr_taskBMC] DONE (PASS, rc=0)
+=== All oracles passed. Found a solution: ===
+    alu_result = (short_A,short_B,f3) -> (f3 == 3'h4) ? ((({{20{short_A[11]}}, short_A}) | ({{20{short_B[11]}}, short_B})) - (({{20{short_A[11]}}, short_A}) + (({{20{short_B[11]}}, short_B}) - (({{20{short_A[11]}}, short_A}) | ({{20{short_B[11]}}, short_B}))))) : ((f3 == 3'h7) ? (({{20{short_A[11]}}, short_A}) + (({{20{short_B[11]}}, short_B}) - (({{20{short_A[11]}}, short_A}) | ({{20{short_B[11]}}, short_B})))) : ((f3 == 3'h6) ? (({{20{short_A[11]}}, short_A}) | ({{20{short_B[11]}}, short_B})) : (({{20{short_A[11]}}, short_A}) + ({{20{short_B[11]}}, short_B}))))
+    alu_result = (define-fun ((short_A (_ BitVec 12)) (short_B (_ BitVec 12)) (f3 (_ BitVec 3))) (_ BitVec 32) (ite (= f3 #b100) (bvsub (bvor ((_ sign_extend 20) short_A) ((_ sign_extend 20) short_B)) (bvadd ((_ sign_extend 20) short_A) (bvsub ((_ sign_extend 20) short_B) (bvor ((_ sign_extend 20) short_A) ((_ sign_extend 20) short_B))))) (ite (= f3 #b111) (bvadd ((_ sign_extend 20) short_A) (bvsub ((_ sign_extend 20) short_B) (bvor ((_ sign_extend 20) short_A) ((_ sign_extend 20) short_B)))) (ite (= f3 #b110) (bvor ((_ sign_extend 20) short_A) ((_ sign_extend 20) short_B)) (bvadd ((_ sign_extend 20) short_A) ((_ sign_extend 20) short_B))))))
++--------------+--------+---------------+---------------+
+|  operation   | counts | total seconds |  avg seconds  |
++--------------+--------+---------------+---------------+
+|   PV_PARSE   |   2    |  2.876925093  |  1.4384625465 |
+| DF_TRAVERSE  |   2    |   1.53287693  |  0.766438465  |
+|  IO_ORACLE   |   5    |  0.030288909  |  0.0060577818 |
+| CORR_ORACLE  |   5    | 140.617070114 | 28.1234140228 |
+| SYNTH_ENGINE |   5    |   1.22082926  |  0.244165852  |
++--------------+--------+---------------+---------------+
+Total runtime: 146.686490981 seconds
+Model contained 2560 state variables and 1 UFs

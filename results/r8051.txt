@@ -1,0 +1,543 @@
+Model r8051 (generated via GeneratedBy.VERILOG_PARSE):
+    inputs=
+        rst : bool,
+        cpu_en : bool,
+        cpu_restart : bool,
+        rom_byte : bv8,
+        rom_vld : bool,
+        ram_rd_byte : bv8,
+        ram_rd_vld : bool
+    outputs=
+        rom_en : bool,
+        rom_addr : bv16,
+        lft_acc : bv8,
+        lft_pc : bv16,
+        lft_psw_c : bool,
+        lft_cmd0 : bv8,
+        lft_cmd1 : bv8,
+        lft_cmd2 : bv8,
+        lft_sp : bv8,
+        lft_psw_ov : bool,
+        lft_psw_ac : bool,
+        lft_psw_other : bv4,
+        lft_dp : bv16,
+        lft_b : bv8,
+        lft_same_flag : bool,
+        lft_same_byte : bv8,
+        lft_data1 : bv8,
+        ram_rd_en_data : bool,
+        ram_rd_en_sfr : bool,
+        ram_rd_en_xdata : bool,
+        ram_rd_addr : bv16,
+        ram_wr_en_data : bool,
+        ram_wr_en_sfr : bool,
+        ram_wr_en_xdata : bool,
+        ram_wr_addr : bv16,
+        ram_wr_byte : bv8
+    state=
+        next_acc : bv8
+    ufs=
+        wr_en_xdata(__free_wr_en_xdata),
+        length3(__free_length3),
+        wr_en_data(__free_wr_en_data),
+        same_flag_data(__free_same_flag_data),
+        read_internal(__free_read_internal),
+        or_out(__free_or_out),
+        work_en(__free_work_en),
+        wr_en_data_idata(__free_wr_en_data_idata),
+        rd_en_data_sfr(__free_rd_en_data_sfr),
+        da_high(__free_da_high),
+        mult(__free_mult),
+        psw_rs(__free_psw_rs),
+        code_base(__free_code_base),
+        wait_en(__free_wait_en),
+        cmda(__free_cmda),
+        wr_en_sfr(__free_wr_en_sfr),
+        low(__free_low),
+        div_ans(__free_div_ans),
+        ram_rd_en_sfr(__free_ram_rd_en_sfr),
+        cmdb(__free_cmdb),
+        wr_psw_rs(__free_wr_psw_rs),
+        same_flag_xdata(__free_same_flag_xdata),
+        wr_acc(__free_wr_acc),
+        cmdc(__free_cmdc),
+        rd_en_data(__free_rd_en_data),
+        use_psw_rs(__free_use_psw_rs),
+        bit_ov(__free_bit_ov),
+        high(__free_high),
+        ram_rd_en_xdata(__free_ram_rd_en_xdata),
+        bit_c(__free_bit_c),
+        wr_dp(__free_wr_dp),
+        and_out(__free_and_out),
+        code_rel(__free_code_rel),
+        psw(__free_psw),
+        use_sp(__free_use_sp),
+        div_rem(__free_div_rem),
+        sp_sub1(__free_sp_sub1),
+        bit_high(__free_bit_high),
+        rd_en_data_idata(__free_rd_en_data_idata),
+        psw_p(__free_psw_p),
+        da_low(__free_da_low),
+        use_acc(__free_use_acc),
+        use_dp(__free_use_dp),
+        rd_en_sfr(__free_rd_en_sfr),
+        rd_en_xdata(__free_rd_en_xdata),
+        wr_en_data_sfr(__free_wr_en_data_sfr),
+        wr_sp(__free_wr_sp),
+        xor_out(__free_xor_out),
+        code_addr(__free_code_addr),
+        add_byte(__free_add_byte),
+        bit_ac(__free_bit_ac),
+        length2r1(__free_length2r1),
+        length2(__free_length2),
+        sp_add1(__free_sp_add1),
+        cmd0(__free_cmd0),
+        pc_add1(__free_pc_add1),
+        ram_rd_en_data(__free_ram_rd_en_data),
+        same_flag_sfr(__free_same_flag_sfr),
+        lft_sp(__free_lft_sp),
+        lft_psw_ov(__free_lft_psw_ov),
+        lft_psw_ac(__free_lft_psw_ac),
+        lft_psw_other(__free_lft_psw_other),
+        lft_dp(__free_lft_dp),
+        lft_b(__free_lft_b),
+        lft_same_flag(__free_lft_same_flag),
+        lft_same_byte(__free_lft_same_byte),
+        ram_rd_addr(__free_ram_rd_addr),
+        ram_wr_en_data(__free_ram_wr_en_data),
+        ram_wr_en_sfr(__free_ram_wr_en_sfr),
+        ram_wr_en_xdata(__free_ram_wr_en_xdata),
+        ram_wr_addr(__free_ram_wr_addr),
+        ram_wr_byte(__free_ram_wr_byte)
+    next_ufs=
+        psw_other(__free_psw_other),
+        rd_wait(__free_rd_wait),
+        sub_flag(__free_sub_flag),
+        same_byte(__free_same_byte),
+        acc(__free_acc),
+        pc(__free_pc),
+        rom_en(__free_rom_en),
+        cmd1(__free_cmd1),
+        psw_ov(__free_psw_ov),
+        wr_bit_byte(__free_wr_bit_byte),
+        data0(__free_data0),
+        wr_addr(__free_wr_addr),
+        rom_wait(__free_rom_wait),
+        wr_byte(__free_wr_byte),
+        add_c(__free_add_c),
+        rom_addr(__free_rom_addr),
+        cmd_flag(__free_cmd_flag),
+        psw_ac(__free_psw_ac),
+        dp(__free_dp),
+        pc_en(__free_pc_en),
+        data1(__free_data1),
+        psw_c(__free_psw_c),
+        b(__free_b),
+        add_a(__free_add_a),
+        same_flag(__free_same_flag),
+        rd_addr(__free_rd_addr),
+        sp(__free_sp),
+        add_b(__free_add_b),
+        cmd2(__free_cmd2)
+    instances=
+    logic=
+        lft_pc: pc,
+        lft_acc: acc,
+        next_acc: (wr_en_sfr && (wr_addr[7:0] == 8'he0)) ? wr_byte : ((((((((((((((md_always19.al_if80_ELSE.al_functioncall297.add_a_rn || md_always19.al_if80_ELSE.al_functioncall298.add_a_di) || md_always19.al_if80_ELSE.al_functioncall299.add_a_ri) || md_always19.al_if80_ELSE.al_functioncall300.add_a_da) || md_always19.al_if80_ELSE.al_functioncall301.addc_a_rn) || md_always19.al_if80_ELSE.al_functioncall302.addc_a_di) || md_always19.al_if80_ELSE.al_functioncall303.addc_a_ri) || md_always19.al_if80_ELSE.al_functioncall304.addc_a_da) || md_always19.al_if80_ELSE.al_functioncall305.subb_a_rn) || md_always19.al_if80_ELSE.al_functioncall306.subb_a_di) || md_always19.al_if80_ELSE.al_functioncall307.subb_a_ri) || md_always19.al_if80_ELSE.al_functioncall308.subb_a_da) || md_always19.al_if80_ELSE.al_functioncall309.inc_a) || md_always19.al_if80_ELSE.al_functioncall310.dec_a) ? add_byte : (md_always19.al_if80_ELSE.al_if81_ELSE.al_functioncall311.mul ? mult[7:0] : (md_always19.al_if80_ELSE.al_if81_ELSE.al_if82_ELSE.al_functioncall312.div ? div_ans : (md_always19.al_if80_ELSE.al_if81_ELSE.al_if82_ELSE.al_if83_ELSE.al_functioncall313.da ? ({da_high,da_low}) : ((((md_always19.al_if80_ELSE.al_if81_ELSE.al_if82_ELSE.al_if83_ELSE.al_if84_ELSE.al_functioncall314.anl_a_rn || md_always19.al_if80_ELSE.al_if81_ELSE.al_if82_ELSE.al_if83_ELSE.al_if84_ELSE.al_functioncall315.anl_a_di) || md_always19.al_if80_ELSE.al_if81_ELSE.al_if82_ELSE.al_if83_ELSE.al_if84_ELSE.al_functioncall316.anl_a_ri) || md_always19.al_if80_ELSE.al_if81_ELSE.al_if82_ELSE.al_if83_ELSE.al_if84_ELSE.al_functioncall317.anl_a_da) ? and_out : ((((md_always19.al_if80_ELSE.al_if81_ELSE.al_if82_ELSE.al_if83_ELSE.al_if84_ELSE.al_if85_ELSE.al_functioncall318.orl_a_rn || md_always19.al_if80_ELSE.al_if81_ELSE.al_if82_ELSE.al_if83_ELSE.al_if84_ELSE.al_if85_ELSE.al_functioncall319.orl_a_di) || md_always19.al_if80_ELSE.al_if81_ELSE.al_if82_ELSE.al_if83_ELSE.al_if84_ELSE.al_if85_ELSE.al_functioncall320.orl_a_ri) || md_always19.al_if80_ELSE.al_if81_ELSE.al_if82_ELSE.al_if83_ELSE.al_if84_ELSE.al_if85_ELSE.al_functioncall321.orl_a_da) ? or_out : ((((md_always19.al_if80_ELSE.al_if81_ELSE.al_if82_ELSE.al_if83_ELSE.al_if84_ELSE.al_if85_ELSE.al_if86_ELSE.al_functioncall322.xrl_a_rn || md_always19.al_if80_ELSE.al_if81_ELSE.al_if82_ELSE.al_if83_ELSE.al_if84_ELSE.al_if85_ELSE.al_if86_ELSE.al_functioncall323.xrl_a_di) || md_always19.al_if80_ELSE.al_if81_ELSE.al_if82_ELSE.al_if83_ELSE.al_if84_ELSE.al_if85_ELSE.al_if86_ELSE.al_functioncall324.xrl_a_ri) || md_always19.al_if80_ELSE.al_if81_ELSE.al_if82_ELSE.al_if83_ELSE.al_if84_ELSE.al_if85_ELSE.al_if86_ELSE.al_functioncall325.xrl_a_da) ? xor_out : (md_always19.al_if80_ELSE.al_if81_ELSE.al_if82_ELSE.al_if83_ELSE.al_if84_ELSE.al_if85_ELSE.al_if86_ELSE.al_if87_ELSE.al_functioncall326.clr_a ? 8'h0 : (md_always19.al_if80_ELSE.al_if81_ELSE.al_if82_ELSE.al_if83_ELSE.al_if84_ELSE.al_if85_ELSE.al_if86_ELSE.al_if87_ELSE.al_if88_ELSE.al_functioncall327.cpl_a ? (~acc) : (md_always19.al_if80_ELSE.al_if81_ELSE.al_if82_ELSE.al_if83_ELSE.al_if84_ELSE.al_if85_ELSE.al_if86_ELSE.al_if87_ELSE.al_if88_ELSE.al_if89_ELSE.al_functioncall328.rl ? ({acc[6:0],((acc[7:7] == 1'h1) ? 1 : 0)}) : (md_always19.al_if80_ELSE.al_if81_ELSE.al_if82_ELSE.al_if83_ELSE.al_if84_ELSE.al_if85_ELSE.al_if86_ELSE.al_if87_ELSE.al_if88_ELSE.al_if89_ELSE.al_if90_ELSE.al_functioncall329.rlc ? ({acc[6:0],psw_c}) : (md_always19.al_if80_ELSE.al_if81_ELSE.al_if82_ELSE.al_if83_ELSE.al_if84_ELSE.al_if85_ELSE.al_if86_ELSE.al_if87_ELSE.al_if88_ELSE.al_if89_ELSE.al_if90_ELSE.al_if91_ELSE.al_functioncall330.rr ? ({((acc[0:0] == 1'h1) ? 1 : 0),acc[7:1]}) : (md_always19.al_if80_ELSE.al_if81_ELSE.al_if82_ELSE.al_if83_ELSE.al_if84_ELSE.al_if85_ELSE.al_if86_ELSE.al_if87_ELSE.al_if88_ELSE.al_if89_ELSE.al_if90_ELSE.al_if91_ELSE.al_if92_ELSE.al_functioncall331.rrc ? ({psw_c,acc[7:1]}) : (md_always19.al_if80_ELSE.al_if81_ELSE.al_if82_ELSE.al_if83_ELSE.al_if84_ELSE.al_if85_ELSE.al_if86_ELSE.al_if87_ELSE.al_if88_ELSE.al_if89_ELSE.al_if90_ELSE.al_if91_ELSE.al_if92_ELSE.al_if93_ELSE.al_functioncall332.swap ? ({acc[3:0],acc[7:4]}) : ((((((((md_always19.al_if80_ELSE.al_if81_ELSE.al_if82_ELSE.al_if83_ELSE.al_if84_ELSE.al_if85_ELSE.al_if86_ELSE.al_if87_ELSE.al_if88_ELSE.al_if89_ELSE.al_if90_ELSE.al_if91_ELSE.al_if92_ELSE.al_if93_ELSE.al_if94_ELSE.al_functioncall333.mov_a_rn || md_always19.al_if80_ELSE.al_if81_ELSE.al_if82_ELSE.al_if83_ELSE.al_if84_ELSE.al_if85_ELSE.al_if86_ELSE.al_if87_ELSE.al_if88_ELSE.al_if89_ELSE.al_if90_ELSE.al_if91_ELSE.al_if92_ELSE.al_if93_ELSE.al_if94_ELSE.al_functioncall334.mov_a_di) || md_always19.al_if80_ELSE.al_if81_ELSE.al_if82_ELSE.al_if83_ELSE.al_if84_ELSE.al_if85_ELSE.al_if86_ELSE.al_if87_ELSE.al_if88_ELSE.al_if89_ELSE.al_if90_ELSE.al_if91_ELSE.al_if92_ELSE.al_if93_ELSE.al_if94_ELSE.al_functioncall335.mov_a_ri) || md_always19.al_if80_ELSE.al_if81_ELSE.al_if82_ELSE.al_if83_ELSE.al_if84_ELSE.al_if85_ELSE.al_if86_ELSE.al_if87_ELSE.al_if88_ELSE.al_if89_ELSE.al_if90_ELSE.al_if91_ELSE.al_if92_ELSE.al_if93_ELSE.al_if94_ELSE.al_functioncall336.movx_a_ri) || md_always19.al_if80_ELSE.al_if81_ELSE.al_if82_ELSE.al_if83_ELSE.al_if84_ELSE.al_if85_ELSE.al_if86_ELSE.al_if87_ELSE.al_if88_ELSE.al_if89_ELSE.al_if90_ELSE.al_if91_ELSE.al_if92_ELSE.al_if93_ELSE.al_if94_ELSE.al_functioncall337.movx_a_dp) || md_always19.al_if80_ELSE.al_if81_ELSE.al_if82_ELSE.al_if83_ELSE.al_if84_ELSE.al_if85_ELSE.al_if86_ELSE.al_if87_ELSE.al_if88_ELSE.al_if89_ELSE.al_if90_ELSE.al_if91_ELSE.al_if92_ELSE.al_if93_ELSE.al_if94_ELSE.al_functioncall338.xch_a_rn) || md_always19.al_if80_ELSE.al_if81_ELSE.al_if82_ELSE.al_if83_ELSE.al_if84_ELSE.al_if85_ELSE.al_if86_ELSE.al_if87_ELSE.al_if88_ELSE.al_if89_ELSE.al_if90_ELSE.al_if91_ELSE.al_if92_ELSE.al_if93_ELSE.al_if94_ELSE.al_functioncall339.xch_a_di) || md_always19.al_if80_ELSE.al_if81_ELSE.al_if82_ELSE.al_if83_ELSE.al_if84_ELSE.al_if85_ELSE.al_if86_ELSE.al_if87_ELSE.al_if88_ELSE.al_if89_ELSE.al_if90_ELSE.al_if91_ELSE.al_if92_ELSE.al_if93_ELSE.al_if94_ELSE.al_functioncall340.xch_a_ri) ? data0 : (((md_always19.al_if80_ELSE.al_if81_ELSE.al_if82_ELSE.al_if83_ELSE.al_if84_ELSE.al_if85_ELSE.al_if86_ELSE.al_if87_ELSE.al_if88_ELSE.al_if89_ELSE.al_if90_ELSE.al_if91_ELSE.al_if92_ELSE.al_if93_ELSE.al_if94_ELSE.al_if95_ELSE.al_functioncall341.mov_a_da || md_always19.al_if80_ELSE.al_if81_ELSE.al_if82_ELSE.al_if83_ELSE.al_if84_ELSE.al_if85_ELSE.al_if86_ELSE.al_if87_ELSE.al_if88_ELSE.al_if89_ELSE.al_if90_ELSE.al_if91_ELSE.al_if92_ELSE.al_if93_ELSE.al_if94_ELSE.al_if95_ELSE.al_functioncall342.movc_a_dp) || md_always19.al_if80_ELSE.al_if81_ELSE.al_if82_ELSE.al_if83_ELSE.al_if84_ELSE.al_if85_ELSE.al_if86_ELSE.al_if87_ELSE.al_if88_ELSE.al_if89_ELSE.al_if90_ELSE.al_if91_ELSE.al_if92_ELSE.al_if93_ELSE.al_if94_ELSE.al_if95_ELSE.al_functioncall343.movc_a_pc) ? cmd0 : acc)))))))))))))))),
+        lft_psw_c: psw_c,
+        lft_cmd0: cmd0,
+        lft_cmd1: cmd1,
+        lft_cmd2: cmd2,
+        lft_data1: data1
+    transition=
+
+Model r8051 (generated via GeneratedBy.VERILOG_PARSE):
+    inputs=
+        rst : bool,
+        cpu_en : bool,
+        cpu_restart : bool,
+        rom_byte : bv8,
+        rom_vld : bool,
+        ram_rd_byte : bv8,
+        ram_rd_vld : bool
+    outputs=
+        rom_en : bool,
+        rom_addr : bv16,
+        lft_acc : bv8,
+        lft_pc : bv16,
+        lft_psw_c : bool,
+        lft_cmd0 : bv8,
+        lft_cmd1 : bv8,
+        lft_cmd2 : bv8,
+        lft_sp : bv8,
+        lft_psw_ov : bool,
+        lft_psw_ac : bool,
+        lft_psw_other : bv4,
+        lft_dp : bv16,
+        lft_b : bv8,
+        lft_same_flag : bool,
+        lft_same_byte : bv8,
+        lft_data1 : bv8,
+        ram_rd_en_data : bool,
+        ram_rd_en_sfr : bool,
+        ram_rd_en_xdata : bool,
+        ram_rd_addr : bv16,
+        ram_wr_en_data : bool,
+        ram_wr_en_sfr : bool,
+        ram_wr_en_xdata : bool,
+        ram_wr_addr : bv16,
+        ram_wr_byte : bv8
+    state=
+    ufs=
+        ram_rd_en_sfr(__free_ram_rd_en_sfr),
+        ram_rd_en_xdata(__free_ram_rd_en_xdata),
+        cmd0(__free_cmd0),
+        ram_rd_en_data(__free_ram_rd_en_data),
+        lft_sp(__free_lft_sp),
+        lft_psw_ov(__free_lft_psw_ov),
+        lft_psw_ac(__free_lft_psw_ac),
+        lft_psw_other(__free_lft_psw_other),
+        lft_dp(__free_lft_dp),
+        lft_b(__free_lft_b),
+        lft_same_flag(__free_lft_same_flag),
+        lft_same_byte(__free_lft_same_byte),
+        ram_rd_addr(__free_ram_rd_addr),
+        ram_wr_en_data(__free_ram_wr_en_data),
+        ram_wr_en_sfr(__free_ram_wr_en_sfr),
+        ram_wr_en_xdata(__free_ram_wr_en_xdata),
+        ram_wr_addr(__free_ram_wr_addr),
+        ram_wr_byte(__free_ram_wr_byte)
+    next_ufs=
+        acc(__free_acc),
+        pc(__free_pc),
+        rom_en(__free_rom_en),
+        cmd1(__free_cmd1),
+        rom_addr(__free_rom_addr),
+        data1(__free_data1),
+        psw_c(__free_psw_c),
+        cmd2(__free_cmd2)
+    instances=
+    logic=
+        lft_pc: pc,
+        lft_acc: acc,
+        lft_psw_c: psw_c,
+        lft_cmd0: cmd0,
+        lft_cmd1: cmd1,
+        lft_cmd2: cmd2,
+        lft_data1: data1
+    transition=
+
+***WARNING: grammar changes type signature of UF r8051.psw_c***
+            original args: (); new args: (lft_data1 : bv8, lft_acc : bv8)
+Copied files!
+Correctness oracle returned false, synthesizing new candidates
+calling io oracle
+Beginning sample
+Sampled tb->lft_psw_c@9=0
+io oracle result: inputs: lft_acc=0xa, lft_data1=0x5; outputs: r8051.psw_c=0x0
+Running synthesis...
+Synthesis done, candidates are:
+    psw_c = (lft_data1,lft_acc) -> !1
+calling corr oracle
+SBY  2:33:54 [corr_taskBMC] Removing directory '/home/jhshi/research/easyila/designs/R8051/symbiyosys/corr_taskBMC'.
+SBY  2:33:54 [corr_taskBMC] Copy '/home/jhshi/research/easyila/designs/R8051/symbiyosys/top.v' to '/home/jhshi/research/easyila/designs/R8051/symbiyosys/corr_taskBMC/src/top.v'.
+SBY  2:33:54 [corr_taskBMC] Copy '/home/jhshi/research/easyila/designs/R8051/symbiyosys/r8051.v' to '/home/jhshi/research/easyila/designs/R8051/symbiyosys/corr_taskBMC/src/r8051.v'.
+SBY  2:33:54 [corr_taskBMC] Copy '/home/jhshi/research/easyila/designs/R8051/symbiyosys/instruction.v' to '/home/jhshi/research/easyila/designs/R8051/symbiyosys/corr_taskBMC/src/instruction.v'.
+SBY  2:33:54 [corr_taskBMC] Copy '/home/jhshi/research/easyila/designs/R8051/symbiyosys/Formal.v' to '/home/jhshi/research/easyila/designs/R8051/symbiyosys/corr_taskBMC/src/Formal.v'.
+SBY  2:33:54 [corr_taskBMC] engine_0: smtbmc yices
+SBY  2:33:54 [corr_taskBMC] base: starting process "cd corr_taskBMC/src; yosys -ql ../model/design.log ../model/design.ys"
+SBY  2:33:54 [corr_taskBMC] base: top.v:0: Warning: System task `$write' outside initial block is unsupported.
+SBY  2:33:56 [corr_taskBMC] base: finished (returncode=0)
+SBY  2:33:56 [corr_taskBMC] smt2: starting process "cd corr_taskBMC/model; yosys -ql design_smt2.log design_smt2.ys"
+SBY  2:33:56 [corr_taskBMC] smt2: finished (returncode=0)
+SBY  2:33:56 [corr_taskBMC] engine_0: starting process "cd corr_taskBMC; yosys-smtbmc -s yices --presat --unroll --noprogress -t 12  --append 0 --dump-vcd engine_0/trace.vcd --dump-vlogtb engine_0/trace_tb.v --dump-smtc engine_0/trace.smtc model/design_smt2.smt2"
+SBY  2:33:56 [corr_taskBMC] engine_0: ##   0:00:00  Solver: yices
+SBY  2:33:56 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 0..
+SBY  2:33:56 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 0..
+SBY  2:33:57 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 1..
+SBY  2:33:57 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 1..
+SBY  2:33:57 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 2..
+SBY  2:33:57 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 2..
+SBY  2:33:57 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 3..
+SBY  2:33:57 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 3..
+SBY  2:33:57 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 4..
+SBY  2:33:57 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 4..
+SBY  2:33:57 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 5..
+SBY  2:33:57 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 5..
+SBY  2:33:57 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 6..
+SBY  2:33:57 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 6..
+SBY  2:33:57 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 7..
+SBY  2:33:57 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 7..
+SBY  2:33:57 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 8..
+SBY  2:33:57 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 8..
+SBY  2:33:57 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 9..
+SBY  2:33:57 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 9..
+SBY  2:33:57 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 10..
+SBY  2:33:57 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 10..
+SBY  2:33:57 [corr_taskBMC] engine_0: ##   0:00:00  BMC failed!
+SBY  2:33:57 [corr_taskBMC] engine_0: ##   0:00:00  Value for anyconst tb.__shadow_lft_data1 (Formal.v:0.0-0.0): 128
+SBY  2:33:57 [corr_taskBMC] engine_0: ##   0:00:00  Value for anyconst tb.__shadow_lft_acc (Formal.v:0.0-0.0): 128
+SBY  2:33:57 [corr_taskBMC] engine_0: ##   0:00:00  Assert failed in tb: Formal.v:57.42-58.59
+SBY  2:33:57 [corr_taskBMC] engine_0: ##   0:00:00  Writing trace to VCD file: engine_0/trace.vcd
+SBY  2:33:57 [corr_taskBMC] engine_0: ##   0:00:00  Writing trace to Verilog testbench: engine_0/trace_tb.v
+SBY  2:33:57 [corr_taskBMC] engine_0: ##   0:00:01  Writing trace to constraints file: engine_0/trace.smtc
+SBY  2:33:57 [corr_taskBMC] engine_0: ##   0:00:01  Status: failed
+SBY  2:33:57 [corr_taskBMC] engine_0: finished (returncode=1)
+SBY  2:33:57 [corr_taskBMC] engine_0: Status returned by engine: FAIL
+SBY  2:33:57 [corr_taskBMC] summary: Elapsed clock time [H:MM:SS (secs)]: 0:00:02 (2)
+SBY  2:33:57 [corr_taskBMC] summary: Elapsed process time [H:MM:SS (secs)]: 0:00:03 (3)
+SBY  2:33:57 [corr_taskBMC] summary: engine_0 (smtbmc yices) returned FAIL
+SBY  2:33:57 [corr_taskBMC] summary: counterexample trace: corr_taskBMC/engine_0/trace.vcd
+SBY  2:33:57 [corr_taskBMC] DONE (FAIL, rc=2)
+SBY  2:33:57 The following tasks failed: ['taskBMC']
+Adding counterexample: (lft_data1=128, lft_acc=128) -> (r8051.psw_c=1)
+Correctness oracle returned false, synthesizing new candidates
+calling io oracle
+Beginning sample
+Sampled tb->lft_psw_c@9=1
+io oracle result: inputs: lft_data1=0x80, lft_acc=0x80; outputs: r8051.psw_c=0x1
+Running synthesis...
+Synthesis done, candidates are:
+    psw_c = (lft_data1,lft_acc) -> ({{1'h0}, lft_data1}) == ({{1'h0}, lft_acc})
+calling corr oracle
+SBY  2:33:57 [corr_taskBMC] Removing directory '/home/jhshi/research/easyila/designs/R8051/symbiyosys/corr_taskBMC'.
+SBY  2:33:57 [corr_taskBMC] Copy '/home/jhshi/research/easyila/designs/R8051/symbiyosys/top.v' to '/home/jhshi/research/easyila/designs/R8051/symbiyosys/corr_taskBMC/src/top.v'.
+SBY  2:33:57 [corr_taskBMC] Copy '/home/jhshi/research/easyila/designs/R8051/symbiyosys/r8051.v' to '/home/jhshi/research/easyila/designs/R8051/symbiyosys/corr_taskBMC/src/r8051.v'.
+SBY  2:33:57 [corr_taskBMC] Copy '/home/jhshi/research/easyila/designs/R8051/symbiyosys/instruction.v' to '/home/jhshi/research/easyila/designs/R8051/symbiyosys/corr_taskBMC/src/instruction.v'.
+SBY  2:33:57 [corr_taskBMC] Copy '/home/jhshi/research/easyila/designs/R8051/symbiyosys/Formal.v' to '/home/jhshi/research/easyila/designs/R8051/symbiyosys/corr_taskBMC/src/Formal.v'.
+SBY  2:33:57 [corr_taskBMC] engine_0: smtbmc yices
+SBY  2:33:57 [corr_taskBMC] base: starting process "cd corr_taskBMC/src; yosys -ql ../model/design.log ../model/design.ys"
+SBY  2:33:58 [corr_taskBMC] base: top.v:0: Warning: System task `$write' outside initial block is unsupported.
+SBY  2:33:59 [corr_taskBMC] base: finished (returncode=0)
+SBY  2:33:59 [corr_taskBMC] smt2: starting process "cd corr_taskBMC/model; yosys -ql design_smt2.log design_smt2.ys"
+SBY  2:33:59 [corr_taskBMC] smt2: finished (returncode=0)
+SBY  2:33:59 [corr_taskBMC] engine_0: starting process "cd corr_taskBMC; yosys-smtbmc -s yices --presat --unroll --noprogress -t 12  --append 0 --dump-vcd engine_0/trace.vcd --dump-vlogtb engine_0/trace_tb.v --dump-smtc engine_0/trace.smtc model/design_smt2.smt2"
+SBY  2:33:59 [corr_taskBMC] engine_0: ##   0:00:00  Solver: yices
+SBY  2:33:59 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 0..
+SBY  2:33:59 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 0..
+SBY  2:34:00 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 1..
+SBY  2:34:00 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 1..
+SBY  2:34:00 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 2..
+SBY  2:34:00 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 2..
+SBY  2:34:00 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 3..
+SBY  2:34:00 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 3..
+SBY  2:34:00 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 4..
+SBY  2:34:00 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 4..
+SBY  2:34:00 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 5..
+SBY  2:34:00 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 5..
+SBY  2:34:00 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 6..
+SBY  2:34:00 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 6..
+SBY  2:34:00 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 7..
+SBY  2:34:00 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 7..
+SBY  2:34:00 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 8..
+SBY  2:34:00 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 8..
+SBY  2:34:00 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 9..
+SBY  2:34:00 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 9..
+SBY  2:34:00 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 10..
+SBY  2:34:00 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 10..
+SBY  2:34:00 [corr_taskBMC] engine_0: ##   0:00:00  BMC failed!
+SBY  2:34:00 [corr_taskBMC] engine_0: ##   0:00:00  Value for anyconst tb.__shadow_lft_data1 (Formal.v:0.0-0.0): 192
+SBY  2:34:00 [corr_taskBMC] engine_0: ##   0:00:00  Value for anyconst tb.__shadow_lft_acc (Formal.v:0.0-0.0): 128
+SBY  2:34:00 [corr_taskBMC] engine_0: ##   0:00:00  Assert failed in tb: Formal.v:57.42-58.59
+SBY  2:34:00 [corr_taskBMC] engine_0: ##   0:00:00  Writing trace to VCD file: engine_0/trace.vcd
+SBY  2:34:00 [corr_taskBMC] engine_0: ##   0:00:00  Writing trace to Verilog testbench: engine_0/trace_tb.v
+SBY  2:34:00 [corr_taskBMC] engine_0: ##   0:00:00  Writing trace to constraints file: engine_0/trace.smtc
+SBY  2:34:00 [corr_taskBMC] engine_0: ##   0:00:01  Status: failed
+SBY  2:34:00 [corr_taskBMC] engine_0: finished (returncode=1)
+SBY  2:34:00 [corr_taskBMC] engine_0: Status returned by engine: FAIL
+SBY  2:34:00 [corr_taskBMC] summary: Elapsed clock time [H:MM:SS (secs)]: 0:00:02 (2)
+SBY  2:34:00 [corr_taskBMC] summary: Elapsed process time [H:MM:SS (secs)]: 0:00:03 (3)
+SBY  2:34:00 [corr_taskBMC] summary: engine_0 (smtbmc yices) returned FAIL
+SBY  2:34:00 [corr_taskBMC] summary: counterexample trace: corr_taskBMC/engine_0/trace.vcd
+SBY  2:34:00 [corr_taskBMC] DONE (FAIL, rc=2)
+SBY  2:34:00 The following tasks failed: ['taskBMC']
+Adding counterexample: (lft_data1=192, lft_acc=128) -> (r8051.psw_c=1)
+Correctness oracle returned false, synthesizing new candidates
+calling io oracle
+Beginning sample
+Sampled tb->lft_psw_c@9=1
+io oracle result: inputs: lft_data1=0xc0, lft_acc=0x80; outputs: r8051.psw_c=0x1
+Running synthesis...
+Synthesis done, candidates are:
+    psw_c = (lft_data1,lft_acc) -> !(({{1'h0}, lft_data1}) < ({{1'h0}, lft_acc}))
+calling corr oracle
+SBY  2:34:01 [corr_taskBMC] Removing directory '/home/jhshi/research/easyila/designs/R8051/symbiyosys/corr_taskBMC'.
+SBY  2:34:01 [corr_taskBMC] Copy '/home/jhshi/research/easyila/designs/R8051/symbiyosys/top.v' to '/home/jhshi/research/easyila/designs/R8051/symbiyosys/corr_taskBMC/src/top.v'.
+SBY  2:34:01 [corr_taskBMC] Copy '/home/jhshi/research/easyila/designs/R8051/symbiyosys/r8051.v' to '/home/jhshi/research/easyila/designs/R8051/symbiyosys/corr_taskBMC/src/r8051.v'.
+SBY  2:34:01 [corr_taskBMC] Copy '/home/jhshi/research/easyila/designs/R8051/symbiyosys/instruction.v' to '/home/jhshi/research/easyila/designs/R8051/symbiyosys/corr_taskBMC/src/instruction.v'.
+SBY  2:34:01 [corr_taskBMC] Copy '/home/jhshi/research/easyila/designs/R8051/symbiyosys/Formal.v' to '/home/jhshi/research/easyila/designs/R8051/symbiyosys/corr_taskBMC/src/Formal.v'.
+SBY  2:34:01 [corr_taskBMC] engine_0: smtbmc yices
+SBY  2:34:01 [corr_taskBMC] base: starting process "cd corr_taskBMC/src; yosys -ql ../model/design.log ../model/design.ys"
+SBY  2:34:01 [corr_taskBMC] base: top.v:0: Warning: System task `$write' outside initial block is unsupported.
+SBY  2:34:02 [corr_taskBMC] base: finished (returncode=0)
+SBY  2:34:02 [corr_taskBMC] smt2: starting process "cd corr_taskBMC/model; yosys -ql design_smt2.log design_smt2.ys"
+SBY  2:34:02 [corr_taskBMC] smt2: finished (returncode=0)
+SBY  2:34:02 [corr_taskBMC] engine_0: starting process "cd corr_taskBMC; yosys-smtbmc -s yices --presat --unroll --noprogress -t 12  --append 0 --dump-vcd engine_0/trace.vcd --dump-vlogtb engine_0/trace_tb.v --dump-smtc engine_0/trace.smtc model/design_smt2.smt2"
+SBY  2:34:02 [corr_taskBMC] engine_0: ##   0:00:00  Solver: yices
+SBY  2:34:03 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 0..
+SBY  2:34:03 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 0..
+SBY  2:34:03 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 1..
+SBY  2:34:03 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 1..
+SBY  2:34:03 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 2..
+SBY  2:34:03 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 2..
+SBY  2:34:03 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 3..
+SBY  2:34:03 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 3..
+SBY  2:34:03 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 4..
+SBY  2:34:03 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 4..
+SBY  2:34:03 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 5..
+SBY  2:34:03 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 5..
+SBY  2:34:03 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 6..
+SBY  2:34:03 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 6..
+SBY  2:34:03 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 7..
+SBY  2:34:03 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 7..
+SBY  2:34:03 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 8..
+SBY  2:34:03 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 8..
+SBY  2:34:03 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 9..
+SBY  2:34:03 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 9..
+SBY  2:34:03 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 10..
+SBY  2:34:03 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 10..
+SBY  2:34:03 [corr_taskBMC] engine_0: ##   0:00:00  BMC failed!
+SBY  2:34:03 [corr_taskBMC] engine_0: ##   0:00:00  Value for anyconst tb.__shadow_lft_data1 (Formal.v:0.0-0.0): 128
+SBY  2:34:03 [corr_taskBMC] engine_0: ##   0:00:00  Value for anyconst tb.__shadow_lft_acc (Formal.v:0.0-0.0): 192
+SBY  2:34:03 [corr_taskBMC] engine_0: ##   0:00:00  Assert failed in tb: Formal.v:57.42-58.59
+SBY  2:34:03 [corr_taskBMC] engine_0: ##   0:00:00  Writing trace to VCD file: engine_0/trace.vcd
+SBY  2:34:03 [corr_taskBMC] engine_0: ##   0:00:00  Writing trace to Verilog testbench: engine_0/trace_tb.v
+SBY  2:34:03 [corr_taskBMC] engine_0: ##   0:00:00  Writing trace to constraints file: engine_0/trace.smtc
+SBY  2:34:03 [corr_taskBMC] engine_0: ##   0:00:00  Status: failed
+SBY  2:34:03 [corr_taskBMC] engine_0: finished (returncode=1)
+SBY  2:34:03 [corr_taskBMC] engine_0: Status returned by engine: FAIL
+SBY  2:34:03 [corr_taskBMC] summary: Elapsed clock time [H:MM:SS (secs)]: 0:00:02 (2)
+SBY  2:34:03 [corr_taskBMC] summary: Elapsed process time [H:MM:SS (secs)]: 0:00:03 (3)
+SBY  2:34:03 [corr_taskBMC] summary: engine_0 (smtbmc yices) returned FAIL
+SBY  2:34:03 [corr_taskBMC] summary: counterexample trace: corr_taskBMC/engine_0/trace.vcd
+SBY  2:34:03 [corr_taskBMC] DONE (FAIL, rc=2)
+SBY  2:34:03 The following tasks failed: ['taskBMC']
+Adding counterexample: (lft_data1=128, lft_acc=192) -> (r8051.psw_c=1)
+Correctness oracle returned false, synthesizing new candidates
+calling io oracle
+Beginning sample
+Sampled tb->lft_psw_c@9=1
+io oracle result: inputs: lft_data1=0x80, lft_acc=0xc0; outputs: r8051.psw_c=0x1
+Running synthesis...
+Synthesis done, candidates are:
+    psw_c = (lft_data1,lft_acc) -> ({{1'h0}, lft_acc}) < (({{1'h0}, lft_data1}) + ({{1'h0}, lft_data1}))
+calling corr oracle
+SBY  2:34:04 [corr_taskBMC] Removing directory '/home/jhshi/research/easyila/designs/R8051/symbiyosys/corr_taskBMC'.
+SBY  2:34:04 [corr_taskBMC] Copy '/home/jhshi/research/easyila/designs/R8051/symbiyosys/top.v' to '/home/jhshi/research/easyila/designs/R8051/symbiyosys/corr_taskBMC/src/top.v'.
+SBY  2:34:04 [corr_taskBMC] Copy '/home/jhshi/research/easyila/designs/R8051/symbiyosys/r8051.v' to '/home/jhshi/research/easyila/designs/R8051/symbiyosys/corr_taskBMC/src/r8051.v'.
+SBY  2:34:04 [corr_taskBMC] Copy '/home/jhshi/research/easyila/designs/R8051/symbiyosys/instruction.v' to '/home/jhshi/research/easyila/designs/R8051/symbiyosys/corr_taskBMC/src/instruction.v'.
+SBY  2:34:04 [corr_taskBMC] Copy '/home/jhshi/research/easyila/designs/R8051/symbiyosys/Formal.v' to '/home/jhshi/research/easyila/designs/R8051/symbiyosys/corr_taskBMC/src/Formal.v'.
+SBY  2:34:04 [corr_taskBMC] engine_0: smtbmc yices
+SBY  2:34:04 [corr_taskBMC] base: starting process "cd corr_taskBMC/src; yosys -ql ../model/design.log ../model/design.ys"
+SBY  2:34:04 [corr_taskBMC] base: top.v:0: Warning: System task `$write' outside initial block is unsupported.
+SBY  2:34:05 [corr_taskBMC] base: finished (returncode=0)
+SBY  2:34:05 [corr_taskBMC] smt2: starting process "cd corr_taskBMC/model; yosys -ql design_smt2.log design_smt2.ys"
+SBY  2:34:05 [corr_taskBMC] smt2: finished (returncode=0)
+SBY  2:34:05 [corr_taskBMC] engine_0: starting process "cd corr_taskBMC; yosys-smtbmc -s yices --presat --unroll --noprogress -t 12  --append 0 --dump-vcd engine_0/trace.vcd --dump-vlogtb engine_0/trace_tb.v --dump-smtc engine_0/trace.smtc model/design_smt2.smt2"
+SBY  2:34:05 [corr_taskBMC] engine_0: ##   0:00:00  Solver: yices
+SBY  2:34:06 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 0..
+SBY  2:34:06 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 0..
+SBY  2:34:06 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 1..
+SBY  2:34:06 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 1..
+SBY  2:34:06 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 2..
+SBY  2:34:06 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 2..
+SBY  2:34:06 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 3..
+SBY  2:34:06 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 3..
+SBY  2:34:06 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 4..
+SBY  2:34:06 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 4..
+SBY  2:34:06 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 5..
+SBY  2:34:06 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 5..
+SBY  2:34:06 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 6..
+SBY  2:34:06 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 6..
+SBY  2:34:06 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 7..
+SBY  2:34:06 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 7..
+SBY  2:34:06 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 8..
+SBY  2:34:06 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 8..
+SBY  2:34:06 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 9..
+SBY  2:34:06 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 9..
+SBY  2:34:06 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 10..
+SBY  2:34:06 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 10..
+SBY  2:34:06 [corr_taskBMC] engine_0: ##   0:00:00  BMC failed!
+SBY  2:34:06 [corr_taskBMC] engine_0: ##   0:00:00  Value for anyconst tb.__shadow_lft_data1 (Formal.v:0.0-0.0): 128
+SBY  2:34:06 [corr_taskBMC] engine_0: ##   0:00:00  Value for anyconst tb.__shadow_lft_acc (Formal.v:0.0-0.0): 64
+SBY  2:34:06 [corr_taskBMC] engine_0: ##   0:00:00  Assert failed in tb: Formal.v:57.42-58.59
+SBY  2:34:06 [corr_taskBMC] engine_0: ##   0:00:00  Writing trace to VCD file: engine_0/trace.vcd
+SBY  2:34:06 [corr_taskBMC] engine_0: ##   0:00:00  Writing trace to Verilog testbench: engine_0/trace_tb.v
+SBY  2:34:06 [corr_taskBMC] engine_0: ##   0:00:00  Writing trace to constraints file: engine_0/trace.smtc
+SBY  2:34:06 [corr_taskBMC] engine_0: ##   0:00:00  Status: failed
+SBY  2:34:06 [corr_taskBMC] engine_0: finished (returncode=1)
+SBY  2:34:06 [corr_taskBMC] engine_0: Status returned by engine: FAIL
+SBY  2:34:06 [corr_taskBMC] summary: Elapsed clock time [H:MM:SS (secs)]: 0:00:02 (2)
+SBY  2:34:06 [corr_taskBMC] summary: Elapsed process time [H:MM:SS (secs)]: 0:00:02 (2)
+SBY  2:34:06 [corr_taskBMC] summary: engine_0 (smtbmc yices) returned FAIL
+SBY  2:34:06 [corr_taskBMC] summary: counterexample trace: corr_taskBMC/engine_0/trace.vcd
+SBY  2:34:06 [corr_taskBMC] DONE (FAIL, rc=2)
+SBY  2:34:06 The following tasks failed: ['taskBMC']
+Adding counterexample: (lft_data1=128, lft_acc=64) -> (r8051.psw_c=0)
+Correctness oracle returned false, synthesizing new candidates
+calling io oracle
+Beginning sample
+Sampled tb->lft_psw_c@9=0
+io oracle result: inputs: lft_data1=0x80, lft_acc=0x40; outputs: r8051.psw_c=0x0
+Running synthesis...
+Synthesis done, candidates are:
+    psw_c = (lft_data1,lft_acc) -> ({{1'h0}, 8'hff}) < (({{1'h0}, lft_data1}) + ({{1'h0}, lft_acc}))
+calling corr oracle
+SBY  2:34:07 [corr_taskBMC] Removing directory '/home/jhshi/research/easyila/designs/R8051/symbiyosys/corr_taskBMC'.
+SBY  2:34:07 [corr_taskBMC] Copy '/home/jhshi/research/easyila/designs/R8051/symbiyosys/top.v' to '/home/jhshi/research/easyila/designs/R8051/symbiyosys/corr_taskBMC/src/top.v'.
+SBY  2:34:07 [corr_taskBMC] Copy '/home/jhshi/research/easyila/designs/R8051/symbiyosys/r8051.v' to '/home/jhshi/research/easyila/designs/R8051/symbiyosys/corr_taskBMC/src/r8051.v'.
+SBY  2:34:07 [corr_taskBMC] Copy '/home/jhshi/research/easyila/designs/R8051/symbiyosys/instruction.v' to '/home/jhshi/research/easyila/designs/R8051/symbiyosys/corr_taskBMC/src/instruction.v'.
+SBY  2:34:07 [corr_taskBMC] Copy '/home/jhshi/research/easyila/designs/R8051/symbiyosys/Formal.v' to '/home/jhshi/research/easyila/designs/R8051/symbiyosys/corr_taskBMC/src/Formal.v'.
+SBY  2:34:07 [corr_taskBMC] engine_0: smtbmc yices
+SBY  2:34:07 [corr_taskBMC] base: starting process "cd corr_taskBMC/src; yosys -ql ../model/design.log ../model/design.ys"
+SBY  2:34:07 [corr_taskBMC] base: top.v:0: Warning: System task `$write' outside initial block is unsupported.
+SBY  2:34:08 [corr_taskBMC] base: finished (returncode=0)
+SBY  2:34:08 [corr_taskBMC] smt2: starting process "cd corr_taskBMC/model; yosys -ql design_smt2.log design_smt2.ys"
+SBY  2:34:08 [corr_taskBMC] smt2: finished (returncode=0)
+SBY  2:34:08 [corr_taskBMC] engine_0: starting process "cd corr_taskBMC; yosys-smtbmc -s yices --presat --unroll --noprogress -t 12  --append 0 --dump-vcd engine_0/trace.vcd --dump-vlogtb engine_0/trace_tb.v --dump-smtc engine_0/trace.smtc model/design_smt2.smt2"
+SBY  2:34:08 [corr_taskBMC] engine_0: ##   0:00:00  Solver: yices
+SBY  2:34:09 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 0..
+SBY  2:34:09 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 0..
+SBY  2:34:09 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 1..
+SBY  2:34:09 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 1..
+SBY  2:34:09 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 2..
+SBY  2:34:09 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 2..
+SBY  2:34:09 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 3..
+SBY  2:34:09 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 3..
+SBY  2:34:09 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 4..
+SBY  2:34:09 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 4..
+SBY  2:34:09 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 5..
+SBY  2:34:09 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 5..
+SBY  2:34:09 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 6..
+SBY  2:34:09 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 6..
+SBY  2:34:09 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 7..
+SBY  2:34:09 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 7..
+SBY  2:34:09 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 8..
+SBY  2:34:09 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 8..
+SBY  2:34:09 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 9..
+SBY  2:34:09 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 9..
+SBY  2:34:09 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 10..
+SBY  2:34:09 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 10..
+SBY  2:34:09 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 11..
+SBY  2:34:09 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 11..
+SBY  2:34:09 [corr_taskBMC] engine_0: ##   0:00:00  Status: passed
+SBY  2:34:09 [corr_taskBMC] engine_0: finished (returncode=0)
+SBY  2:34:09 [corr_taskBMC] engine_0: Status returned by engine: pass
+SBY  2:34:09 [corr_taskBMC] summary: Elapsed clock time [H:MM:SS (secs)]: 0:00:02 (2)
+SBY  2:34:09 [corr_taskBMC] summary: Elapsed process time [H:MM:SS (secs)]: 0:00:02 (2)
+SBY  2:34:09 [corr_taskBMC] summary: engine_0 (smtbmc yices) returned pass
+SBY  2:34:09 [corr_taskBMC] DONE (PASS, rc=0)
+=== All oracles passed. Found a solution: ===
+    psw_c = (lft_data1,lft_acc) -> ({{1'h0}, 8'hff}) < (({{1'h0}, lft_data1}) + ({{1'h0}, lft_acc}))
+    psw_c = (define-fun ((lft_data1 (_ BitVec 8)) (lft_acc (_ BitVec 8))) Bool (bvult ((_ zero_extend 1) #xff) (bvadd ((_ zero_extend 1) lft_data1) ((_ zero_extend 1) lft_acc))))
++--------------+--------+---------------+-----------------------+
+|  operation   | counts | total seconds |      avg seconds      |
++--------------+--------+---------------+-----------------------+
+|   PV_PARSE   |   1    |  1.380060717  |      1.380060717      |
+| DF_TRAVERSE  |   1    |  0.112275845  |      0.112275845      |
+|  IO_ORACLE   |   5    |   0.01428067  |      0.002856134      |
+| CORR_ORACLE  |   5    |  15.001702549 |      3.0003405098     |
+| SYNTH_ENGINE |   5    |   0.01761009  | 0.0035220179999999996 |
++--------------+--------+---------------+-----------------------+
+Total runtime: 16.762017182 seconds
+Model contained 33 state variables and 26 UFs
