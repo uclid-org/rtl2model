@@ -1858,83 +1858,94 @@ Model Datapath (generated via GeneratedBy.VERILOG_PARSE):
         started: _T_301 ? reset : (reset ? reset : reset),
         pc: reset ? ({0,_T_158}) : ((!stall) ? (csr_io_expt ? ({0,csr_io_evec}) : (_T_160 ? ({0,csr_io_epc}) : (_T_162 ? _T_166 : ((!_T_167) ? _T_170 : pc)))) : pc)
 
-Creating pickle at rvmini.pickle
 Copied files!
 Correctness oracle returned false, synthesizing new candidates
 calling io oracle
 Beginning sample
-Sampled Tile->lft_tile_regs_13@13=4294967231
-io oracle result: inputs: short_A=0xcad, short_B=0xbb2, f3=0x6; outputs: ALUArea.alu_result=0xffffffbf
+Sampled Tile->lft_tile_regs_13@13=4294965442
+io oracle result: inputs: short_A=0xdd2, short_B=0x8e3, f3=0x7; outputs: ALUArea.alu_result=0xfffff8c2
 Running synthesis...
 Synthesis done, candidates are:
-    alu_result = (short_A,short_B,f3) -> ({{20{short_A[11]}}, short_A}) | ({{20{short_B[11]}}, short_B})
+    alu_result = (short_A,short_B,f3) -> ({{20{short_A[11]}}, short_A}) + (({{20{short_B[11]}}, short_B}) - (({{20{short_A[11]}}, short_A}) | ({{20{short_B[11]}}, short_B})))
 calling corr oracle
-SBY  5:20:37 [corr_taskBMC] Removing directory '/home/jhshi/research/easyila/designs/riscv-mini/symbiyosys/corr_taskBMC'.
-SBY  5:20:37 [corr_taskBMC] Copy '/home/jhshi/research/easyila/designs/riscv-mini/symbiyosys/TileM.v' to '/home/jhshi/research/easyila/designs/riscv-mini/symbiyosys/corr_taskBMC/src/TileM.v'.
-SBY  5:20:37 [corr_taskBMC] Copy '/home/jhshi/research/easyila/designs/riscv-mini/symbiyosys/Formal.v' to '/home/jhshi/research/easyila/designs/riscv-mini/symbiyosys/corr_taskBMC/src/Formal.v'.
-SBY  5:20:37 [corr_taskBMC] engine_0: smtbmc yices
-SBY  5:20:37 [corr_taskBMC] base: starting process "cd corr_taskBMC/src; yosys -ql ../model/design.log ../model/design.ys"
-SBY  5:20:39 [corr_taskBMC] base: finished (returncode=0)
-SBY  5:20:39 [corr_taskBMC] smt2: starting process "cd corr_taskBMC/model; yosys -ql design_smt2.log design_smt2.ys"
-SBY  5:20:39 [corr_taskBMC] smt2: finished (returncode=0)
-SBY  5:20:39 [corr_taskBMC] engine_0: starting process "cd corr_taskBMC; yosys-smtbmc -s yices --presat --unroll --noprogress -t 15  --append 0 --dump-vcd engine_0/trace.vcd --dump-vlogtb engine_0/trace_tb.v --dump-smtc engine_0/trace.smtc model/design_smt2.smt2"
-SBY  5:20:39 [corr_taskBMC] engine_0: ##   0:00:00  Solver: yices
-SBY  5:20:40 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 0..
-SBY  5:20:40 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 0..
-SBY  5:20:40 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 1..
-SBY  5:20:40 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 1..
-SBY  5:20:40 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 2..
-SBY  5:20:40 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 2..
-SBY  5:20:40 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 3..
-SBY  5:20:40 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 3..
-SBY  5:20:40 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 4..
-SBY  5:20:40 [corr_taskBMC] engine_0: ##   0:00:01  Checking assertions in step 4..
-SBY  5:20:41 [corr_taskBMC] engine_0: ##   0:00:01  Checking assumptions in step 5..
-SBY  5:20:41 [corr_taskBMC] engine_0: ##   0:00:01  Checking assertions in step 5..
-SBY  5:20:41 [corr_taskBMC] engine_0: ##   0:00:01  Checking assumptions in step 6..
-SBY  5:20:41 [corr_taskBMC] engine_0: ##   0:00:01  Checking assertions in step 6..
-SBY  5:20:42 [corr_taskBMC] engine_0: ##   0:00:02  Checking assumptions in step 7..
-SBY  5:20:43 [corr_taskBMC] engine_0: ##   0:00:03  Checking assertions in step 7..
-SBY  5:20:43 [corr_taskBMC] engine_0: ##   0:00:03  Checking assumptions in step 8..
-SBY  5:20:44 [corr_taskBMC] engine_0: ##   0:00:05  Checking assertions in step 8..
-SBY  5:20:45 [corr_taskBMC] engine_0: ##   0:00:05  Checking assumptions in step 9..
-SBY  5:20:47 [corr_taskBMC] engine_0: ##   0:00:07  Checking assertions in step 9..
-SBY  5:20:47 [corr_taskBMC] engine_0: ##   0:00:08  Checking assumptions in step 10..
-SBY  5:20:48 [corr_taskBMC] engine_0: ##   0:00:08  Checking assertions in step 10..
-SBY  5:20:48 [corr_taskBMC] engine_0: ##   0:00:08  Checking assumptions in step 11..
-SBY  5:20:49 [corr_taskBMC] engine_0: ##   0:00:10  Checking assertions in step 11..
-SBY  5:20:50 [corr_taskBMC] engine_0: ##   0:00:10  Checking assumptions in step 12..
-SBY  5:20:55 [corr_taskBMC] engine_0: ##   0:00:15  Checking assertions in step 12..
-SBY  5:20:55 [corr_taskBMC] engine_0: ##   0:00:15  Checking assumptions in step 13..
-SBY  5:21:05 [corr_taskBMC] engine_0: ##   0:00:25  Checking assertions in step 13..
-SBY  5:21:06 [corr_taskBMC] engine_0: ##   0:00:26  Checking assumptions in step 14..
-SBY  5:21:14 [corr_taskBMC] engine_0: ##   0:00:34  Checking assertions in step 14..
-SBY  5:21:14 [corr_taskBMC] engine_0: ##   0:00:34  BMC failed!
-SBY  5:21:14 [corr_taskBMC] engine_0: ##   0:00:34  Value for anyconst Tile.__shadow_short_B (Formal.v:0.0-0.0): 2049
-SBY  5:21:14 [corr_taskBMC] engine_0: ##   0:00:34  Value for anyconst Tile.__shadow_short_A (Formal.v:0.0-0.0): 493
-SBY  5:21:14 [corr_taskBMC] engine_0: ##   0:00:34  Value for anyconst Tile.__shadow_f3 (Formal.v:0.0-0.0): 7
-SBY  5:21:14 [corr_taskBMC] engine_0: ##   0:00:34  Assert failed in Tile: Formal.v:513.49-514.73
-SBY  5:21:14 [corr_taskBMC] engine_0: ##   0:00:34  Writing trace to VCD file: engine_0/trace.vcd
-SBY  5:21:16 [corr_taskBMC] engine_0: ##   0:00:36  Writing trace to Verilog testbench: engine_0/trace_tb.v
-SBY  5:21:16 [corr_taskBMC] engine_0: ##   0:00:36  Writing trace to constraints file: engine_0/trace.smtc
-SBY  5:21:16 [corr_taskBMC] engine_0: ##   0:00:36  Status: failed
-SBY  5:21:16 [corr_taskBMC] engine_0: finished (returncode=1)
-SBY  5:21:16 [corr_taskBMC] engine_0: Status returned by engine: FAIL
-SBY  5:21:16 [corr_taskBMC] summary: Elapsed clock time [H:MM:SS (secs)]: 0:00:39 (39)
-SBY  5:21:16 [corr_taskBMC] summary: Elapsed process time [H:MM:SS (secs)]: 0:00:39 (39)
-SBY  5:21:16 [corr_taskBMC] summary: engine_0 (smtbmc yices) returned FAIL
-SBY  5:21:16 [corr_taskBMC] summary: counterexample trace: corr_taskBMC/engine_0/trace.vcd
-SBY  5:21:16 [corr_taskBMC] DONE (FAIL, rc=2)
-SBY  5:21:16 The following tasks failed: ['taskBMC']
+SBY  5:26:05 [corr_taskBMC] Removing directory '/home/jhshi/research/easyila/designs/riscv-mini/symbiyosys/corr_taskBMC'.
+SBY  5:26:05 [corr_taskBMC] Copy '/home/jhshi/research/easyila/designs/riscv-mini/symbiyosys/TileM.v' to '/home/jhshi/research/easyila/designs/riscv-mini/symbiyosys/corr_taskBMC/src/TileM.v'.
+SBY  5:26:05 [corr_taskBMC] Copy '/home/jhshi/research/easyila/designs/riscv-mini/symbiyosys/Formal.v' to '/home/jhshi/research/easyila/designs/riscv-mini/symbiyosys/corr_taskBMC/src/Formal.v'.
+SBY  5:26:05 [corr_taskBMC] engine_0: smtbmc yices
+SBY  5:26:05 [corr_taskBMC] base: starting process "cd corr_taskBMC/src; yosys -ql ../model/design.log ../model/design.ys"
+SBY  5:26:07 [corr_taskBMC] base: finished (returncode=0)
+SBY  5:26:07 [corr_taskBMC] smt2: starting process "cd corr_taskBMC/model; yosys -ql design_smt2.log design_smt2.ys"
+SBY  5:26:08 [corr_taskBMC] smt2: finished (returncode=0)
+SBY  5:26:08 [corr_taskBMC] engine_0: starting process "cd corr_taskBMC; yosys-smtbmc -s yices --presat --unroll --noprogress -t 15  --append 0 --dump-vcd engine_0/trace.vcd --dump-vlogtb engine_0/trace_tb.v --dump-smtc engine_0/trace.smtc model/design_smt2.smt2"
+SBY  5:26:08 [corr_taskBMC] engine_0: ##   0:00:00  Solver: yices
+SBY  5:26:08 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 0..
+SBY  5:26:08 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 0..
+SBY  5:26:08 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 1..
+SBY  5:26:08 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 1..
+SBY  5:26:08 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 2..
+SBY  5:26:08 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 2..
+SBY  5:26:08 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 3..
+SBY  5:26:08 [corr_taskBMC] engine_0: ##   0:00:00  Checking assertions in step 3..
+SBY  5:26:08 [corr_taskBMC] engine_0: ##   0:00:00  Checking assumptions in step 4..
+SBY  5:26:09 [corr_taskBMC] engine_0: ##   0:00:01  Checking assertions in step 4..
+SBY  5:26:09 [corr_taskBMC] engine_0: ##   0:00:01  Checking assumptions in step 5..
+SBY  5:26:09 [corr_taskBMC] engine_0: ##   0:00:01  Checking assertions in step 5..
+SBY  5:26:09 [corr_taskBMC] engine_0: ##   0:00:01  Checking assumptions in step 6..
+SBY  5:26:10 [corr_taskBMC] engine_0: ##   0:00:01  Checking assertions in step 6..
+SBY  5:26:10 [corr_taskBMC] engine_0: ##   0:00:02  Checking assumptions in step 7..
+SBY  5:26:10 [corr_taskBMC] engine_0: ##   0:00:02  Checking assertions in step 7..
+SBY  5:26:10 [corr_taskBMC] engine_0: ##   0:00:02  Checking assumptions in step 8..
+SBY  5:26:12 [corr_taskBMC] engine_0: ##   0:00:04  Checking assertions in step 8..
+SBY  5:26:12 [corr_taskBMC] engine_0: ##   0:00:04  Checking assumptions in step 9..
+SBY  5:26:14 [corr_taskBMC] engine_0: ##   0:00:06  Checking assertions in step 9..
+SBY  5:26:14 [corr_taskBMC] engine_0: ##   0:00:06  Checking assumptions in step 10..
+SBY  5:26:14 [corr_taskBMC] engine_0: ##   0:00:06  Checking assertions in step 10..
+SBY  5:26:15 [corr_taskBMC] engine_0: ##   0:00:06  Checking assumptions in step 11..
+SBY  5:26:15 [corr_taskBMC] engine_0: ##   0:00:07  Checking assertions in step 11..
+SBY  5:26:15 [corr_taskBMC] engine_0: ##   0:00:07  Checking assumptions in step 12..
+SBY  5:26:16 [corr_taskBMC] engine_0: ##   0:00:08  Checking assertions in step 12..
+SBY  5:26:16 [corr_taskBMC] engine_0: ##   0:00:08  Checking assumptions in step 13..
+SBY  5:26:17 [corr_taskBMC] engine_0: ##   0:00:09  Checking assertions in step 13..
+SBY  5:26:18 [corr_taskBMC] engine_0: ##   0:00:10  Checking assumptions in step 14..
+SBY  5:26:18 [corr_taskBMC] engine_0: ##   0:00:10  Checking assertions in step 14..
+SBY  5:26:19 [corr_taskBMC] engine_0: ##   0:00:11  BMC failed!
+SBY  5:26:19 [corr_taskBMC] engine_0: ##   0:00:11  Value for anyconst Tile.__shadow_short_B (Formal.v:0.0-0.0): 4095
+SBY  5:26:19 [corr_taskBMC] engine_0: ##   0:00:11  Value for anyconst Tile.__shadow_short_A (Formal.v:0.0-0.0): 2066
+SBY  5:26:19 [corr_taskBMC] engine_0: ##   0:00:11  Value for anyconst Tile.__shadow_f3 (Formal.v:0.0-0.0): 4
+SBY  5:26:19 [corr_taskBMC] engine_0: ##   0:00:11  Assert failed in Tile: Formal.v:513.49-514.73
+SBY  5:26:19 [corr_taskBMC] engine_0: ##   0:00:11  Writing trace to VCD file: engine_0/trace.vcd
+SBY  5:26:21 [corr_taskBMC] engine_0: ##   0:00:13  Writing trace to Verilog testbench: engine_0/trace_tb.v
+SBY  5:26:21 [corr_taskBMC] engine_0: ##   0:00:13  Writing trace to constraints file: engine_0/trace.smtc
+SBY  5:26:21 [corr_taskBMC] engine_0: ##   0:00:13  Status: failed
+SBY  5:26:21 [corr_taskBMC] engine_0: finished (returncode=1)
+SBY  5:26:21 [corr_taskBMC] engine_0: Status returned by engine: FAIL
+SBY  5:26:21 [corr_taskBMC] summary: Elapsed clock time [H:MM:SS (secs)]: 0:00:15 (15)
+SBY  5:26:21 [corr_taskBMC] summary: Elapsed process time [H:MM:SS (secs)]: 0:00:15 (15)
+SBY  5:26:21 [corr_taskBMC] summary: engine_0 (smtbmc yices) returned FAIL
+SBY  5:26:21 [corr_taskBMC] summary: counterexample trace: corr_taskBMC/engine_0/trace.vcd
+SBY  5:26:21 [corr_taskBMC] DONE (FAIL, rc=2)
+SBY  5:26:21 The following tasks failed: ['taskBMC']
+Adding counterexample: (short_B=4095, short_A=2066, f3=4) -> (ALUArea.alu_result=2033)
+Correctness oracle returned false, synthesizing new candidates
+calling io oracle
+Beginning sample
+Sampled Tile->lft_tile_regs_13@13=2029
+io oracle result: inputs: short_B=0xfff, short_A=0x812, f3=0x4; outputs: ALUArea.alu_result=0x7ed
+Running synthesis...
+No solution found. There is likely a bug in one of the oracles.
+I/O history:
+inputs: short_A=0xdd2, short_B=0x8e3, f3=0x7; outputs: ALUArea.alu_result=0xfffff8c2
+inputs: short_A=0x812, short_B=0xfff, f3=0x4; outputs: ALUArea.alu_result=0x7ed
+BMC counterexamples:
+inputs: short_B=0xfff, short_A=0x812, f3=0x4; outputs: ALUArea.alu_result=0x7f1
 +--------------+--------+---------------+--------------+
 |  operation   | counts | total seconds | avg seconds  |
 +--------------+--------+---------------+--------------+
-|   PV_PARSE   |   2    |  2.917378805  | 1.4586894025 |
-| DF_TRAVERSE  |   2    |  1.530612005  | 0.7653060025 |
-|  IO_ORACLE   |   1    |  0.005413576  | 0.005413576  |
-| CORR_ORACLE  |   0    |      0.0      |      --      |
-| SYNTH_ENGINE |   1    |  0.003639554  | 0.003639554  |
+|   PV_PARSE   |   2    |  2.851492001  | 1.4257460005 |
+| DF_TRAVERSE  |   2    |  1.517336008  | 0.758668004  |
+|  IO_ORACLE   |   2    |  0.011712227  | 0.0058561135 |
+| CORR_ORACLE  |   1    |  15.873489665 | 15.873489665 |
+| SYNTH_ENGINE |   2    |  0.007040087  | 0.0035200435 |
 +--------------+--------+---------------+--------------+
-Total runtime: 44.004016138 seconds
-EXITED ABNORMALLY; last CORR_ORACLE ran for 39.163696324 seconds
+Total runtime: 20.636113028 seconds
 Model contained 2559 state variables and 2 UFs

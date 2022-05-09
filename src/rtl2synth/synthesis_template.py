@@ -444,7 +444,10 @@ class ModelBuilder(ABC):
                 # Value is always the last token in the line
                 i_val = int(line.split()[-1])
                 in_map[in_var_name_map[var_name]] = i_val
-        top_prefix = self.config.verilator_top + "."
+        if self.config.verilator_top:
+            top_prefix = self.config.verilator_top + "."
+        else:
+            top_prefix = self.model.name + "."
         vcd_r = VcdWrapper(
             os.path.join(self.config.sby_dir, "corr_taskBMC/engine_0/trace.vcd"),
             top_prefix + self.config.clock_name

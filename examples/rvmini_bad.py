@@ -110,7 +110,7 @@ def main():
         "Tile",
         clock_pattern=".*clock",
         defined_modules=[dpath],
-        pickle_path="rvmini.pickle",
+        # pickle_path="rvmini.pickle",
     )
 
     sketch = ProgramSketch(
