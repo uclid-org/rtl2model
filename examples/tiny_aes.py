@@ -65,14 +65,19 @@ def main():
         os.path.join(BASEDIR, "full_tableless.v"),
         "top",
         "clk",
-        defined_modules=[s_table, xs_table],
+        # defined_modules=[s_table, xs_table],
         important_signals=[
             "aes_reg_state",
+            "cmd_word",
+            "ack",
         ],
         pickle_path="tiny_aes.pickle",
+        coi_conf=COIConf.UF_ARGS_COI,
     )
     top.print()
     assert top.validate()
+
+    cmd_word = smt.bv_variable("cmd_word", 32)
 
     # Custom instruction encoding:
     # - (W * 8) | (D * 8) | (A * 16)
@@ -86,14 +91,16 @@ def main():
     # 0xFF10: AES_REG_KEY0
     # 0xFF20: AES_REG_CTR
     sketch = ProgramSketch(
-        inst_word(0x0101FF00),
+        Inst(cmd_word),
+        # inst_word(0x0101FF00),
     )
     signals = [
         S("top", "rst", 1),
-        S("top", "cmd_word", 8),
+        S("top", "cmd_word", 32),
         S("top", "wr", 1),
         S("top", "addr", 16),
         S("top", "data_in", 8),
+        S("top", "in_addr_range", 1),
         S("top", "data_out", 8),
         S("top", "aes_state", 2),
         S("top", "aes_addr", 16),
@@ -101,13 +108,48 @@ def main():
         S("top", "aes_ctr", 16),
     ]
     guidance = Guidance(signals, 22)
-    for sig in ("rst",):
-        guidance.annotate(sig, AnnoType.ASSUME)
+    guidance.annotate("rst", AnnoType.ASSUME)
+    guidance.annotate("cmd_word", {
+        0: AnnoType.Param(cmd_word),
+    })
+    guidance.annotate("in_addr_range", {
+        0: AnnoType.Output(smt.bv_variable("top.in_addr_range", 1)),
+    })
+    start = smt.bv_variable("start", 1)
+    # Workaround for converting boolean expressions to BV1
+    boolterm = smt.bool_variable("boolterm")
+    bv16term = smt.bv_variable("bv16term", 16)
+    grammar = smt.Grammar(
+        bound_vars=(cmd_word,),
+        nonterminals=(start, boolterm, bv16term),
+        terms={
+            start: (
+                boolterm.ite(smt.BVConst(1, 1), smt.BVConst(0, 1)),
+                smt.BVConst(1, 1),
+            ),
+            boolterm: (
+                bv16term < bv16term,
+                bv16term.op_eq(bv16term),
+                smt.BoolConst.T,
+                ~boolterm,
+                boolterm & boolterm,
+                boolterm | boolterm,
+            ),
+            bv16term: (
+                cmd_word[15:0],
+                # Making the range too large causes a segfault
+                *list(smt.BVConst(n, 16) for n in range(0xFF00, 0xFFFF)),
+            ),
+        }
+    )
+    # for tlist in grammar.terms.values():
+    #     for t in tlist:
+    #         print(t.to_sygus2())
     model = TinyAesModel(
         ProjectConfig(os.path.join(BASEDIR, "symbiyosys")),
         sketch,
         top,
-        {},
+        {("top", "in_addr_range"): grammar},
         guidance,
     )
 

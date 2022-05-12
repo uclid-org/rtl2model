@@ -96,11 +96,11 @@ class ModelBuilder(ABC):
         submodel_map = {m.name: m for m in submodels}
         synthfuns = {}
         for (sf_mod, sf_name), g in synthfun_grammars.items():
-            g_binds = g.bound_vars
             maybe_uf = submodel_map[sf_mod].find_uf_p(sf_name)
             if maybe_uf is None:
                 raise Exception(f"Could not find UF {sf_name} in module {sf_mod}")
-            if g_binds != maybe_uf.params:
+            if g is not None and g.bound_vars != maybe_uf.params:
+                g_binds = g.bound_vars
                 print(f"***WARNING: grammar changes type signature of UF {sf_mod}.{sf_name}***")
                 original_args_s = ", ".join(f"{v.name} : {v.sort}" for v in maybe_uf.params)
                 new_args_s = ", ".join(f"{v.name} : {v.sort}" for v in g_binds)
@@ -458,6 +458,7 @@ class ModelBuilder(ABC):
         out_map = {}
         out_annos = self.guidance.get_outputs()
         for sf_ref, sig_name, cc_or_pred in out_annos:
+            sig_name = sig_name.replace("->", ".")
             if isinstance(cc_or_pred, smt.Term):
                 cond = cc_or_pred
                 all_vars = cond.get_vars()
@@ -468,7 +469,7 @@ class ModelBuilder(ABC):
                     }
                     should_sample = cond.eval(values)
                     if should_sample:
-                        out_map[sf_ref] = vcd_r.get_value_at(sig_name.replace("->", "."), cc)
+                        out_map[sf_ref] = vcd_r.get_value_at(sig_name, cc)
             else:
                 out_map[sf_ref] = vcd_r.get_value_at(sig_name, cc_or_pred)
         return in_map, out_map
@@ -565,7 +566,6 @@ class ModelBuilder(ABC):
         prev_candidates = []
         self.build_sim()
         while True:
-            print("Correctness oracle returned false, synthesizing new candidates")
             io_o = self.o_ctx.oracles["io"]
             replayed_inputs = io_o.next_replay_input()
             if replayed_inputs is not None:
@@ -618,12 +618,14 @@ class ModelBuilder(ABC):
                             candidates[uf_name].body,
                         )
                     return model
+                else:
+                    print("Correctness oracle returned false, synthesizing new candidates")
             else:
-                print("No solution found. There is likely a bug in one of the oracles.")
-                print("I/O history:")
+                print("******** No solution found. There is likely a bug in one of the oracles.")
+                print("**** I/O history:")
                 for call in io_o.calls:
                     print(call)
-                print("BMC counterexamples:")
+                print("**** BMC counterexamples:")
                 for cex in io_o.cexs():
                     print(cex)
                 return None
