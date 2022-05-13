@@ -608,7 +608,7 @@ class ModelBuilder(ABC):
                     print("=== All oracles passed. Found a solution: ===")
                     for name, cand in candidates.items():
                         print("   ", name, "=", cand)
-                        print("   ", name, "=", cand.to_sygus2())
+                        print("    sygus:", cand._to_sygus2_fn(name))
                     io_o.save_call_logs()
                     model = self.model
                     for (mod_name, uf_name) in self.sf_map:

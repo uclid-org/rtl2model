@@ -195,6 +195,8 @@ def main():
                 substart + substart,
                 substart - substart,
                 substart | substart,
+                substart & substart,
+                substart ^ substart,
                 boolterm.ite(smt.BVConst(1, 32), smt.BVConst(0, 32)),
                 boolterm.ite(smt.BVConst(0xFFFFF000, 32), smt.BVConst(0, 32)),
                 short_a.sext(20),

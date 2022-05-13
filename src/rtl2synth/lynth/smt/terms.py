@@ -1266,6 +1266,14 @@ class LambdaTerm(Term):
         else:
             raise TypeError("LambdaTerm must be translated from pycvc5.Kind.LAMBDA, instead got " + str(cvc5_term.getKind()))
 
+    def _to_sygus2_fn(self, name: str):
+        """hacky workaround since these aren't named"""
+        return f"(define-fun {name} (" + \
+            " ".join([f"({p.name} {p.sort.to_sygus2()})" for p in self.params]) + ") " + \
+            self.body.sort.to_sygus2() + " " + \
+            self.body.to_sygus2() \
+            + ")"
+
     def to_target_format(self, tgt: TargetFormat, **kwargs):
         if tgt == TargetFormat.CVC5:
             cvc5_ctx = kwargs["cvc5_ctx"]

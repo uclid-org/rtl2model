@@ -25,6 +25,20 @@ class Segment(Enum):
     SYNTH_ENGINE = auto()
     """Time spent in the synthesis engine."""
 
+    def description(self):
+        if self == Segment.PV_PARSE:
+            return "Dataflow parsing from Verilog"
+        elif self == Segment.DF_TRAVERSE:
+            return "Partial model construction from dataflow"
+        elif self == Segment.IO_ORACLE:
+            return "I/O oracle invocation"
+        elif self == Segment.CORR_ORACLE:
+            return "Correctness oracle invocation"
+        elif self == Segment.SYNTH_ENGINE:
+            return "Solver synthesis invocation"
+        raise TypeError()
+
+
 _segments = [
     Segment.PV_PARSE,
     Segment.DF_TRAVERSE,
@@ -32,6 +46,7 @@ _segments = [
     Segment.CORR_ORACLE,
     Segment.SYNTH_ENGINE,
 ]
+
 
 class _ProfileResults:
     def __init__(self):
@@ -64,6 +79,7 @@ class _ProfileResults:
         count_cols = [s.name + " counts" for s in _segments]
         tot_cols = [s.name + " seconds" for s in _segments]
         t = PrettyTable(["operation", "counts", "total seconds", "avg seconds"])
+        rows = []
         for s, times in self.segments.items():
             counts = len(times)
             tot_times = sum(end - start for start, end in times) / 1e9
@@ -71,7 +87,10 @@ class _ProfileResults:
                 avg = "--"
             else:
                 avg = tot_times / counts
-            t.add_row([s.name, counts, tot_times, avg])
+            row = [s.name, counts, tot_times, avg]
+            t.add_row(row)
+            rows.append(row)
+
         print(t)
         print("Total runtime:", (final - self.init_ns) / 1e9, "seconds")
         if self.curr_segment_stack:
@@ -81,5 +100,10 @@ class _ProfileResults:
         m = self.model
         if m is not None:
             print(f"Model contained {m.state_var_count()} state variables and {m.uf_count()} UFs")
+        print("=== CONVENIENCE LATEX BELOW ===")
+        for s, row in zip(_segments, rows):
+            _, counts, tot_times, avg = row
+            avg_str = avg if avg == "--" else f"{avg:.3f}"
+            print(f"{s.description()} & {counts} & {tot_times:.3f} & {avg_str} \\\\")
 
 PROFILE = _ProfileResults()
