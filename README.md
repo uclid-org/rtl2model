@@ -1,4 +1,4 @@
-`rtl2synth` is a Python framework for modeling, synthesis, and verification of hardware designs.
+`rtl2model` is a Python framework for modeling, synthesis, and verification of hardware designs.
 It is an offshoot of a larger hardware lifting project: https://github.com/adwait/hwlifting/
 
 ## Installation
@@ -17,14 +17,14 @@ Run `git submodule init --update --recursive` to get the source code for those f
 - custom build of [pyverilog](https://github.com/PyHDI/Pyverilog/) (`pip3 install -e ./Pyverilog`)
 - custom build of [pyvcd](https://github.com/westerndigitalcorporation/pyvcd) (`pip3 install -e ./pyvcd`)
 
-Finally, run `pip3 install -e .` in this directory to install the `rtl2synth` package. You can then run examples with `python3 examples/rvmini.py`.
+Finally, run `pip3 install -e .` in this directory to install the `rtl2model` package. You can then run examples with `python3 examples/rvmini.py`.
 
-To build documentation, run `pdoc rtl2synth`.
+To build documentation, run `pdoc rtl2model`.
 
 ## Structure
 - `designs`: submodule containing RTL, simulation, and model checking code for each design under test
-- `examples`: example scripts for verifying designs, written using the `rtl2synth` framework
+- `examples`: example scripts for verifying designs, written using the `rtl2model` framework
 - `pyvcd`, `Pyverilog`: git submodules for custom builds of dependencies
 - `scripts`: various utility python and shell scripts
-- `src`: python source code for `rtl2synth` module
-- `tests`: test cases for `rtl2synth`
+- `src`: python source code for `rtl2model` module
+- `tests`: test cases for `rtl2model`

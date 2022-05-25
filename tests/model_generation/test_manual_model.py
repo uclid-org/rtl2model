@@ -1,8 +1,8 @@
 
 import pytest
 
-import rtl2synth.lynth.smt as smt
-from rtl2synth.model import *
+import rtl2model.lynth.smt as smt
+from rtl2model.model import *
 
 class TestManualModel:
     """

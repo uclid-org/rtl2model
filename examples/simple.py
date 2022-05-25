@@ -2,12 +2,12 @@
 import os
 import subprocess
 
-from rtl2synth.guidance import Guidance, AnnoType
-from rtl2synth.synthesis_template import *
-from rtl2synth.sketch import *
-import rtl2synth.gen_config as gen_config
-import rtl2synth.lynth.smt as smt
-from rtl2synth.verilog import *
+from rtl2model.guidance import Guidance, AnnoType
+from rtl2model.synthesis_template import *
+from rtl2model.sketch import *
+import rtl2model.gen_config as gen_config
+import rtl2model.lynth.smt as smt
+from rtl2model.verilog import *
 
 REPO_BASE_DIR = subprocess.run(
     "git rev-parse --show-toplevel",

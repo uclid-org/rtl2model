@@ -1,4 +1,4 @@
-from rtl2synth.sketch import *
+from rtl2model.sketch import *
 
 class TestSketch:
 

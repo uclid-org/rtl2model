@@ -1,7 +1,7 @@
 import textwrap
 
-from rtl2synth.model import Model
-import rtl2synth.lynth.smt as smt
+from rtl2model.model import Model
+import rtl2model.lynth.smt as smt
 
 class TestModelToUclid:
     """

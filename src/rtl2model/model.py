@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 import textwrap
 from typing import Collection, List, Dict, Optional, Tuple
 
-import rtl2synth.lynth.smt as smt
+import rtl2model.lynth.smt as smt
 
 Instruction = Dict[smt.Term, smt.Term]
 """

@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List, Tuple, Set, Optional, Union
 
-import rtl2synth.lynth.smt as smt
+import rtl2model.lynth.smt as smt
 
 
 @dataclass(frozen=True)
@@ -112,7 +112,7 @@ class Guidance:
 
         If the argument is a dict of ints, then just copy it.
 
-        If the argument is a dict mapping `rtl2synth.lynth.smt.Term` to `AnnoType`, it is copied as well.
+        If the argument is a dict mapping `rtl2model.lynth.smt.Term` to `AnnoType`, it is copied as well.
         These predicates will be turned into an "if/elseif" tree, so if two conditions
         are true, only the first will matter.
 

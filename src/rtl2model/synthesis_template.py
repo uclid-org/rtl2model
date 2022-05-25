@@ -9,14 +9,14 @@ from subprocess import Popen, PIPE
 import textwrap
 from typing import List, Mapping, Set
 
-from rtl2synth.common import *
-from rtl2synth.guidance import Guidance
-from rtl2synth.lynth import smt
-import rtl2synth.lynth.oracleinterface as oi
-from rtl2synth.model import *
-from rtl2synth.profile import PROFILE, Segment
-from rtl2synth.sketch import ConcreteProgram, ProgramSketch
-from rtl2synth.verilog import VcdWrapper
+from rtl2model.common import *
+from rtl2model.guidance import Guidance
+from rtl2model.lynth import smt
+import rtl2model.lynth.oracleinterface as oi
+from rtl2model.model import *
+from rtl2model.profile import PROFILE, Segment
+from rtl2model.sketch import ConcreteProgram, ProgramSketch
+from rtl2model.verilog import VcdWrapper
 
 @dataclass
 class ProjectConfig:

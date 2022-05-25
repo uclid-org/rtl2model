@@ -1,5 +1,5 @@
 
-import rtl2synth.lynth.smt as smt
+import rtl2model.lynth.smt as smt
 
 class TestSMTOptimize:
 

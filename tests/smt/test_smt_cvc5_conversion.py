@@ -1,7 +1,7 @@
 
 import cvc5
 
-from rtl2synth.lynth import smt
+from rtl2model.lynth import smt
 
 class TestSmtCvc5Conversion:
     """

@@ -4,8 +4,8 @@ import os
 
 import cvc5
 
-from rtl2synth.lynth import smt
-from rtl2synth.lynth.oracleinterface import *
+from rtl2model.lynth import smt
+from rtl2model.lynth.oracleinterface import *
 
 class TestSMT:
     """

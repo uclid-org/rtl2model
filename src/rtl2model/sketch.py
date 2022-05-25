@@ -7,7 +7,7 @@ Facilities for generating a low-level program sketch.
 from dataclasses import dataclass
 from typing import Dict, List, Tuple, Union, Optional
 
-import rtl2synth.lynth.smt as smt
+import rtl2model.lynth.smt as smt
 
 @dataclass(frozen=True)
 class SketchHole:

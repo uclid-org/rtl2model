@@ -5,8 +5,8 @@ import random
 from subprocess import Popen, PIPE
 from typing import *
 
-import rtl2synth.lynth.smt as smt
-from rtl2synth.profile import PROFILE, Segment
+import rtl2model.lynth.smt as smt
+from rtl2model.profile import PROFILE, Segment
 
 @dataclass
 class CallResult:

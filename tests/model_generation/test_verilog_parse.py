@@ -3,9 +3,9 @@ import textwrap
 
 import pytest
 
-import rtl2synth.lynth.smt as smt
-from rtl2synth.verilog import verilog_to_model
-from rtl2synth.model import Model, Instance, UFPlaceholder
+import rtl2model.lynth.smt as smt
+from rtl2model.verilog import verilog_to_model
+from rtl2model.model import Model, Instance, UFPlaceholder
 
 class TestVerilogParse:
     """

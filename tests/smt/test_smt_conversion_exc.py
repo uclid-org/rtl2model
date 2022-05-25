@@ -7,7 +7,7 @@ import itertools
 
 import pytest
 
-import rtl2synth.lynth.smt as smt
+import rtl2model.lynth.smt as smt
 
 bv4 = smt.BVSort(4)
 x = smt.Variable("x", bv4)

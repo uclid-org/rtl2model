@@ -1,7 +1,7 @@
 
-from rtl2synth.guidance import Guidance, AnnoType
-from rtl2synth.synthesis_template import *
-import rtl2synth.lynth.smt as smt
+from rtl2model.guidance import Guidance, AnnoType
+from rtl2model.synthesis_template import *
+import rtl2model.lynth.smt as smt
 
 class TestGuidance:
 

@@ -9,11 +9,11 @@ from subprocess import Popen, PIPE
 
 import pytest
 
-import rtl2synth
-from rtl2synth.guidance import Guidance, AnnoType
-from rtl2synth.synthesis_template import *
-import rtl2synth.gen_config as gen_config
-import rtl2synth.lynth.smt as smt
+import rtl2model
+from rtl2model.guidance import Guidance, AnnoType
+from rtl2model.synthesis_template import *
+import rtl2model.gen_config as gen_config
+import rtl2model.lynth.smt as smt
 
 REPO_BASE_DIR = subprocess.run(
         "git rev-parse --show-toplevel",

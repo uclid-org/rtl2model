@@ -3,9 +3,9 @@ import textwrap
 
 import pytest
 
-from rtl2synth.verilog.pipeline_partition import *
-import rtl2synth.lynth.smt as smt
-from rtl2synth.model import Model
+from rtl2model.verilog.pipeline_partition import *
+import rtl2model.lynth.smt as smt
+from rtl2model.model import Model
 
 @pytest.mark.skip()
 class TestPartition:

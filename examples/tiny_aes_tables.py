@@ -2,8 +2,8 @@
 Manually constructed models for AES lookup tables to circumvent pyverilog performance issues.
 """
 
-import rtl2synth.lynth.smt as smt
-from rtl2synth.model import Model
+import rtl2model.lynth.smt as smt
+from rtl2model.model import Model
 
 __all__ = ["s_table", "xs_table"]
 

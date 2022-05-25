@@ -24,13 +24,13 @@ import pickle
 import subprocess
 import sys
 
-import rtl2synth.gen_config as gen_config
-from rtl2synth.guidance import Guidance, AnnoType
-from rtl2synth.synthesis_template import *
-from rtl2synth.sketch import *
-import rtl2synth.lynth.smt as smt
-from rtl2synth.model import *
-from rtl2synth.verilog import *
+import rtl2model.gen_config as gen_config
+from rtl2model.guidance import Guidance, AnnoType
+from rtl2model.synthesis_template import *
+from rtl2model.sketch import *
+import rtl2model.lynth.smt as smt
+from rtl2model.model import *
+from rtl2model.verilog import *
 
 from tiny_aes_tables import s_table, xs_table
 
